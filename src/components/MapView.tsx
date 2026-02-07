@@ -282,11 +282,17 @@ export default function MapView({
               <select
                 value={selectedResourceId ?? ''}
                 onChange={(event) => onSelectResource(event.target.value || undefined)}
-                className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white focus:outline-none focus:border-emerald-400/60"
+                className="h-8 rounded-lg bg-[#0b111b] border border-white/10 px-2 text-white focus:outline-none focus:border-emerald-400/60 shadow-inner"
               >
-                <option value="">Выберите ресурс</option>
+                <option value="" className="bg-[#0b111b] text-white">
+                  Выберите ресурс
+                </option>
                 {resources.map((resource) => (
-                  <option key={resource.id} value={resource.id} className="text-black">
+                  <option
+                    key={resource.id}
+                    value={resource.id}
+                    className="bg-[#0b111b] text-white"
+                  >
                     {resource.name}
                   </option>
                 ))}
