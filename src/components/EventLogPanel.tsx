@@ -191,9 +191,16 @@ export default function EventLogPanel({
     [log.entries, log.filters, log.sortByPriority, log.countryScope, activeCountryId],
   );
 
+  const wrapperClass = collapsed
+    ? 'absolute top-24 right-4 z-40 w-[26rem]'
+    : 'absolute top-24 right-4 bottom-24 z-40 w-[26rem]';
+  const panelClass = collapsed
+    ? 'rounded-2xl border border-white/10 bg-black/45 backdrop-blur-xl shadow-2xl'
+    : 'h-full rounded-2xl border border-white/10 bg-black/45 backdrop-blur-xl shadow-2xl flex flex-col';
+
   return (
-    <div className="absolute top-24 right-4 bottom-24 z-40 w-[26rem]">
-      <div className="h-full rounded-2xl border border-white/10 bg-black/45 backdrop-blur-xl shadow-2xl flex flex-col">
+    <div className={wrapperClass}>
+      <div className={panelClass}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div className="flex items-center gap-2 text-white/85 text-sm font-semibold">
             Журнал событий
@@ -222,7 +229,7 @@ export default function EventLogPanel({
             <div className="relative group">
               <button
                 onClick={clearLog}
-                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/70 hover:border-emerald-400/40 flex items-center justify-center"
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/70 hover:border-red-400/60 hover:text-red-300 hover:bg-red-400/10 flex items-center justify-center"
               >
                 <ActionIcon name="clear" />
               </button>
