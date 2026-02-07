@@ -805,9 +805,10 @@ function App() {
 
   const toggleLayer = (id: string) => {
     setMapLayers((prev) => {
-      const next = prev.map((layer) =>
-        layer.id === id ? { ...layer, visible: !layer.visible } : layer,
-      );
+      const next = prev.map((layer) => ({
+        ...layer,
+        visible: layer.id === id,
+      }));
       if (id === 'resources') {
         const resourcesLayer = next.find((layer) => layer.id === id);
         if (resourcesLayer?.visible && !selectedResourceId && resources.length > 0) {

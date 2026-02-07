@@ -400,8 +400,8 @@ export default function EventLogPanel({
   );
 
   return (
-    <div className="fixed bottom-40 right-4 z-40 w-[26rem]">
-      <div className="rounded-2xl border border-white/10 bg-black/45 backdrop-blur-xl shadow-2xl">
+    <div className="absolute top-24 right-4 bottom-24 z-40 w-[26rem]">
+      <div className="h-full rounded-2xl border border-white/10 bg-black/45 backdrop-blur-xl shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div className="flex items-center gap-2 text-white/85 text-sm font-semibold">
             Журнал событий
@@ -502,7 +502,7 @@ export default function EventLogPanel({
               })}
             </div>
 
-            <div className="max-h-72 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-3 legend-scroll">
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-3 legend-scroll">
               {entries.length === 0 ? (
                 <div className="text-xs text-white/50">Нет событий</div>
               ) : (

@@ -1,4 +1,13 @@
-﻿import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Flag,
+  Palette,
+  Mountain,
+  CloudSun,
+  Landmark,
+  Gem,
+  MapPinned,
+} from 'lucide-react';
 import svgPanZoom from 'svg-pan-zoom';
 import mapUrl from '../assets/world-states-provinces.svg';
 import type { MapLayer, MapLayerPaint, Trait } from '../types';
@@ -29,6 +38,16 @@ const layerTone: Record<string, string> = {
   religion: 'from-yellow-300/30 via-purple-400/10 to-transparent',
   resources: 'from-emerald-300/25 via-lime-400/10 to-transparent',
   colonization: 'from-emerald-400/20 via-emerald-500/10 to-transparent',
+};
+
+const layerIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  political: Flag,
+  cultural: Palette,
+  landscape: Mountain,
+  climate: CloudSun,
+  religion: Landmark,
+  resources: Gem,
+  colonization: MapPinned,
 };
 
 const stripeIdFromColor = (color: string) =>
@@ -273,90 +292,104 @@ export default function MapView({
         </div>
       </div>
 
-      {resourcesLayerVisible && (
-        <div className="absolute right-[18.5rem] top-2 z-30 w-56 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-3 shadow-xl">
-          <div className="text-white/80 text-sm font-semibold mb-2">Ресурсы</div>
-          {resources.length > 0 ? (
-            <label className="flex flex-col gap-1 text-xs text-white/70">
-              Ресурс
-              <select
-                value={selectedResourceId ?? ''}
-                onChange={(event) => onSelectResource(event.target.value || undefined)}
-                className="h-8 rounded-lg bg-[#0b111b] border border-white/10 px-2 text-white focus:outline-none focus:border-emerald-400/60 shadow-inner"
-              >
-                <option value="" className="bg-[#0b111b] text-white">
-                  Выберите ресурс
-                </option>
-                {resources.map((resource) => (
-                  <option
-                    key={resource.id}
-                    value={resource.id}
-                    className="bg-[#0b111b] text-white"
-                  >
-                    {resource.name}
+      
+
+      <div className="absolute left-1/2 -translate-x-1/2 bottom-2 -translate-y-[0.1rem] z-30">
+        {resourcesLayerVisible && (
+          <div className="absolute right-full mr-4 bottom-0 w-56 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-3 shadow-xl">
+            <div className="text-white/80 text-sm font-semibold mb-2">Ресурсы</div>
+            {resources.length > 0 ? (
+              <label className="flex flex-col gap-1 text-xs text-white/70">
+                Ресурс
+                <select
+                  value={selectedResourceId ?? ''}
+                  onChange={(event) => onSelectResource(event.target.value || undefined)}
+                  className="h-8 rounded-lg bg-[#0b111b] border border-white/10 px-2 text-white focus:outline-none focus:border-emerald-400/60 shadow-inner"
+                >
+                  <option value="" className="bg-[#0b111b] text-white">
+                    Выберите ресурс
                   </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <div className="text-white/50 text-xs">Нет ресурсов</div>
-          )}
-        </div>
-      )}
+                  {resources.map((resource) => (
+                    <option
+                      key={resource.id}
+                      value={resource.id}
+                      className="bg-[#0b111b] text-white"
+                    >
+                      {resource.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <div className="text-white/50 text-xs">Нет ресурсов</div>
+            )}
+          </div>
+        )}
 
-      <div className="absolute right-4 top-2 z-30 w-64 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-3 shadow-xl">
-        <div className="text-white/80 text-sm font-semibold mb-2">Карты</div>
-        <div className="flex flex-col gap-2">
-          {layers.map((layer) => (
-            <button
-              key={layer.id}
-              onClick={() => onToggleLayer(layer.id)}
-              className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm transition-colors ${
-                layer.visible
-                  ? 'border-emerald-400/40 bg-emerald-500/10 text-white'
-                  : 'border-white/10 bg-white/5 text-white/60 hover:border-emerald-400/30'
-              }`}
-            >
-              <span>{layer.name}</span>
-              <span
-                className={`h-2.5 w-2.5 rounded-full ${
-                  layer.visible ? 'bg-emerald-400' : 'bg-white/30'
-                }`}
-              />
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-3 space-y-3 max-h-48 overflow-y-auto pr-1 legend-scroll">
-          {layers
-            .filter((layer) => layer.visible)
-            .map((layer) => {
-              const legendItems = layerLegends[layer.id] ?? [];
-              if (legendItems.length === 0) return null;
+        <div className="relative rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl px-3 py-2 shadow-2xl">
+          <div className="text-white/80 text-xs font-semibold mb-2 text-center">Слои</div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {layers.map((layer) => {
+              const Icon = layerIconMap[layer.id] ?? Flag;
               return (
-                <div key={`legend-${layer.id}`} className="space-y-1">
-                  <div className="text-white/70 text-xs font-semibold">
+                <button
+                  key={layer.id}
+                  onClick={() => onToggleLayer(layer.id)}
+                  className={`w-11 h-11 rounded-xl border transition-all duration-200 flex items-center justify-center group relative ${
+                    layer.visible
+                      ? 'bg-emerald-500/20 border-emerald-400/50 shadow-lg shadow-emerald-500/20'
+                      : 'bg-black/30 border-white/10 hover:border-emerald-400/50 hover:bg-emerald-400/10 hover:scale-110'
+                  }`}
+                >
+                  <Icon
+                    className={`w-5 h-5 transition-colors ${
+                      layer.visible
+                        ? 'text-emerald-400'
+                        : 'text-white/70 group-hover:text-emerald-400'
+                    }`}
+                  />
+                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                     {layer.name}
                   </div>
-                  <div className="space-y-1">
-                    {legendItems.map((item) => (
-                      <div
-                        key={`${layer.id}-${item.label}`}
-                        className="flex items-center gap-2 text-[11px] text-white/70"
-                      >
-                        <span
-                          className="w-3 h-3 rounded-full border border-white/10"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="truncate">{item.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                </button>
               );
             })}
+          </div>
+          <div className="absolute left-full ml-4 bottom-0 w-64 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-3 shadow-xl">
+            <div className="text-white/80 text-xs font-semibold mb-2">Легенда</div>
+            <div className="mt-3 space-y-3 max-h-48 overflow-y-auto pr-1 legend-scroll">
+              {layers
+                .filter((layer) => layer.visible)
+                .map((layer) => {
+                  const legendItems = layerLegends[layer.id] ?? [];
+                  if (legendItems.length === 0) return null;
+                  return (
+                    <div key={`legend-${layer.id}`} className="space-y-1">
+                      <div className="text-white/70 text-xs font-semibold">
+                        {layer.name}
+                      </div>
+                      <div className="space-y-1">
+                        {legendItems.map((item) => (
+                          <div
+                            key={`${layer.id}-${item.label}`}
+                            className="flex items-center gap-2 text-[11px] text-white/70"
+                          >
+                            <span
+                              className="w-3 h-3 rounded-full border border-white/10"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="truncate">{item.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
         </div>
       </div>
+
     </div>
   );
 }
