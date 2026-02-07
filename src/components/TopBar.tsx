@@ -1,4 +1,4 @@
-﻿import { Menu, RotateCcw, SkipForward, Globe2 } from 'lucide-react';
+﻿import { Menu, RotateCcw, SkipForward, Globe2, Hammer } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { Country } from '../types';
 
@@ -7,6 +7,7 @@ type TopBarProps = {
   countries: Country[];
   activeCountryId?: string;
   colonizationGainPerTurn: number;
+  constructionGainPerTurn: number;
   onSelectCountry: (id: string) => void;
   onEndTurn: () => void;
   onOpenHotseat: () => void;
@@ -21,6 +22,7 @@ export default function TopBar({
   countries,
   activeCountryId,
   colonizationGainPerTurn,
+  constructionGainPerTurn,
   onSelectCountry,
   onEndTurn,
   onOpenHotseat,
@@ -177,6 +179,27 @@ export default function TopBar({
           {colonizationGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
               +{colonizationGainPerTurn}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+          <div
+            className="relative group"
+            onMouseEnter={(event) => showTooltip('Очки строительства', event)}
+            onMouseMove={moveTooltip}
+            onMouseLeave={hideTooltip}
+          >
+            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
+              <Hammer className="w-4 h-4 text-white/80" />
+            </div>
+          </div>
+          <span className="text-white font-bold text-sm">
+            {activeCountry?.constructionPoints ?? 0}
+          </span>
+          {constructionGainPerTurn > 0 && (
+            <span className="text-emerald-400 text-xs font-semibold">
+              +{constructionGainPerTurn}
             </span>
           )}
         </div>

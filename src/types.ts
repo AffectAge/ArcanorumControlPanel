@@ -5,6 +5,7 @@ export type Country = {
   flagDataUrl?: string;
   coatDataUrl?: string;
   colonizationPoints: number;
+  constructionPoints?: number;
 };
 
 export type GameState = {
@@ -19,6 +20,7 @@ export type GameState = {
   cultures?: Trait[];
   landscapes?: Trait[];
   resources?: Trait[];
+  buildings?: BuildingDefinition[];
   settings?: GameSettings;
   eventLog?: EventLogState;
 };
@@ -51,6 +53,8 @@ export type ProvinceData = {
   colonizationCost?: number;
   colonizationProgress?: Record<string, number>;
   colonizationDisabled?: boolean;
+  buildingsBuilt?: string[];
+  constructionProgress?: Record<string, number>;
 };
 
 export type ProvinceRecord = Record<string, ProvinceData>;
@@ -65,6 +69,14 @@ export type Trait = {
 export type GameSettings = {
   colonizationPointsPerTurn: number;
   eventLogRetainTurns?: number;
+  constructionPointsPerTurn?: number;
+};
+
+export type BuildingDefinition = {
+  id: string;
+  name: string;
+  cost: number;
+  iconDataUrl?: string;
 };
 
 export type EventCategory =

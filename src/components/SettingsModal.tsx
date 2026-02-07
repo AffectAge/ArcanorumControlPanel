@@ -53,6 +53,25 @@ export default function SettingsModal({
           </label>
 
           <label className="flex flex-col gap-2 text-white/70 text-sm">
+            Базовый прирост очков строительства за ход
+            <input
+              type="number"
+              min={0}
+              value={settings.constructionPointsPerTurn ?? 10}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  constructionPointsPerTurn: Math.max(
+                    0,
+                    Number(event.target.value) || 0,
+                  ),
+                })
+              }
+              className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-white/70 text-sm">
             Хранить события за последние (ходов)
             <input
               type="number"

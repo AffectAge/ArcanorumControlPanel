@@ -10,8 +10,9 @@ import {
   Palette,
   Package,
   Image as ImageIcon,
+  Building2,
 } from 'lucide-react';
-import type { Country, ProvinceRecord, Trait } from '../types';
+import type { Country, ProvinceRecord, Trait, BuildingDefinition } from '../types';
 
 type AdminTab =
   | 'provinces'
@@ -19,7 +20,8 @@ type AdminTab =
   | 'religions'
   | 'landscapes'
   | 'cultures'
-  | 'resources';
+  | 'resources'
+  | 'buildings';
 
 type AdminPanelProps = {
   open: boolean;
@@ -31,6 +33,7 @@ type AdminPanelProps = {
   landscapes: Trait[];
   cultures: Trait[];
   resources: Trait[];
+  buildings: BuildingDefinition[];
   onClose: () => void;
   onAssignOwner: (provinceId: string, ownerId?: string) => void;
   onAssignClimate: (provinceId: string, climateId?: string) => void;
@@ -49,14 +52,17 @@ type AdminPanelProps = {
   onAddLandscape: (name: string, color: string) => void;
   onAddCulture: (name: string, color: string, iconDataUrl?: string) => void;
   onAddResource: (name: string, color: string, iconDataUrl?: string) => void;
+  onAddBuilding: (name: string, cost: number, iconDataUrl?: string) => void;
   onUpdateReligionIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateCultureIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateResourceIcon: (id: string, iconDataUrl?: string) => void;
+  onUpdateBuildingIcon: (id: string, iconDataUrl?: string) => void;
   onDeleteClimate: (id: string) => void;
   onDeleteReligion: (id: string) => void;
   onDeleteLandscape: (id: string) => void;
   onDeleteCulture: (id: string) => void;
   onDeleteResource: (id: string) => void;
+  onDeleteBuilding: (id: string) => void;
 };
 
 const emptyColor = '#4ade80';
@@ -71,6 +77,7 @@ export default function AdminPanel({
   landscapes,
   cultures,
   resources,
+  buildings,
   onClose,
   onAssignOwner,
   onAssignClimate,
@@ -85,14 +92,17 @@ export default function AdminPanel({
   onAddLandscape,
   onAddCulture,
   onAddResource,
+  onAddBuilding,
   onUpdateReligionIcon,
   onUpdateCultureIcon,
   onUpdateResourceIcon,
+  onUpdateBuildingIcon,
   onDeleteClimate,
   onDeleteReligion,
   onDeleteLandscape,
   onDeleteCulture,
   onDeleteResource,
+  onDeleteBuilding,
 }: AdminPanelProps) {
   const [tab, setTab] = useState<AdminTab>('provinces');
   const [selectedProvince, setSelectedProvince] = useState<string>('');
@@ -107,6 +117,9 @@ export default function AdminPanel({
   const [cultureColor, setCultureColor] = useState('#fb7185');
   const [cultureIcon, setCultureIcon] = useState<string | undefined>(undefined);
   const [resourceName, setResourceName] = useState('');
+  const [buildingName, setBuildingName] = useState('');
+  const [buildingCost, setBuildingCost] = useState(100);
+  const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
   const [resourceColor, setResourceColor] = useState('#22c55e');
   const [resourceIcon, setResourceIcon] = useState<string | undefined>(undefined);
 
@@ -158,6 +171,17 @@ export default function AdminPanel({
     setResourceName('');
     setResourceIcon(undefined);
   };
+
+
+  const handleAddBuilding = () => {
+    const name = buildingName.trim();
+    if (!name) return;
+    onAddBuilding(name, Math.max(1, Number(buildingCost) || 1), buildingIcon);
+    setBuildingName('');
+    setBuildingCost(100);
+    setBuildingIcon(undefined);
+  };
+
 
   const handleIconUpload = (
     file: File | undefined,
@@ -249,6 +273,17 @@ export default function AdminPanel({
             Ресурсы
           </button>
           <button
+            onClick={() => setTab('buildings')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'buildings'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            Здания
+          </button>
+          <button
             onClick={onClose}
             className="mt-auto flex items-center gap-2 px-3 py-2 rounded-lg text-sm border bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30"
           >
@@ -257,7 +292,7 @@ export default function AdminPanel({
           </button>
         </div>
 
-        <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex-1 p-6 overflow-y-auto legend-scroll">
           {tab === 'provinces' && (
             <div className="space-y-4">
               <div>
@@ -483,6 +518,67 @@ export default function AdminPanel({
                     />
                     Запретить колонизацию
                   </label>
+
+                  <div className="md:col-span-2">
+                    <div className="text-white/70 text-sm mb-2">Здания</div>
+                    {buildings.length > 0 ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {buildings.map((building) => {
+                          const built = activeProvince.buildingsBuilt?.includes(
+                            building.id,
+                          );
+                          const cost = Math.max(1, building.cost ?? 1);
+                          const hasProgress =
+                            activeProvince.constructionProgress != null &&
+                            building.id in activeProvince.constructionProgress;
+                          const progress = hasProgress
+                            ? activeProvince.constructionProgress?.[building.id] ?? 0
+                            : 0;
+                          const inProgress = Boolean(hasProgress && !built);
+                          const percent = Math.min(
+                            100,
+                            Math.round((progress / cost) * 100),
+                          );
+
+                          return (
+                            <div
+                              key={building.id}
+                              className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
+                            >
+                              <div className="flex items-center gap-3">
+                                {building.iconDataUrl ? (
+                                  <img
+                                    src={building.iconDataUrl}
+                                    alt=""
+                                    className="w-7 h-7 rounded-md object-cover border border-white/10"
+                                  />
+                                ) : (
+                                  <Building2 className="w-5 h-5 text-white/50" />
+                                )}
+                                <div>
+                                  <div className="text-white/80 text-sm">
+                                    {building.name}
+                                  </div>
+                                  <div className="text-white/50 text-xs">
+                                    Стоимость: {cost}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-white/50 text-xs">
+                                {built
+                                  ? 'Построено'
+                                  : inProgress
+                                    ? `Прогресс: ${percent}%`
+                                    : 'Не построено'}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-white/50 text-sm">Нет зданий</div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -970,6 +1066,142 @@ export default function AdminPanel({
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {tab === 'buildings' && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Здания</h2>
+                <p className="text-white/60 text-sm">
+                  Добавляйте и редактируйте здания для строительства.
+                </p>
+              </div>
+
+              <div className="flex gap-3 items-end flex-wrap">
+                <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
+                  Название
+                  <input
+                    value={buildingName}
+                    onChange={(event) => setBuildingName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Стоимость
+                  <input
+                    type="number"
+                    min={1}
+                    value={buildingCost}
+                    onChange={(event) =>
+                      setBuildingCost(Math.max(1, Number(event.target.value) || 1))
+                    }
+                    className="w-24 h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Логотип
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        handleIconUpload(event.target.files?.[0], setBuildingIcon)
+                      }
+                      className="hidden"
+                      id="building-icon"
+                    />
+                    <label
+                      htmlFor="building-icon"
+                      className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Выбрать
+                    </label>
+                    {buildingIcon && (
+                      <img
+                        src={buildingIcon}
+                        alt=""
+                        className="w-8 h-8 rounded-lg object-cover border border-white/10"
+                      />
+                    )}
+                  </div>
+                </label>
+                <button
+                  onClick={handleAddBuilding}
+                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {buildings.length > 0 ? (
+                  buildings.map((building) => (
+                    <div
+                      key={building.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                    >
+                      <div className="flex items-center gap-3">
+                        {building.iconDataUrl ? (
+                          <img
+                            src={building.iconDataUrl}
+                            alt=""
+                            className="w-6 h-6 rounded-md object-cover border border-white/10"
+                          />
+                        ) : (
+                          <Building2 className="w-5 h-5 text-white/50" />
+                        )}
+                        <div>
+                          <div className="text-white/80 text-sm">
+                            {building.name}
+                          </div>
+                          <div className="text-white/50 text-xs">
+                            Стоимость: {Math.max(1, building.cost ?? 1)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              handleIconUpload(
+                                event.target.files?.[0],
+                                (value) =>
+                                  onUpdateBuildingIcon(building.id, value),
+                              )
+                            }
+                          />
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          Изменить логотип
+                        </label>
+                        {building.iconDataUrl && (
+                          <button
+                            onClick={() =>
+                              onUpdateBuildingIcon(building.id, undefined)
+                            }
+                            className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                          >
+                            Удалить логотип
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onDeleteBuilding(building.id)}
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                        >
+                          <Trash2 className="w-4 h-4 text-white/60" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-white/50 text-sm">Нет зданий</div>
+                )}
               </div>
             </div>
           )}

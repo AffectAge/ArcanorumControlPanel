@@ -4,6 +4,7 @@ type ProvinceContextMenuProps = {
   y: number;
   onClose: () => void;
   onColonize: () => void;
+  onConstruct: () => void;
   onEditProvince: () => void;
 };
 
@@ -13,6 +14,7 @@ export default function ProvinceContextMenu({
   y,
   onClose,
   onColonize,
+  onConstruct,
   onEditProvince,
 }: ProvinceContextMenuProps) {
   if (!open) return null;
@@ -32,6 +34,15 @@ export default function ProvinceContextMenu({
           className="w-full px-4 py-3 text-left text-white/80 hover:bg-emerald-400/10 hover:text-emerald-300 transition-colors"
         >
           Колонизация
+        </button>
+        <button
+          onClick={() => {
+            onConstruct();
+            onClose();
+          }}
+          className="w-full px-4 py-3 text-left text-white/80 hover:bg-emerald-400/10 hover:text-emerald-300 transition-colors"
+        >
+          Строительство
         </button>
         <button
           onClick={() => {

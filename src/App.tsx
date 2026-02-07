@@ -8,6 +8,7 @@ import SaveLoadPanel from './components/SaveLoadPanel';
 import MapView from './components/MapView';
 import AdminPanel from './components/AdminPanel';
 import ColonizationModal from './components/ColonizationModal';
+import ConstructionModal from './components/ConstructionModal';
 import SettingsModal from './components/SettingsModal';
 import ProvinceContextMenu from './components/ProvinceContextMenu';
 import EventLogPanel from './components/EventLogPanel';
@@ -26,6 +27,7 @@ import type {
   ProvinceData,
   Trait,
   GameSettings,
+  BuildingDefinition,
   EventLogEntry,
   EventCategory,
   EventLogState,
@@ -110,6 +112,7 @@ const initialMapLayers: MapLayer[] = [
 function App() {
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     colonizationPointsPerTurn: 10,
+    constructionPointsPerTurn: 10,
     eventLogRetainTurns: 3,
   });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
@@ -149,19 +152,21 @@ function App() {
     { id: createId(), name: 'Южане', color: '#f97316' },
   ]);
   const [resources, setResources] = useState<Trait[]>([]);
+  const [buildings, setBuildings] = useState<BuildingDefinition[]>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
     provinceId: string;
   } | null>(null);
   const [colonizationModalOpen, setColonizationModalOpen] = useState(false);
+  const [constructionModalOpen, setConstructionModalOpen] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>(
     undefined,
   );
 
   const createCountry = (country: Omit<Country, 'id' | 'colonizationPoints'>) => {
     const id = createId();
-    const newCountry: Country = { id, colonizationPoints: 100, ...country };
+    const newCountry: Country = { id, colonizationPoints: 100, constructionPoints: 0, ...country };
     setCountries((prev) => [...prev, newCountry]);
     if (!activeCountryId) {
       setActiveCountryId(id);
@@ -330,6 +335,64 @@ function App() {
     );
   };
 
+
+  const applyConstructionTurn = (countryId: string) => {
+    const country = countries.find((c) => c.id === countryId);
+    const available = country?.constructionPoints ?? 0;
+    if (!country || available <= 0) return;
+
+    const tasks: { provinceId: string; buildingId: string }[] = [];
+    Object.values(provinces).forEach((province) => {
+      if (province.ownerCountryId !== countryId) return;
+      const progress = province.constructionProgress ?? {};
+      Object.keys(progress).forEach((buildingId) => {
+        tasks.push({ provinceId: province.id, buildingId });
+      });
+    });
+
+    if (tasks.length === 0) return;
+
+    const share = available / tasks.length;
+
+    setProvinces((prev) => {
+      const next: ProvinceRecord = { ...prev };
+      tasks.forEach(({ provinceId, buildingId }) => {
+        const province = next[provinceId];
+        if (!province) return;
+        const built = new Set(province.buildingsBuilt ?? []);
+        if (built.has(buildingId)) return;
+        const progress = { ...(province.constructionProgress ?? {}) };
+        const current = progress[buildingId] ?? 0;
+        const cost = buildings.find((b) => b.id === buildingId)?.cost ?? 100;
+        const updated = current + share;
+        if (updated >= cost) {
+          built.add(buildingId);
+          delete progress[buildingId];
+          province.buildingsBuilt = Array.from(built);
+          province.constructionProgress = progress;
+          const buildingName =
+            buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
+          addEvent({
+            category: 'economy',
+            message: `Строительство завершено: ${buildingName} в провинции ${provinceId}.`,
+            countryId,
+            priority: 'medium',
+          });
+        } else {
+          progress[buildingId] = updated;
+          province.constructionProgress = progress;
+        }
+      });
+      return next;
+    });
+
+    setCountries((prev) =>
+      prev.map((c) =>
+        c.id === countryId ? { ...c, constructionPoints: 0 } : c,
+      ),
+    );
+  };
+
   const endTurn = () => {
     if (countries.length === 0) return;
     const currentIndex = countries.findIndex(
@@ -348,6 +411,7 @@ function App() {
       });
       countries.forEach((country) => {
         applyColonizationTurn(country.id);
+        applyConstructionTurn(country.id);
       });
     }
     setActiveCountryId(nextId);
@@ -359,6 +423,17 @@ function App() {
             ({
               ...country,
               colonizationPoints: (country.colonizationPoints ?? 0) + gain,
+            }),
+          ),
+        );
+      }
+      const buildGain = Math.max(0, gameSettings.constructionPointsPerTurn ?? 0);
+      if (buildGain > 0) {
+        setCountries((prev) =>
+          prev.map((country) =>
+            ({
+              ...country,
+              constructionPoints: (country.constructionPoints ?? 0) + buildGain,
             }),
           ),
         );
@@ -452,9 +527,11 @@ function App() {
     setLandscapes(save.data.landscapes ?? landscapes);
     setCultures(save.data.cultures ?? cultures);
     setResources(save.data.resources ?? resources);
+    setBuildings(save.data.buildings ?? buildings);
     setGameSettings(
       save.data.settings ?? {
         colonizationPointsPerTurn: 10,
+    constructionPointsPerTurn: 10,
         eventLogRetainTurns: 3,
       },
     );
@@ -555,7 +632,8 @@ function App() {
       { id: createId(), name: 'Южане', color: '#f97316' },
     ]);
     setResources([]);
-    setGameSettings({ colonizationPointsPerTurn: 10, eventLogRetainTurns: 3 });
+    setBuildings([]);
+    setGameSettings({ colonizationPointsPerTurn: 10, constructionPointsPerTurn: 10, eventLogRetainTurns: 3 });
     setEventLog(createDefaultLog());
     setHotseatOpen(false);
   };
@@ -584,6 +662,8 @@ function App() {
             colonizationCost: 100,
             colonizationProgress: {},
             colonizationDisabled: false,
+            buildingsBuilt: [],
+            constructionProgress: {},
           };
           changed = true;
           return;
@@ -602,6 +682,14 @@ function App() {
         }
         if (existing.colonizationDisabled == null) {
           existing.colonizationDisabled = false;
+          updated = true;
+        }
+        if (!existing.buildingsBuilt) {
+          existing.buildingsBuilt = [];
+          updated = true;
+        }
+        if (!existing.constructionProgress) {
+          existing.constructionProgress = {};
           updated = true;
         }
         if (!existing.resourceAmounts) {
@@ -967,6 +1055,89 @@ function App() {
     setCultures((prev) => [...prev, { id: createId(), name, color, iconDataUrl }]);
   };
 
+
+  const addBuilding = (name: string, cost: number, iconDataUrl?: string) => {
+    setBuildings((prev) => [...prev, { id: createId(), name, cost, iconDataUrl }]);
+  };
+
+  const updateBuildingIcon = (id: string, iconDataUrl?: string) => {
+    setBuildings((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, iconDataUrl } : item)),
+    );
+  };
+
+  const deleteBuilding = (id: string) => {
+    setBuildings((prev) => prev.filter((b) => b.id !== id));
+    setProvinces((prev) => {
+      const next: ProvinceRecord = { ...prev };
+      Object.values(next).forEach((province) => {
+        if (province.buildingsBuilt?.includes(id)) {
+          province.buildingsBuilt = province.buildingsBuilt.filter((b) => b !== id);
+        }
+        if (province.constructionProgress && id in province.constructionProgress) {
+          const progress = { ...province.constructionProgress };
+          delete progress[id];
+          province.constructionProgress = progress;
+        }
+      });
+      return next;
+    });
+  };
+
+  const startConstruction = (provinceId: string, buildingId: string) => {
+    const buildingName =
+      buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
+    const country = countries.find((c) => c.id === activeCountryId);
+    setProvinces((prev) => {
+      const province = prev[provinceId];
+      if (!province || province.ownerCountryId == null) return prev;
+      const built = new Set(province.buildingsBuilt ?? []);
+      if (built.has(buildingId)) return prev;
+      const progress = { ...(province.constructionProgress ?? {}) };
+      if (progress[buildingId] != null) return prev;
+      progress[buildingId] = 0;
+      addEvent({
+        category: 'economy',
+        message: `${country?.name ?? 'Страна'} начала строительство ${buildingName} в провинции ${provinceId}.`,
+        countryId: province.ownerCountryId,
+        priority: 'low',
+      });
+      return {
+        ...prev,
+        [provinceId]: {
+          ...province,
+          constructionProgress: progress,
+        },
+      };
+    });
+  };
+
+  const cancelConstruction = (provinceId: string, buildingId: string) => {
+    const buildingName =
+      buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
+    const country = countries.find((c) => c.id === activeCountryId);
+    setProvinces((prev) => {
+      const province = prev[provinceId];
+      if (!province || !province.constructionProgress) return prev;
+      if (!(buildingId in province.constructionProgress)) return prev;
+      const progress = { ...province.constructionProgress };
+      delete progress[buildingId];
+      addEvent({
+        category: 'economy',
+        message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId}.`,
+        countryId: province.ownerCountryId,
+        priority: 'low',
+      });
+      return {
+        ...prev,
+        [provinceId]: {
+          ...province,
+          constructionProgress: progress,
+        },
+      };
+    });
+  };
+
   const addResource = (name: string, color: string, iconDataUrl?: string) => {
     setResources((prev) => [...prev, { id: createId(), name, color, iconDataUrl }]);
   };
@@ -1143,6 +1314,7 @@ function App() {
           colonizationTint={colonizationTint}
           layerLegends={layerLegends}
           resources={resources}
+        buildings={buildings}
           selectedResourceId={selectedResourceId}
           onSelectResource={setSelectedResourceId}
           selectedId={selectedProvinceId}
@@ -1164,6 +1336,7 @@ function App() {
         countries={countries}
         activeCountryId={activeCountryId}
         colonizationGainPerTurn={gameSettings.colonizationPointsPerTurn}
+        constructionGainPerTurn={gameSettings.constructionPointsPerTurn ?? 0}
         onSelectCountry={selectCountry}
         onEndTurn={endTurn}
         onOpenHotseat={() => setHotseatOpen(true)}
@@ -1255,6 +1428,12 @@ function App() {
             setColonizationModalOpen(true);
           }
         }}
+        onConstruct={() => {
+          if (contextMenu?.provinceId) {
+            setSelectedProvinceId(contextMenu.provinceId);
+            setConstructionModalOpen(true);
+          }
+        }}
         onEditProvince={() => {
           if (contextMenu?.provinceId) {
             setSelectedProvinceId(contextMenu.provinceId);
@@ -1310,6 +1489,29 @@ function App() {
         }}
       />
 
+      <ConstructionModal
+        open={constructionModalOpen}
+        provinceId={selectedProvinceId}
+        province={selectedProvince}
+        buildings={buildings}
+        activeCountryId={activeCountryId}
+        activeCountryPoints={
+          countries.find((country) => country.id === activeCountryId)
+            ?.constructionPoints ?? 0
+        }
+        onClose={() => setConstructionModalOpen(false)}
+        onStart={(buildingId) => {
+          if (selectedProvinceId) {
+            startConstruction(selectedProvinceId, buildingId);
+          }
+        }}
+        onCancel={(buildingId) => {
+          if (selectedProvinceId) {
+            cancelConstruction(selectedProvinceId, buildingId);
+          }
+        }}
+      />
+
       <SettingsModal
         open={settingsOpen}
         settings={gameSettings}
@@ -1327,6 +1529,7 @@ function App() {
         landscapes={landscapes}
         cultures={cultures}
         resources={resources}
+        buildings={buildings}
         onClose={() => setAdminOpen(false)}
         onAssignOwner={assignOwner}
         onAssignClimate={assignClimate}
@@ -1341,14 +1544,17 @@ function App() {
         onAddLandscape={addLandscape}
         onAddCulture={addCulture}
         onAddResource={addResource}
+        onAddBuilding={addBuilding}
         onUpdateReligionIcon={updateReligionIcon}
         onUpdateCultureIcon={updateCultureIcon}
         onUpdateResourceIcon={updateResourceIcon}
+        onUpdateBuildingIcon={updateBuildingIcon}
         onDeleteClimate={deleteClimate}
         onDeleteReligion={deleteReligion}
         onDeleteLandscape={deleteLandscape}
         onDeleteCulture={deleteCulture}
         onDeleteResource={deleteResource}
+        onDeleteBuilding={deleteBuilding}
       />
     </div>
     </EventLogContext.Provider>
