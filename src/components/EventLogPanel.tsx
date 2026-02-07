@@ -145,6 +145,7 @@ const Tooltip = ({ label }: { label: string }) => (
   </span>
 );
 
+
 const PriorityIcon = ({ priority }: { priority: EventPriority }) => {
   const color =
     priority === 'high' ? '#ef4444' : priority === 'medium' ? '#facc15' : '#22c55e';
@@ -511,7 +512,7 @@ export default function EventLogPanel({
                   return (
                     <div
                       key={entry.id}
-                      className="relative flex flex-col gap-2 rounded-xl border bg-white/5 px-3 py-2 overflow-hidden"
+                      className="relative flex flex-col gap-2 rounded-xl border bg-white/5 px-3 py-2"
                       style={{ borderColor: `${meta.color}55` }}
                     >
                       <div className="flex items-start gap-3">
