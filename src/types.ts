@@ -20,6 +20,7 @@ export type GameState = {
   landscapes?: Trait[];
   resources?: Trait[];
   settings?: GameSettings;
+  eventLog?: EventLogState;
 };
 
 export type SaveGame = {
@@ -63,4 +64,27 @@ export type Trait = {
 
 export type GameSettings = {
   colonizationPointsPerTurn: number;
+};
+
+export type EventCategory =
+  | 'system'
+  | 'colonization'
+  | 'politics'
+  | 'economy'
+  | 'military'
+  | 'diplomacy';
+
+export type EventLogEntry = {
+  id: string;
+  turn: number;
+  timestamp: string;
+  category: EventCategory;
+  title?: string;
+  message: string;
+  countryId?: string;
+};
+
+export type EventLogState = {
+  entries: EventLogEntry[];
+  filters: Record<EventCategory, boolean>;
 };

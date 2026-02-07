@@ -11,6 +11,12 @@ import AdminPanel from './components/AdminPanel';
 import ColonizationModal from './components/ColonizationModal';
 import SettingsModal from './components/SettingsModal';
 import ProvinceContextMenu from './components/ProvinceContextMenu';
+import EventLogPanel from './components/EventLogPanel';
+import {
+  EventLogContext,
+  createDefaultLog,
+  createDefaultFilters,
+} from './eventLog';
 import type {
   Country,
   GameState,
@@ -21,6 +27,9 @@ import type {
   ProvinceData,
   Trait,
   GameSettings,
+  EventLogEntry,
+  EventCategory,
+  EventLogState,
 } from './types';
 
 const STORAGE_KEY = 'civ.saves.v1';
@@ -34,8 +43,18 @@ const createId = () =>
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
+const normalizeEventLog = (log?: EventLogState): EventLogState => {
+  const base = createDefaultFilters();
+  const filters =
+    log && log.filters ? { ...base, ...log.filters } : createDefaultFilters();
+  const entries = Array.isArray(log?.entries) ? log?.entries : [];
+  return { entries, filters };
+};
+
 const COST_STEP = 100;
 const COST_LEVELS = 10;
+const MAX_LOG_ENTRIES = 200;
+const TRIM_LOG_TO = 50;
 
 const colonizationCostColor = (cost: number) => {
   if (!Number.isFinite(cost)) return 'hsl(145 60% 65%)';
@@ -97,7 +116,10 @@ function App() {
   const [savePanelMode, setSavePanelMode] = useState<'save' | 'load'>('save');
   const [saves, setSaves] = useState<SaveGame[]>(() => readSaves());
   const [mapLayers, setMapLayers] = useState<MapLayer[]>(initialMapLayers);
+  const [showProvinceStroke, setShowProvinceStroke] = useState(true);
   const [provinces, setProvinces] = useState<ProvinceRecord>({});
+  const [eventLog, setEventLog] = useState<EventLogState>(() => createDefaultLog());
+  const [eventLogCollapsed, setEventLogCollapsed] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>([
@@ -184,6 +206,42 @@ function App() {
     setActiveCountryId(id);
   };
 
+  const addEvent = (payload: {
+    category: EventCategory;
+    message: string;
+    title?: string;
+    countryId?: string;
+  }) => {
+    const entry: EventLogEntry = {
+      id: createId(),
+      turn,
+      timestamp: new Date().toISOString(),
+      category: payload.category,
+      title: payload.title,
+      message: payload.message,
+      countryId: payload.countryId,
+    };
+    setEventLog((prev) => ({
+      ...prev,
+      entries: [...prev.entries, entry].slice(-MAX_LOG_ENTRIES),
+    }));
+  };
+
+  const setEventFilters = (filters: EventLogState['filters']) => {
+    setEventLog((prev) => ({ ...prev, filters }));
+  };
+
+  const clearEventLog = () => {
+    setEventLog((prev) => ({ ...prev, entries: [] }));
+  };
+
+  const trimEventLog = () => {
+    setEventLog((prev) => ({
+      ...prev,
+      entries: prev.entries.slice(-TRIM_LOG_TO),
+    }));
+  };
+
   const applyColonizationTurn = (countryId: string) => {
     const country = countries.find((c) => c.id === countryId);
     if (!country || country.colonizationPoints <= 0) return;
@@ -216,6 +274,11 @@ function App() {
         if (updated >= cost) {
           province.ownerCountryId = countryId;
           province.colonizationProgress = {};
+          addEvent({
+            category: 'colonization',
+            message: `${country.name} завершила колонизацию провинции ${provinceId}.`,
+            countryId,
+          });
         } else {
           province.colonizationProgress = progress;
         }
@@ -244,6 +307,10 @@ function App() {
     const nextId = wraps ? countries[0]?.id : countries[nextIndex].id;
     if (wraps) {
       setTurn((prev) => prev + 1);
+      addEvent({
+        category: 'system',
+        message: `Начался глобальный ход ${turn + 1}`,
+      });
     }
     setActiveCountryId(nextId);
     if (wraps) {
@@ -275,6 +342,7 @@ function App() {
       cultures,
       resources,
       settings: gameSettings,
+      eventLog,
     }),
     [
       turn,
@@ -289,6 +357,7 @@ function App() {
       cultures,
       resources,
       gameSettings,
+      eventLog,
     ],
   );
 
@@ -346,6 +415,7 @@ function App() {
     setCultures(save.data.cultures ?? cultures);
     setResources(save.data.resources ?? resources);
     setGameSettings(save.data.settings ?? { colonizationPointsPerTurn: 10 });
+    setEventLog(normalizeEventLog(save.data.eventLog));
     setSavePanelOpen(false);
   };
 
@@ -443,6 +513,7 @@ function App() {
     ]);
     setResources([]);
     setGameSettings({ colonizationPointsPerTurn: 10 });
+    setEventLog(createDefaultLog());
     setHotseatOpen(false);
   };
 
@@ -786,6 +857,7 @@ function App() {
   };
 
   const startColonization = (provinceId: string, countryId: string) => {
+    const country = countries.find((c) => c.id === countryId);
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId || province.colonizationDisabled) {
@@ -794,6 +866,11 @@ function App() {
       const progress = { ...(province.colonizationProgress ?? {}) };
       if (!(countryId in progress)) {
         progress[countryId] = 0;
+        addEvent({
+          category: 'colonization',
+          message: `${country?.name ?? 'Страна'} начала колонизацию провинции ${provinceId}.`,
+          countryId,
+        });
       }
       return {
         ...prev,
@@ -806,12 +883,18 @@ function App() {
   };
 
   const cancelColonization = (provinceId: string, countryId: string) => {
+    const country = countries.find((c) => c.id === countryId);
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || !province.colonizationProgress) return prev;
       const progress = { ...province.colonizationProgress };
       if (!(countryId in progress)) return prev;
       delete progress[countryId];
+      addEvent({
+        category: 'colonization',
+        message: `${country?.name ?? 'Страна'} отменила колонизацию провинции ${provinceId}.`,
+        countryId,
+      });
       return {
         ...prev,
         [provinceId]: {
@@ -962,8 +1045,29 @@ function App() {
     setSelectedResourceId(resources[0]?.id);
   }, [resources, selectedResourceId]);
 
+  const eventLogValue = useMemo(
+    () => ({
+      log: eventLog,
+      addEvent,
+      setFilters: setEventFilters,
+      clearLog: clearEventLog,
+      trimOld: trimEventLog,
+      toggleCollapsed: () => setEventLogCollapsed((prev) => !prev),
+      collapsed: eventLogCollapsed,
+    }),
+    [
+      eventLog,
+      addEvent,
+      setEventFilters,
+      clearEventLog,
+      trimEventLog,
+      eventLogCollapsed,
+    ],
+  );
+
   return (
-    <div className="relative w-full h-screen bg-gradient-to-br from-[#0a0f18] via-[#0d1420] to-[#0a0f18] overflow-hidden">
+    <EventLogContext.Provider value={eventLogValue}>
+      <div className="relative w-full h-screen bg-gradient-to-br from-[#0a0f18] via-[#0d1420] to-[#0a0f18] overflow-hidden">
       <div
         className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/10 via-transparent to-transparent"
       />
@@ -1082,6 +1186,7 @@ function App() {
 
       <RightQuickButtons />
       <BottomDock onOpenSettings={() => setSettingsOpen(true)} />
+      <EventLogPanel />
 
       <ProvinceContextMenu
         open={Boolean(contextMenu)}
@@ -1190,6 +1295,7 @@ function App() {
         onDeleteResource={deleteResource}
       />
     </div>
+    </EventLogContext.Provider>
   );
 }
 
