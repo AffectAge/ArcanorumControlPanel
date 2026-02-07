@@ -76,6 +76,7 @@ export type EventCategory =
   | 'diplomacy';
 
 export type EventPriority = 'low' | 'medium' | 'high';
+export type EventVisibility = 'public' | 'private';
 
 export type EventLogEntry = {
   id: string;
@@ -83,6 +84,7 @@ export type EventLogEntry = {
   timestamp: string;
   category: EventCategory;
   priority: EventPriority;
+  visibility?: EventVisibility;
   title?: string;
   message: string;
   countryId?: string;

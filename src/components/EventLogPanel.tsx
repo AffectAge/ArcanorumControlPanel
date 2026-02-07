@@ -152,13 +152,6 @@ const PriorityIcon = ({ priority }: { priority: EventPriority }) => {
     <span
       className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10"
       style={{ backgroundColor: `${color}22`, color }}
-      title={
-        priority === 'high'
-          ? 'Высокая важность'
-          : priority === 'medium'
-            ? 'Средняя важность'
-            : 'Низкая важность'
-      }
     >
       <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
         <path
@@ -174,8 +167,53 @@ const PriorityIcon = ({ priority }: { priority: EventPriority }) => {
   );
 };
 
+const VisibilityIcon = ({ visibility }: { visibility: 'public' | 'private' }) => {
+  const isPrivate = visibility === 'private';
+  const color = isPrivate ? '#f97316' : '#38bdf8';
+  return (
+    <span
+      className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10"
+      style={{ backgroundColor: `${color}22`, color }}
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+        {isPrivate ? (
+          <>
+            <rect
+              x="6"
+              y="11"
+              width="12"
+              height="9"
+              rx="2"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+            />
+            <path
+              d="M8.5 11V8.5a3.5 3.5 0 0 1 7 0V11"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </>
+        ) : (
+          <>
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none" />
+            <path
+              d="M3 12h18M12 3c3.5 3 3.5 15 0 18M12 3c-3.5 3-3.5 15 0 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </>
+        )}
+      </svg>
+    </span>
+  );
+};
+
 type EventLogPanelProps = {
   activeCountryId?: string;
+  countries?: { id: string; flagDataUrl?: string; color?: string }[];
 };
 
 const ActionIcon = ({ name }: { name: 'trim' | 'sort' | 'clear' | 'collapse' | 'expand' }) => {
@@ -295,7 +333,10 @@ const ScopeIcon = ({ scope }: { scope: 'all' | 'own' | 'others' }) => {
   }
 };
 
-export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
+export default function EventLogPanel({
+  activeCountryId,
+  countries = [],
+}: EventLogPanelProps) {
   const {
     log,
     setFilters,
@@ -316,6 +357,12 @@ export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
   const entries = useMemo(
     () => {
       const filtered = log.entries.filter((entry) => {
+        if (
+          entry.visibility === 'private' &&
+          (!entry.countryId || entry.countryId !== activeCountryId)
+        ) {
+          return false;
+        }
         if (entry.category === 'system') return true;
         if (log.filters[entry.category] === false) return false;
         const scope = log.countryScope ?? 'all';
@@ -455,7 +502,7 @@ export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
               })}
             </div>
 
-            <div className="max-h-72 overflow-y-auto px-4 py-3 space-y-3 legend-scroll">
+            <div className="max-h-72 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-3 legend-scroll">
               {entries.length === 0 ? (
                 <div className="text-xs text-white/50">Нет событий</div>
               ) : (
@@ -464,14 +511,12 @@ export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
                   return (
                     <div
                       key={entry.id}
-                      className="relative flex items-start gap-3 rounded-xl border bg-white/5 px-3 py-2"
+                      className="relative flex flex-col gap-2 rounded-xl border bg-white/5 px-3 py-2 overflow-hidden"
                       style={{ borderColor: `${meta.color}55` }}
                     >
-                      <CategoryIcon category={entry.category} />
-                      <div className="absolute right-2 top-2">
-                        <PriorityIcon priority={entry.priority} />
-                      </div>
-                      <div className="flex-1">
+                      <div className="flex items-start gap-3">
+                        <CategoryIcon category={entry.category} />
+                        <div className="flex-1">
                         <div className="flex items-center gap-2 text-[11px] text-white/50">
                           <span className="text-white/70">
                             Ход {entry.turn}
@@ -494,6 +539,55 @@ export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
                         )}
                         <div className="text-sm text-white/75">
                           {entry.message}
+                        </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        {entry.countryId && (
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                            {countries.find((c) => c.id === entry.countryId)
+                              ?.flagDataUrl ? (
+                              <img
+                                src={
+                                  countries.find((c) => c.id === entry.countryId)
+                                    ?.flagDataUrl
+                                }
+                                alt=""
+                                className="h-4 w-4 rounded-full object-cover"
+                              />
+                            ) : (
+                              <span
+                                className="h-3 w-3 rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    countries.find((c) => c.id === entry.countryId)
+                                      ?.color ?? '#94a3b8',
+                                }}
+                              />
+                            )}
+                          </span>
+                        )}
+                        <div className="relative group">
+                          <PriorityIcon priority={entry.priority} />
+                          <Tooltip
+                            label={
+                              entry.priority === 'high'
+                                ? 'Высокая важность'
+                                : entry.priority === 'medium'
+                                  ? 'Средняя важность'
+                                  : 'Низкая важность'
+                            }
+                          />
+                        </div>
+                        <div className="relative group">
+                          <VisibilityIcon visibility={entry.visibility ?? 'public'} />
+                          <Tooltip
+                            label={
+                              (entry.visibility ?? 'public') === 'private'
+                                ? 'Только для нашей страны'
+                                : 'Публичное сообщение'
+                            }
+                          />
                         </div>
                       </div>
                     </div>

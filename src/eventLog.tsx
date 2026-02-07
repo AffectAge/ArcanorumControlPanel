@@ -4,6 +4,7 @@ import type {
   EventLogEntry,
   EventLogState,
   EventPriority,
+  EventVisibility,
 } from './types';
 
 export type AddEventPayload = {
@@ -12,6 +13,7 @@ export type AddEventPayload = {
   title?: string;
   countryId?: string;
   priority?: EventPriority;
+  visibility?: EventVisibility;
 };
 
 export type EventLogContextValue = {

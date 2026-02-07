@@ -50,6 +50,7 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
     const entries = rawEntries.map((entry) => ({
       ...entry,
       priority: entry.priority ?? 'medium',
+      visibility: entry.visibility ?? 'public',
     }));
     return {
       entries,
@@ -231,6 +232,7 @@ function App() {
     title?: string;
     countryId?: string;
     priority?: 'low' | 'medium' | 'high';
+    visibility?: 'public' | 'private';
   }) => {
     const entry: EventLogEntry = {
       id: createId(),
@@ -238,6 +240,7 @@ function App() {
       timestamp: new Date().toISOString(),
       category: payload.category,
       priority: payload.priority ?? 'medium',
+      visibility: payload.visibility ?? 'public',
       title: payload.title,
       message: payload.message,
       countryId: payload.countryId,
@@ -1238,7 +1241,7 @@ function App() {
       )}
 
       <BottomDock onOpenSettings={() => setSettingsOpen(true)} />
-      <EventLogPanel activeCountryId={activeCountryId} />
+      <EventLogPanel activeCountryId={activeCountryId} countries={countries} />
 
       <ProvinceContextMenu
         open={Boolean(contextMenu)}
