@@ -11,8 +11,9 @@ import {
   Package,
   Image as ImageIcon,
   Building2,
+  Briefcase,
 } from 'lucide-react';
-import type { Country, ProvinceRecord, Trait, BuildingDefinition } from '../types';
+import type { Country, ProvinceRecord, Trait, BuildingDefinition, Company } from '../types';
 
 type AdminTab =
   | 'provinces'
@@ -21,7 +22,8 @@ type AdminTab =
   | 'landscapes'
   | 'cultures'
   | 'resources'
-  | 'buildings';
+  | 'buildings'
+  | 'companies';
 
 type AdminPanelProps = {
   open: boolean;
@@ -34,6 +36,7 @@ type AdminPanelProps = {
   cultures: Trait[];
   resources: Trait[];
   buildings: BuildingDefinition[];
+  companies: Company[];
   onClose: () => void;
   onAssignOwner: (provinceId: string, ownerId?: string) => void;
   onAssignClimate: (provinceId: string, climateId?: string) => void;
@@ -53,6 +56,7 @@ type AdminPanelProps = {
   onAddCulture: (name: string, color: string, iconDataUrl?: string) => void;
   onAddResource: (name: string, color: string, iconDataUrl?: string) => void;
   onAddBuilding: (name: string, cost: number, iconDataUrl?: string) => void;
+  onAddCompany: (name: string, countryId: string) => void;
   onUpdateReligionIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateCultureIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateResourceIcon: (id: string, iconDataUrl?: string) => void;
@@ -63,6 +67,7 @@ type AdminPanelProps = {
   onDeleteCulture: (id: string) => void;
   onDeleteResource: (id: string) => void;
   onDeleteBuilding: (id: string) => void;
+  onDeleteCompany: (id: string) => void;
 };
 
 const emptyColor = '#4ade80';
@@ -78,6 +83,7 @@ export default function AdminPanel({
   cultures,
   resources,
   buildings,
+  companies,
   onClose,
   onAssignOwner,
   onAssignClimate,
@@ -93,6 +99,7 @@ export default function AdminPanel({
   onAddCulture,
   onAddResource,
   onAddBuilding,
+  onAddCompany,
   onUpdateReligionIcon,
   onUpdateCultureIcon,
   onUpdateResourceIcon,
@@ -103,6 +110,7 @@ export default function AdminPanel({
   onDeleteCulture,
   onDeleteResource,
   onDeleteBuilding,
+  onDeleteCompany,
 }: AdminPanelProps) {
   const [tab, setTab] = useState<AdminTab>('provinces');
   const [selectedProvince, setSelectedProvince] = useState<string>('');
@@ -120,6 +128,8 @@ export default function AdminPanel({
   const [buildingName, setBuildingName] = useState('');
   const [buildingCost, setBuildingCost] = useState(100);
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
+  const [companyName, setCompanyName] = useState('');
+  const [companyCountryId, setCompanyCountryId] = useState<string>('');
   const [resourceColor, setResourceColor] = useState('#22c55e');
   const [resourceIcon, setResourceIcon] = useState<string | undefined>(undefined);
 
@@ -180,6 +190,13 @@ export default function AdminPanel({
     setBuildingName('');
     setBuildingCost(100);
     setBuildingIcon(undefined);
+  };
+
+  const handleAddCompany = () => {
+    const name = companyName.trim();
+    if (!name || !companyCountryId) return;
+    onAddCompany(name, companyCountryId);
+    setCompanyName('');
   };
 
 
@@ -282,6 +299,17 @@ export default function AdminPanel({
           >
             <Building2 className="w-4 h-4" />
             Здания
+          </button>
+          <button
+            onClick={() => setTab('companies')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'companies'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Briefcase className="w-4 h-4" />
+            Компании
           </button>
           <button
             onClick={onClose}
@@ -525,13 +553,15 @@ export default function AdminPanel({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {buildings.map((building) => {
                           const builtCount =
-                            activeProvince.buildingsBuilt?.[building.id] ?? 0;
+                            activeProvince.buildingsBuilt?.filter(
+                              (entry) => entry.buildingId === building.id,
+                            ).length ?? 0;
                           const cost = Math.max(1, building.cost ?? 1);
                           const progressEntries =
                             activeProvince.constructionProgress?.[building.id] ?? [];
                           const inProgressCount = progressEntries.length;
                           const progressSum = progressEntries.reduce(
-                            (sum, value) => sum + value,
+                            (sum, entry) => sum + entry.progress,
                             0,
                           );
                           const average = inProgressCount
@@ -1205,6 +1235,92 @@ export default function AdminPanel({
                   ))
                 ) : (
                   <div className="text-white/50 text-sm">Нет зданий</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === 'companies' && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Компании</h2>
+                <p className="text-white/60 text-sm">
+                  Создавайте компании и назначайте их странам.
+                </p>
+              </div>
+
+              <div className="flex gap-3 items-end flex-wrap">
+                <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
+                  Название
+                  <input
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
+                  Страна
+                  <select
+                    value={companyCountryId}
+                    onChange={(event) => setCompanyCountryId(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  >
+                    <option value="" className="bg-[#0b111b] text-white">
+                      Выберите страну
+                    </option>
+                    {countries.map((country) => (
+                      <option
+                        key={country.id}
+                        value={country.id}
+                        className="bg-[#0b111b] text-white"
+                      >
+                        {country.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  onClick={handleAddCompany}
+                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {companies.length > 0 ? (
+                  companies.map((company) => {
+                    const country = countries.find(
+                      (entry) => entry.id === company.countryId,
+                    );
+                    return (
+                      <div
+                        key={company.id}
+                        className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Briefcase className="w-4 h-4 text-white/60" />
+                          <div>
+                            <div className="text-white/80 text-sm">
+                              {company.name}
+                            </div>
+                            <div className="text-white/50 text-xs">
+                              {country?.name ?? 'Без страны'}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onDeleteCompany(company.id)}
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                        >
+                          <Trash2 className="w-4 h-4 text-white/60" />
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-white/50 text-sm">Нет компаний</div>
                 )}
               </div>
             </div>

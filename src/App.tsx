@@ -29,6 +29,8 @@ import type {
   Trait,
   GameSettings,
   BuildingDefinition,
+  Company,
+  BuildingOwner,
   EventLogEntry,
   EventCategory,
   EventLogState,
@@ -50,25 +52,48 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
   Object.values(next).forEach((province) => {
     if (!province) return;
     if (!province.buildingsBuilt) {
-      province.buildingsBuilt = {};
+      province.buildingsBuilt = [];
     } else if (Array.isArray(province.buildingsBuilt)) {
-      const map: Record<string, number> = {};
-      province.buildingsBuilt.forEach((id) => {
-        map[id] = (map[id] ?? 0) + 1;
-      });
-      province.buildingsBuilt = map;
+      const first = province.buildingsBuilt[0] as any;
+      if (first && typeof first === 'object' && 'buildingId' in first) {
+        // already in new format
+      } else {
+        const converted: { buildingId: string; owner: BuildingOwner }[] = [];
+        (province.buildingsBuilt as unknown as string[]).forEach((id) => {
+          converted.push({ buildingId: id, owner: { type: 'state' } });
+        });
+        province.buildingsBuilt = converted;
+      }
+    } else {
+      const converted: { buildingId: string; owner: BuildingOwner }[] = [];
+      Object.entries(province.buildingsBuilt as unknown as Record<string, number>)
+        .forEach(([id, count]) => {
+          const safe = Math.max(0, Math.floor(count ?? 0));
+          for (let i = 0; i < safe; i += 1) {
+            converted.push({ buildingId: id, owner: { type: 'state' } });
+          }
+        });
+      province.buildingsBuilt = converted;
     }
 
     if (!province.constructionProgress) {
       province.constructionProgress = {};
     } else {
-      const converted: Record<string, number[]> = {};
+      const converted: Record<string, { progress: number; owner: BuildingOwner }[]> = {};
       Object.entries(province.constructionProgress).forEach(
         ([buildingId, value]) => {
           if (Array.isArray(value)) {
-            converted[buildingId] = value;
+            const first = value[0] as any;
+            if (first && typeof first === 'object' && 'progress' in first) {
+              converted[buildingId] = value as any;
+            } else {
+              converted[buildingId] = (value as number[]).map((progress) => ({
+                progress,
+                owner: { type: 'state' },
+              }));
+            }
           } else if (typeof value === 'number') {
-            converted[buildingId] = [value];
+            converted[buildingId] = [{ progress: value, owner: { type: 'state' } }];
           }
         },
       );
@@ -188,6 +213,7 @@ function App() {
   ]);
   const [resources, setResources] = useState<Trait[]>([]);
   const [buildings, setBuildings] = useState<BuildingDefinition[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -235,6 +261,7 @@ function App() {
       );
       return next;
     });
+    setCompanies((prev) => prev.filter((company) => company.countryId !== id));
 
     setProvinces((prev) => {
       const next: ProvinceRecord = { ...prev };
@@ -394,7 +421,7 @@ function App() {
       Object.values(next).forEach((province) => {
         if (province.ownerCountryId !== countryId) return;
         const progress = { ...(province.constructionProgress ?? {}) };
-        const builtMap = { ...(province.buildingsBuilt ?? {}) };
+        const builtList = [...(province.buildingsBuilt ?? [])];
         let progressChanged = false;
         let builtChanged = false;
 
@@ -402,20 +429,20 @@ function App() {
           const cost = buildings.find((b) => b.id === buildingId)?.cost ?? 100;
           const buildingName =
             buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
-          const remaining: number[] = [];
+          const remaining: { progress: number; owner: BuildingOwner }[] = [];
           let completed = 0;
 
-          entries.forEach((value) => {
-            const updated = value + share;
+          entries.forEach((entry) => {
+            const updated = entry.progress + share;
             if (updated >= cost) {
               completed += 1;
+              builtList.push({ buildingId, owner: entry.owner });
             } else {
-              remaining.push(updated);
+              remaining.push({ ...entry, progress: updated });
             }
           });
 
           if (completed > 0) {
-            builtMap[buildingId] = (builtMap[buildingId] ?? 0) + completed;
             builtChanged = true;
             addEvent({
               category: 'economy',
@@ -437,7 +464,7 @@ function App() {
           province.constructionProgress = progress;
         }
         if (builtChanged) {
-          province.buildingsBuilt = builtMap;
+          province.buildingsBuilt = builtList;
         }
       });
       return next;
@@ -511,6 +538,8 @@ function App() {
       landscapes,
       cultures,
       resources,
+      buildings,
+      companies,
       settings: gameSettings,
       eventLog,
     }),
@@ -526,6 +555,8 @@ function App() {
       landscapes,
       cultures,
       resources,
+      buildings,
+      companies,
       gameSettings,
       eventLog,
     ],
@@ -585,6 +616,7 @@ function App() {
     setCultures(save.data.cultures ?? cultures);
     setResources(save.data.resources ?? resources);
     setBuildings(save.data.buildings ?? buildings);
+    setCompanies(save.data.companies ?? companies);
     setGameSettings(
       save.data.settings ?? {
         colonizationPointsPerTurn: 10,
@@ -690,6 +722,7 @@ function App() {
     ]);
     setResources([]);
     setBuildings([]);
+    setCompanies([]);
     setGameSettings({ colonizationPointsPerTurn: 10, constructionPointsPerTurn: 10, eventLogRetainTurns: 3 });
     setEventLog(createDefaultLog());
     setHotseatOpen(false);
@@ -719,7 +752,7 @@ function App() {
             colonizationCost: 100,
             colonizationProgress: {},
             colonizationDisabled: false,
-            buildingsBuilt: {},
+            buildingsBuilt: [],
             constructionProgress: {},
           };
           changed = true;
@@ -742,36 +775,12 @@ function App() {
           updated = true;
         }
         if (!existing.buildingsBuilt) {
-          existing.buildingsBuilt = {};
-          updated = true;
-        } else if (Array.isArray(existing.buildingsBuilt)) {
-          const map: Record<string, number> = {};
-          existing.buildingsBuilt.forEach((id) => {
-            map[id] = (map[id] ?? 0) + 1;
-          });
-          existing.buildingsBuilt = map;
+          existing.buildingsBuilt = [];
           updated = true;
         }
         if (!existing.constructionProgress) {
           existing.constructionProgress = {};
           updated = true;
-        } else {
-          const converted: Record<string, number[]> = {};
-          let changedProgress = false;
-          Object.entries(existing.constructionProgress).forEach(
-            ([buildingId, value]) => {
-              if (Array.isArray(value)) {
-                converted[buildingId] = value;
-              } else if (typeof value === 'number') {
-                converted[buildingId] = [value];
-                changedProgress = true;
-              }
-            },
-          );
-          if (changedProgress) {
-            existing.constructionProgress = converted;
-            updated = true;
-          }
         }
         if (!existing.resourceAmounts) {
           if ((existing as any).resourceIds) {
@@ -1141,6 +1150,46 @@ function App() {
     setBuildings((prev) => [...prev, { id: createId(), name, cost, iconDataUrl }]);
   };
 
+  const addCompany = (name: string, countryId: string) => {
+    setCompanies((prev) => [...prev, { id: createId(), name, countryId }]);
+  };
+
+  const deleteCompany = (id: string) => {
+    setCompanies((prev) => prev.filter((company) => company.id !== id));
+    setProvinces((prev) => {
+      const next: ProvinceRecord = { ...prev };
+      Object.values(next).forEach((province) => {
+        if (province.buildingsBuilt) {
+          province.buildingsBuilt = province.buildingsBuilt.map((entry) => {
+            if (entry.owner.type === 'company' && entry.owner.companyId === id) {
+              return { ...entry, owner: { type: 'state' } };
+            }
+            return entry;
+          });
+        }
+        if (province.constructionProgress) {
+          const updated: Record<string, { progress: number; owner: BuildingOwner }[]> =
+            {};
+          Object.entries(province.constructionProgress).forEach(
+            ([buildingId, entries]) => {
+              updated[buildingId] = entries.map((entry) => {
+                if (
+                  entry.owner.type === 'company' &&
+                  entry.owner.companyId === id
+                ) {
+                  return { ...entry, owner: { type: 'state' } };
+                }
+                return entry;
+              });
+            },
+          );
+          province.constructionProgress = updated;
+        }
+      });
+      return next;
+    });
+  };
+
   const updateBuildingIcon = (id: string, iconDataUrl?: string) => {
     setBuildings((prev) =>
       prev.map((item) => (item.id === id ? { ...item, iconDataUrl } : item)),
@@ -1152,10 +1201,10 @@ function App() {
     setProvinces((prev) => {
       const next: ProvinceRecord = { ...prev };
       Object.values(next).forEach((province) => {
-        if (province.buildingsBuilt && id in province.buildingsBuilt) {
-          const built = { ...province.buildingsBuilt };
-          delete built[id];
-          province.buildingsBuilt = built;
+        if (province.buildingsBuilt) {
+          province.buildingsBuilt = province.buildingsBuilt.filter(
+            (entry) => entry.buildingId !== id,
+          );
         }
         if (province.constructionProgress && id in province.constructionProgress) {
           const progress = { ...province.constructionProgress };
@@ -1167,10 +1216,19 @@ function App() {
     });
   };
 
-  const startConstruction = (provinceId: string, buildingId: string) => {
+  const startConstruction = (
+    provinceId: string,
+    buildingId: string,
+    owner: BuildingOwner,
+  ) => {
     const buildingName =
       buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
     const country = countries.find((c) => c.id === activeCountryId);
+    const ownerLabel =
+      owner.type === 'state'
+        ? 'государство'
+        : companies.find((item) => item.id === owner.companyId)?.name ??
+          'компания';
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId == null) return prev;
@@ -1178,11 +1236,11 @@ function App() {
       const entries = Array.isArray(progress[buildingId])
         ? [...progress[buildingId]]
         : [];
-      entries.push(0);
+      entries.push({ progress: 0, owner });
       progress[buildingId] = entries;
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'Страна'} начала строительство ${buildingName} в провинции ${provinceId}.`,
+        message: `${country?.name ?? 'Страна'} начала строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -1209,7 +1267,12 @@ function App() {
         ? [...progress[buildingId]]
         : [];
       if (entries.length === 0) return prev;
-      entries.pop();
+      const removed = entries.pop();
+      const ownerLabel =
+        removed?.owner.type === 'state'
+          ? 'государство'
+          : companies.find((item) => item.id === removed?.owner.companyId)?.name ??
+            'компания';
       if (entries.length > 0) {
         progress[buildingId] = entries;
       } else {
@@ -1217,7 +1280,7 @@ function App() {
       }
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId}.`,
+        message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -1590,15 +1653,16 @@ function App() {
         provinceId={selectedProvinceId}
         province={selectedProvince}
         buildings={buildings}
+        companies={companies}
         activeCountryId={activeCountryId}
         activeCountryPoints={
           countries.find((country) => country.id === activeCountryId)
             ?.constructionPoints ?? 0
         }
         onClose={() => setConstructionModalOpen(false)}
-        onStart={(buildingId) => {
+        onStart={(buildingId, owner) => {
           if (selectedProvinceId) {
-            startConstruction(selectedProvinceId, buildingId);
+            startConstruction(selectedProvinceId, buildingId, owner);
           }
         }}
         onCancel={(buildingId) => {
@@ -1620,6 +1684,7 @@ function App() {
         provinces={provinces}
         buildings={buildings}
         countries={countries}
+        companies={companies}
         activeCountryId={activeCountryId}
         onClose={() => setIndustryOpen(false)}
       />
@@ -1635,6 +1700,7 @@ function App() {
         cultures={cultures}
         resources={resources}
         buildings={buildings}
+        companies={companies}
         onClose={() => setAdminOpen(false)}
         onAssignOwner={assignOwner}
         onAssignClimate={assignClimate}
@@ -1650,6 +1716,7 @@ function App() {
         onAddCulture={addCulture}
         onAddResource={addResource}
         onAddBuilding={addBuilding}
+        onAddCompany={addCompany}
         onUpdateReligionIcon={updateReligionIcon}
         onUpdateCultureIcon={updateCultureIcon}
         onUpdateResourceIcon={updateResourceIcon}
@@ -1660,6 +1727,7 @@ function App() {
         onDeleteCulture={deleteCulture}
         onDeleteResource={deleteResource}
         onDeleteBuilding={deleteBuilding}
+        onDeleteCompany={deleteCompany}
       />
     </div>
     </EventLogContext.Provider>

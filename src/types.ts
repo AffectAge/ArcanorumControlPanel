@@ -21,6 +21,7 @@ export type GameState = {
   landscapes?: Trait[];
   resources?: Trait[];
   buildings?: BuildingDefinition[];
+  companies?: Company[];
   settings?: GameSettings;
   eventLog?: EventLogState;
 };
@@ -53,8 +54,8 @@ export type ProvinceData = {
   colonizationCost?: number;
   colonizationProgress?: Record<string, number>;
   colonizationDisabled?: boolean;
-  buildingsBuilt?: Record<string, number>;
-  constructionProgress?: Record<string, number[]>;
+  buildingsBuilt?: BuiltBuilding[];
+  constructionProgress?: Record<string, ConstructionEntry[]>;
 };
 
 export type ProvinceRecord = Record<string, ProvinceData>;
@@ -77,6 +78,26 @@ export type BuildingDefinition = {
   name: string;
   cost: number;
   iconDataUrl?: string;
+};
+
+export type Company = {
+  id: string;
+  name: string;
+  countryId: string;
+};
+
+export type BuildingOwner =
+  | { type: 'state' }
+  | { type: 'company'; companyId: string };
+
+export type ConstructionEntry = {
+  progress: number;
+  owner: BuildingOwner;
+};
+
+export type BuiltBuilding = {
+  buildingId: string;
+  owner: BuildingOwner;
 };
 
 export type EventCategory =

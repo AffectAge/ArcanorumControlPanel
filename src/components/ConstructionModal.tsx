@@ -1,15 +1,17 @@
 import { X, Hammer, Ban } from 'lucide-react';
-import type { BuildingDefinition, ProvinceData } from '../types';
+import { useMemo, useState } from 'react';
+import type { BuildingDefinition, Company, ProvinceData, BuildingOwner } from '../types';
 
 type ConstructionModalProps = {
   open: boolean;
   provinceId?: string;
   province?: ProvinceData;
   buildings: BuildingDefinition[];
+  companies: Company[];
   activeCountryId?: string;
   activeCountryPoints: number;
   onClose: () => void;
-  onStart: (buildingId: string) => void;
+  onStart: (buildingId: string, owner: BuildingOwner) => void;
   onCancel: (buildingId: string) => void;
 };
 
@@ -18,6 +20,7 @@ export default function ConstructionModal({
   provinceId,
   province,
   buildings,
+  companies,
   activeCountryId,
   activeCountryPoints,
   onClose,
@@ -29,8 +32,18 @@ export default function ConstructionModal({
   const isOwner = Boolean(
     activeCountryId && province.ownerCountryId === activeCountryId,
   );
+  const [ownerType, setOwnerType] = useState<'state' | 'company'>('state');
+  const [companyId, setCompanyId] = useState('');
+  const availableCompanies = useMemo(
+    () => companies.filter((company) => company.countryId === activeCountryId),
+    [companies, activeCountryId],
+  );
+  const owner: BuildingOwner =
+    ownerType === 'company' && companyId
+      ? { type: 'company', companyId }
+      : { type: 'state' };
   const progressMap = province.constructionProgress ?? {};
-  const builtMap = province.buildingsBuilt ?? {};
+  const builtList = province.buildingsBuilt ?? [];
   const activeTasks = Object.values(progressMap).reduce(
     (sum, entries) => sum + entries.length,
     0,
@@ -70,6 +83,51 @@ export default function ConstructionModal({
             </div>
           )}
 
+          <div className="flex items-center gap-3 px-2 py-2 rounded-xl border border-white/10 bg-white/5">
+            <div className="text-white/60 text-xs">Владелец строительства:</div>
+            <button
+              onClick={() => setOwnerType('state')}
+              className={`px-3 h-8 rounded-lg border text-xs ${
+                ownerType === 'state'
+                  ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200'
+                  : 'bg-black/30 border-white/10 text-white/60 hover:border-emerald-400/40'
+              }`}
+            >
+              Государство
+            </button>
+            <button
+              onClick={() => setOwnerType('company')}
+              className={`px-3 h-8 rounded-lg border text-xs ${
+                ownerType === 'company'
+                  ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200'
+                  : 'bg-black/30 border-white/10 text-white/60 hover:border-emerald-400/40'
+              }`}
+              disabled={!isOwner}
+            >
+              Компания
+            </button>
+            {ownerType === 'company' && (
+              <select
+                value={companyId}
+                onChange={(event) => setCompanyId(event.target.value)}
+                className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+              >
+                <option value="" className="bg-[#0b111b] text-white">
+                  Выберите компанию
+                </option>
+                {availableCompanies.map((company) => (
+                  <option
+                    key={company.id}
+                    value={company.id}
+                    className="bg-[#0b111b] text-white"
+                  >
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div className="grid grid-cols-12 gap-2 px-2 py-2 text-white/50 text-[11px] uppercase tracking-wide">
             <div className="col-span-5">Здание</div>
             <div className="col-span-2">Стоимость</div>
@@ -85,10 +143,15 @@ export default function ConstructionModal({
             )}
             {buildings.map((building) => {
               const cost = Math.max(1, building.cost ?? 1);
-              const builtCount = builtMap[building.id] ?? 0;
+              const builtCount = builtList.filter(
+                (entry) => entry.buildingId === building.id,
+              ).length;
               const entries = progressMap[building.id] ?? [];
               const hasProgress = entries.length > 0;
-              const progressSum = entries.reduce((sum, value) => sum + value, 0);
+              const progressSum = entries.reduce(
+                (sum, entry) => sum + entry.progress,
+                0,
+              );
               const average = entries.length
                 ? Math.min(100, Math.round((progressSum / entries.length / cost) * 100))
                 : 0;
@@ -139,8 +202,8 @@ export default function ConstructionModal({
 
                   <div className="col-span-2 flex items-center justify-end gap-2">
                     <button
-                      onClick={() => onStart(building.id)}
-                      disabled={!canStart}
+                      onClick={() => onStart(building.id, owner)}
+                      disabled={!canStart || (ownerType === 'company' && !companyId)}
                       className={`h-8 px-2 rounded-lg border text-[11px] flex items-center gap-1 ${
                         canStart
                           ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200 hover:bg-emerald-500/30'
