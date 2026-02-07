@@ -126,6 +126,32 @@ export default function ConstructionModal({
                 ))}
               </select>
             )}
+            {ownerType === 'company' && (
+              <div className="flex items-center gap-2 max-w-full flex-wrap">
+                {availableCompanies.map((company) => (
+                  <button
+                    key={company.id}
+                    onClick={() => setCompanyId(company.id)}
+                    className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                      companyId === company.id
+                        ? 'border-emerald-400/60 bg-emerald-500/20'
+                        : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
+                    }`}
+                    title={company.name}
+                  >
+                    {company.iconDataUrl ? (
+                      <img
+                        src={company.iconDataUrl}
+                        alt=""
+                        className="w-6 h-6 rounded object-cover"
+                      />
+                    ) : (
+                      <span className="text-white/50 text-[10px]">Logo</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-12 gap-2 px-2 py-2 text-white/50 text-[11px] uppercase tracking-wide">

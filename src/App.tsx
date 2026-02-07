@@ -172,6 +172,7 @@ function App() {
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     colonizationPointsPerTurn: 10,
     constructionPointsPerTurn: 10,
+    demolitionCostPercent: 20,
     eventLogRetainTurns: 3,
   });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
@@ -620,7 +621,8 @@ function App() {
     setGameSettings(
       save.data.settings ?? {
         colonizationPointsPerTurn: 10,
-    constructionPointsPerTurn: 10,
+        constructionPointsPerTurn: 10,
+        demolitionCostPercent: 20,
         eventLogRetainTurns: 3,
       },
     );
@@ -723,7 +725,12 @@ function App() {
     setResources([]);
     setBuildings([]);
     setCompanies([]);
-    setGameSettings({ colonizationPointsPerTurn: 10, constructionPointsPerTurn: 10, eventLogRetainTurns: 3 });
+    setGameSettings({
+      colonizationPointsPerTurn: 10,
+      constructionPointsPerTurn: 10,
+      demolitionCostPercent: 20,
+      eventLogRetainTurns: 3,
+    });
     setEventLog(createDefaultLog());
     setHotseatOpen(false);
   };
@@ -1150,8 +1157,19 @@ function App() {
     setBuildings((prev) => [...prev, { id: createId(), name, cost, iconDataUrl }]);
   };
 
-  const addCompany = (name: string, countryId: string) => {
-    setCompanies((prev) => [...prev, { id: createId(), name, countryId }]);
+  const addCompany = (name: string, countryId: string, iconDataUrl?: string) => {
+    setCompanies((prev) => [
+      ...prev,
+      { id: createId(), name, countryId, iconDataUrl },
+    ]);
+  };
+
+  const updateCompanyIcon = (id: string, iconDataUrl?: string) => {
+    setCompanies((prev) =>
+      prev.map((company) =>
+        company.id === id ? { ...company, iconDataUrl } : company,
+      ),
+    );
   };
 
   const deleteCompany = (id: string) => {
@@ -1686,6 +1704,67 @@ function App() {
         countries={countries}
         companies={companies}
         activeCountryId={activeCountryId}
+        activeCountryPoints={
+          countries.find((country) => country.id === activeCountryId)
+            ?.constructionPoints ?? 0
+        }
+        demolitionCostPercent={gameSettings.demolitionCostPercent ?? 20}
+        onDemolish={(provinceId, buildingId) => {
+          const building = buildings.find((b) => b.id === buildingId);
+          const baseCost = Math.max(1, building?.cost ?? 1);
+          const percent = Math.max(0, gameSettings.demolitionCostPercent ?? 20);
+          const demolishCost = Math.ceil((baseCost * percent) / 100);
+          const country = countries.find((c) => c.id === activeCountryId);
+          const available = country?.constructionPoints ?? 0;
+          if (available < demolishCost) {
+            addEvent({
+              category: 'economy',
+              message: `Недостаточно очков строительства для сноса здания в провинции ${provinceId}.`,
+              countryId: country?.id,
+              priority: 'low',
+            });
+            return;
+          }
+
+          setCountries((prev) =>
+            prev.map((entry) =>
+              entry.id === activeCountryId
+                ? {
+                    ...entry,
+                    constructionPoints: Math.max(
+                      0,
+                      (entry.constructionPoints ?? 0) - demolishCost,
+                    ),
+                  }
+                : entry,
+            ),
+          );
+
+          setProvinces((prev) => {
+            const province = prev[provinceId];
+            if (!province || !province.buildingsBuilt) return prev;
+            const index = province.buildingsBuilt.findIndex(
+              (entry) => entry.buildingId === buildingId,
+            );
+            if (index === -1) return prev;
+            const nextBuilt = [...province.buildingsBuilt];
+            nextBuilt.splice(index, 1);
+            const buildingName = building?.name ?? buildingId;
+            addEvent({
+              category: 'economy',
+              message: `${country?.name ?? 'Страна'} снесла ${buildingName} в провинции ${provinceId} (стоимость: ${demolishCost}).`,
+              countryId: province.ownerCountryId,
+              priority: 'low',
+            });
+            return {
+              ...prev,
+              [provinceId]: {
+                ...province,
+                buildingsBuilt: nextBuilt,
+              },
+            };
+          });
+        }}
         onClose={() => setIndustryOpen(false)}
       />
 
@@ -1717,6 +1796,7 @@ function App() {
         onAddResource={addResource}
         onAddBuilding={addBuilding}
         onAddCompany={addCompany}
+        onUpdateCompanyIcon={updateCompanyIcon}
         onUpdateReligionIcon={updateReligionIcon}
         onUpdateCultureIcon={updateCultureIcon}
         onUpdateResourceIcon={updateResourceIcon}

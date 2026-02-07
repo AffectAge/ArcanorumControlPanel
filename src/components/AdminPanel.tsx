@@ -56,7 +56,8 @@ type AdminPanelProps = {
   onAddCulture: (name: string, color: string, iconDataUrl?: string) => void;
   onAddResource: (name: string, color: string, iconDataUrl?: string) => void;
   onAddBuilding: (name: string, cost: number, iconDataUrl?: string) => void;
-  onAddCompany: (name: string, countryId: string) => void;
+  onAddCompany: (name: string, countryId: string, iconDataUrl?: string) => void;
+  onUpdateCompanyIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateReligionIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateCultureIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateResourceIcon: (id: string, iconDataUrl?: string) => void;
@@ -100,6 +101,7 @@ export default function AdminPanel({
   onAddResource,
   onAddBuilding,
   onAddCompany,
+  onUpdateCompanyIcon,
   onUpdateReligionIcon,
   onUpdateCultureIcon,
   onUpdateResourceIcon,
@@ -130,6 +132,7 @@ export default function AdminPanel({
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
   const [companyName, setCompanyName] = useState('');
   const [companyCountryId, setCompanyCountryId] = useState<string>('');
+  const [companyIcon, setCompanyIcon] = useState<string | undefined>(undefined);
   const [resourceColor, setResourceColor] = useState('#22c55e');
   const [resourceIcon, setResourceIcon] = useState<string | undefined>(undefined);
 
@@ -195,8 +198,9 @@ export default function AdminPanel({
   const handleAddCompany = () => {
     const name = companyName.trim();
     if (!name || !companyCountryId) return;
-    onAddCompany(name, companyCountryId);
+    onAddCompany(name, companyCountryId, companyIcon);
     setCompanyName('');
+    setCompanyIcon(undefined);
   };
 
 
@@ -1279,6 +1283,34 @@ export default function AdminPanel({
                     ))}
                   </select>
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Логотип
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        handleIconUpload(event.target.files?.[0], setCompanyIcon)
+                      }
+                      className="hidden"
+                      id="company-icon"
+                    />
+                    <label
+                      htmlFor="company-icon"
+                      className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Выбрать
+                    </label>
+                    {companyIcon && (
+                      <img
+                        src={companyIcon}
+                        alt=""
+                        className="w-8 h-8 rounded-lg object-cover border border-white/10"
+                      />
+                    )}
+                  </div>
+                </label>
                 <button
                   onClick={handleAddCompany}
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
@@ -1300,7 +1332,15 @@ export default function AdminPanel({
                         className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
                       >
                         <div className="flex items-center gap-3">
-                          <Briefcase className="w-4 h-4 text-white/60" />
+                          {company.iconDataUrl ? (
+                            <img
+                              src={company.iconDataUrl}
+                              alt=""
+                              className="w-6 h-6 rounded-md object-cover border border-white/10"
+                            />
+                          ) : (
+                            <Briefcase className="w-4 h-4 text-white/60" />
+                          )}
                           <div>
                             <div className="text-white/80 text-sm">
                               {company.name}
@@ -1309,6 +1349,31 @@ export default function AdminPanel({
                               {country?.name ?? 'Без страны'}
                             </div>
                           </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) =>
+                                handleIconUpload(
+                                  event.target.files?.[0],
+                                  (value) => onUpdateCompanyIcon(company.id, value),
+                                )
+                              }
+                            />
+                            <ImageIcon className="w-3.5 h-3.5" />
+                            Изменить логотип
+                          </label>
+                          {company.iconDataUrl && (
+                            <button
+                              onClick={() => onUpdateCompanyIcon(company.id, undefined)}
+                              className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                            >
+                              Удалить логотип
+                            </button>
+                          )}
                         </div>
                         <button
                           onClick={() => onDeleteCompany(company.id)}

@@ -72,6 +72,26 @@ export default function SettingsModal({
           </label>
 
           <label className="flex flex-col gap-2 text-white/70 text-sm">
+            Стоимость сноса (% от цены здания)
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={settings.demolitionCostPercent ?? 20}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  demolitionCostPercent: Math.min(
+                    100,
+                    Math.max(0, Number(event.target.value) || 0),
+                  ),
+                })
+              }
+              className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-white/70 text-sm">
             Хранить события за последние (ходов)
             <input
               type="number"

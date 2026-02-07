@@ -71,6 +71,7 @@ export type GameSettings = {
   colonizationPointsPerTurn: number;
   eventLogRetainTurns?: number;
   constructionPointsPerTurn?: number;
+  demolitionCostPercent?: number;
 };
 
 export type BuildingDefinition = {
@@ -84,6 +85,7 @@ export type Company = {
   id: string;
   name: string;
   countryId: string;
+  iconDataUrl?: string;
 };
 
 export type BuildingOwner =

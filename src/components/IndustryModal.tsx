@@ -1,4 +1,4 @@
-import { X, Hammer, Factory, MapPin, Building } from 'lucide-react';
+import { X, Hammer, Factory, MapPin, Building, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { BuildingDefinition, Country, ProvinceRecord, Company } from '../types';
 
@@ -9,6 +9,9 @@ type IndustryModalProps = {
   countries: Country[];
   companies: Company[];
   activeCountryId?: string;
+  activeCountryPoints: number;
+  demolitionCostPercent: number;
+  onDemolish: (provinceId: string, buildingId: string) => void;
   onClose: () => void;
 };
 
@@ -24,6 +27,9 @@ export default function IndustryModal({
   countries,
   companies,
   activeCountryId,
+  activeCountryPoints,
+  demolitionCostPercent,
+  onDemolish,
   onClose,
 }: IndustryModalProps) {
   if (!open) return null;
@@ -34,9 +40,16 @@ export default function IndustryModal({
   const [filterBuildingId, setFilterBuildingId] = useState('');
   const [filterProvinceId, setFilterProvinceId] = useState('');
   const [filterCompanyId, setFilterCompanyId] = useState('');
+  const [filterCompanyCountryId, setFilterCompanyCountryId] = useState('');
   const [sortBy, setSortBy] = useState<'building' | 'province' | 'company'>(
     'building',
   );
+  const [confirmTarget, setConfirmTarget] = useState<{
+    provinceId: string;
+    buildingId: string;
+    buildingName: string;
+    cost: number;
+  } | null>(null);
 
   const cards = useMemo(
     () =>
@@ -59,6 +72,11 @@ export default function IndustryModal({
       if (filterCompanyId) {
         if (card.owner.type !== 'company') return false;
         if (card.owner.companyId !== filterCompanyId) return false;
+      }
+      if (filterCompanyCountryId) {
+        if (card.owner.type !== 'company') return false;
+        const company = companies.find((c) => c.id === card.owner.companyId);
+        if (!company || company.countryId !== filterCompanyCountryId) return false;
       }
       return true;
     });
@@ -101,7 +119,7 @@ export default function IndustryModal({
         </div>
 
         <div className="p-4 space-y-3 flex-1 min-h-0">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <label className="flex flex-col gap-2 text-white/70 text-xs">
               Фильтр по зданию
               <select
@@ -170,6 +188,28 @@ export default function IndustryModal({
                 ))}
               </select>
             </label>
+
+            <label className="flex flex-col gap-2 text-white/70 text-xs">
+              Фильтр по стране компании
+              <select
+                value={filterCompanyCountryId}
+                onChange={(event) => setFilterCompanyCountryId(event.target.value)}
+                className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+              >
+                <option value="" className="bg-[#0b111b] text-white">
+                  Все страны
+                </option>
+                {countries.map((country) => (
+                  <option
+                    key={country.id}
+                    value={country.id}
+                    className="bg-[#0b111b] text-white"
+                  >
+                    {country.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <div className="flex items-center justify-between gap-3 text-white/60 text-xs">
@@ -219,17 +259,27 @@ export default function IndustryModal({
                 {filteredCards.map((card) => {
                   const building = buildings.find((b) => b.id === card.buildingId);
                   const country = countries.find((c) => c.id === card.countryId);
+                  const baseCost = Math.max(1, building?.cost ?? 1);
+                  const demolishCost = Math.ceil(
+                    (baseCost * (demolitionCostPercent ?? 0)) / 100,
+                  );
                   const ownerLabel =
                     card.owner.type === 'state'
-                      ? 'Государство'
+                      ? country?.name ?? 'Государство'
                       : companies.find((c) => c.id === card.owner.companyId)?.name ??
                         'Компания';
+                  const ownerLogo =
+                    card.owner.type === 'state'
+                      ? country?.flagDataUrl
+                      : companies.find((c) => c.id === card.owner.companyId)
+                          ?.iconDataUrl;
                   return (
                     <div
                       key={card.key}
                       className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col gap-4 shadow-lg shadow-black/30"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
                         {building?.iconDataUrl ? (
                           <img
                             src={building.iconDataUrl}
@@ -249,6 +299,21 @@ export default function IndustryModal({
                             Стоимость: {Math.max(1, building?.cost ?? 1)}
                           </div>
                         </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setConfirmTarget({
+                              provinceId: card.provinceId,
+                              buildingId: card.buildingId,
+                              buildingName: building?.name ?? card.buildingId,
+                              cost: demolishCost,
+                            });
+                          }}
+                          className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                          title="Снести"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                       <div className="flex flex-col gap-2 text-white/60 text-xs">
                         <div className="flex items-center gap-2">
@@ -264,7 +329,14 @@ export default function IndustryModal({
                         <div className="flex items-center gap-2">
                           <Factory className="w-3.5 h-3.5" />
                           <span className="text-white/40">Владелец:</span>
-                          <span className="px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-white/70">
+                          <span className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-white/70">
+                            {ownerLogo && (
+                              <img
+                                src={ownerLogo}
+                                alt=""
+                                className="w-4 h-4 rounded object-cover border border-white/10"
+                              />
+                            )}
                             {ownerLabel}
                           </span>
                         </div>
@@ -277,6 +349,58 @@ export default function IndustryModal({
           </div>
         </div>
       </div>
+
+      {confirmTarget && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-[420px] max-w-[92vw] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div className="text-white/90 text-base font-semibold">
+                Подтвердить снос
+              </div>
+              <button
+                onClick={() => setConfirmTarget(null)}
+                className="w-8 h-8 rounded-lg bg-black/30 border border-white/10 flex items-center justify-center hover:border-red-400/50 hover:bg-red-400/10 transition-all"
+              >
+                <X className="w-4 h-4 text-white/70" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3 text-sm text-white/70">
+              <div>
+                Снести <span className="text-white">{confirmTarget.buildingName}</span>{' '}
+                в провинции <span className="text-white">{confirmTarget.provinceId}</span>?
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-1 text-xs">
+                <div>Стоимость сноса: {confirmTarget.cost}</div>
+                <div>Доступно очков строительства: {activeCountryPoints}</div>
+              </div>
+              {activeCountryPoints < confirmTarget.cost && (
+                <div className="text-red-300 text-xs">
+                  Недостаточно очков строительства для сноса.
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setConfirmTarget(null)}
+                  className="h-9 px-4 rounded-lg border border-white/10 bg-black/30 text-white/60 hover:border-emerald-400/40"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={() => {
+                    if (activeCountryPoints < confirmTarget.cost) return;
+                    onDemolish(confirmTarget.provinceId, confirmTarget.buildingId);
+                    setConfirmTarget(null);
+                  }}
+                  className="h-9 px-4 rounded-lg border border-red-400/40 bg-red-500/20 text-red-200 hover:bg-red-500/30 disabled:opacity-50"
+                  disabled={activeCountryPoints < confirmTarget.cost}
+                >
+                  Снести
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
