@@ -1740,20 +1740,81 @@ function App() {
           setConstructionModalOpen(true);
           setIndustryOpen(false);
         }}
-        onChangeOwner={(provinceId, builtIndex, owner) => {
+        onChangeOwner={(provinceId, kind, buildingId, index, owner) => {
           setProvinces((prev) => {
             const province = prev[provinceId];
-            if (!province || !province.buildingsBuilt) return prev;
-            if (builtIndex < 0 || builtIndex >= province.buildingsBuilt.length) {
-              return prev;
+            if (!province) return prev;
+            if (kind === 'built') {
+              if (!province.buildingsBuilt) return prev;
+              if (index < 0 || index >= province.buildingsBuilt.length) {
+                return prev;
+              }
+              const nextBuilt = [...province.buildingsBuilt];
+              nextBuilt[index] = { ...nextBuilt[index], owner };
+              return {
+                ...prev,
+                [provinceId]: {
+                  ...province,
+                  buildingsBuilt: nextBuilt,
+                },
+              };
             }
-            const nextBuilt = [...province.buildingsBuilt];
-            nextBuilt[builtIndex] = { ...nextBuilt[builtIndex], owner };
+
+            if (kind === 'construction') {
+              const progressMap = province.constructionProgress ?? {};
+              const entries = progressMap[buildingId];
+              if (!entries || index < 0 || index >= entries.length) return prev;
+              const nextEntries = [...entries];
+              nextEntries[index] = { ...nextEntries[index], owner };
+              return {
+                ...prev,
+                [provinceId]: {
+                  ...province,
+                  constructionProgress: {
+                    ...progressMap,
+                    [buildingId]: nextEntries,
+                  },
+                },
+              };
+            }
+
+            return prev;
+          });
+        }}
+        onCancelConstruction={(provinceId, buildingId, index) => {
+          setProvinces((prev) => {
+            const province = prev[provinceId];
+            if (!province || !province.constructionProgress) return prev;
+            const entries = province.constructionProgress[buildingId];
+            if (!entries || index < 0 || index >= entries.length) return prev;
+            const nextEntries = [...entries];
+            const removed = nextEntries.splice(index, 1)[0];
+            const nextProgress = { ...province.constructionProgress };
+            if (nextEntries.length > 0) {
+              nextProgress[buildingId] = nextEntries;
+            } else {
+              delete nextProgress[buildingId];
+            }
+            const buildingName =
+              buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
+            const country = countries.find((c) => c.id === activeCountryId);
+            const ownerLabel =
+              removed?.owner.type === 'state'
+                ? countries.find((item) => item.id === removed?.owner.countryId)
+                    ?.name ?? 'государство'
+                : companies.find((item) => item.id === removed?.owner.companyId)
+                    ?.name ?? 'компания';
+            addEvent({
+              category: 'economy',
+              message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+              countryId: province.ownerCountryId,
+              priority: 'low',
+            });
             return {
               ...prev,
               [provinceId]: {
                 ...province,
-                buildingsBuilt: nextBuilt,
+                constructionProgress: nextProgress,
               },
             };
           });

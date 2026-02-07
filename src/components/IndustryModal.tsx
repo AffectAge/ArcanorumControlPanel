@@ -14,11 +14,14 @@ type IndustryModalProps = {
   onOpenConstruction: (provinceId: string) => void;
   onChangeOwner: (
     provinceId: string,
-    builtIndex: number,
+    kind: 'built' | 'construction',
+    buildingId: string,
+    index: number,
     owner:
       | { type: 'state'; countryId: string }
       | { type: 'company'; companyId: string },
   ) => void;
+  onCancelConstruction: (provinceId: string, buildingId: string, index: number) => void;
   onDemolish: (provinceId: string, buildingId: string) => void;
   onClose: () => void;
 };
@@ -39,6 +42,7 @@ export default function IndustryModal({
   demolitionCostPercent,
   onOpenConstruction,
   onChangeOwner,
+  onCancelConstruction,
   onDemolish,
   onClose,
 }: IndustryModalProps) {
@@ -51,6 +55,7 @@ export default function IndustryModal({
   const [filterProvinceId, setFilterProvinceId] = useState('');
   const [filterCompanyId, setFilterCompanyId] = useState('');
   const [filterCompanyCountryId, setFilterCompanyCountryId] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'construction' | 'built'>('all');
   const [sortBy, setSortBy] = useState<'building' | 'province' | 'company'>(
     'building',
   );
@@ -64,26 +69,46 @@ export default function IndustryModal({
   const [ownerEditor, setOwnerEditor] = useState<{
     key: string;
     provinceId: string;
-    builtIndex: number;
+    kind: 'built' | 'construction';
+    buildingId: string;
+    index: number;
     type: 'state' | 'company';
     countryId: string;
     companyId: string;
   } | null>(null);
 
-  const cards = useMemo(
-    () =>
-      rows.flatMap((province) =>
-        (province.buildingsBuilt ?? []).map((entry, index) => ({
-          key: `${province.id}-${entry.buildingId}-${index}`,
-          builtIndex: index,
-          provinceId: province.id,
-          buildingId: entry.buildingId,
-          owner: entry.owner,
-          countryId: province.ownerCountryId,
-        })),
+  const cards = useMemo(() => {
+    const builtCards = rows.flatMap((province) =>
+      (province.buildingsBuilt ?? []).map((entry, index) => ({
+        key: `${province.id}-${entry.buildingId}-built-${index}`,
+        kind: 'built' as const,
+        index,
+        provinceId: province.id,
+        buildingId: entry.buildingId,
+        owner: entry.owner,
+        countryId: province.ownerCountryId,
+        progress: undefined as number | undefined,
+      })),
+    );
+
+    const constructionCards = rows.flatMap((province) =>
+      Object.entries(province.constructionProgress ?? {}).flatMap(
+        ([buildingId, entries]) =>
+          entries.map((entry, index) => ({
+            key: `${province.id}-${buildingId}-progress-${index}`,
+            kind: 'construction' as const,
+            index,
+            provinceId: province.id,
+            buildingId,
+            owner: entry.owner,
+            countryId: province.ownerCountryId,
+            progress: entry.progress,
+          })),
       ),
-    [rows],
-  );
+    );
+
+    return [...builtCards, ...constructionCards];
+  }, [rows]);
 
   const filteredCards = useMemo(() => {
     const filtered = cards.filter((card) => {
@@ -98,6 +123,7 @@ export default function IndustryModal({
         const company = companies.find((c) => c.id === card.owner.companyId);
         if (!company || company.countryId !== filterCompanyCountryId) return false;
       }
+      if (filterStatus !== 'all' && card.kind !== filterStatus) return false;
       return true;
     });
 
@@ -118,7 +144,15 @@ export default function IndustryModal({
       }
       return a.buildingId.localeCompare(b.buildingId);
     });
-  }, [cards, filterBuildingId, filterProvinceId, filterCompanyId, sortBy]);
+  }, [
+    cards,
+    filterBuildingId,
+    filterProvinceId,
+    filterCompanyId,
+    filterCompanyCountryId,
+    sortBy,
+    companies,
+  ]);
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -139,7 +173,7 @@ export default function IndustryModal({
         </div>
 
         <div className="p-4 space-y-3 flex-1 min-h-0">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <label className="flex flex-col gap-2 text-white/70 text-xs">
               Фильтр по зданию
               <select
@@ -230,6 +264,29 @@ export default function IndustryModal({
                 ))}
               </select>
             </label>
+
+            <label className="flex flex-col gap-2 text-white/70 text-xs">
+              Статус
+              <select
+                value={filterStatus}
+                onChange={(event) =>
+                  setFilterStatus(
+                    event.target.value as 'all' | 'construction' | 'built',
+                  )
+                }
+                className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+              >
+                <option value="all" className="bg-[#0b111b] text-white">
+                  Все
+                </option>
+                <option value="construction" className="bg-[#0b111b] text-white">
+                  Только строящиеся
+                </option>
+                <option value="built" className="bg-[#0b111b] text-white">
+                  Только построенные
+                </option>
+              </select>
+            </label>
           </div>
 
           <div className="flex items-center justify-between gap-3 text-white/60 text-xs">
@@ -287,6 +344,10 @@ export default function IndustryModal({
                   const demolishCost = Math.ceil(
                     (baseCost * (demolitionCostPercent ?? 0)) / 100,
                   );
+                  const progressPercent =
+                    card.kind === 'construction'
+                      ? Math.min(100, Math.round(((card.progress ?? 0) / baseCost) * 100))
+                      : 100;
                   const ownerLabel =
                     card.owner.type === 'state'
                       ? ownerCountry?.name ?? 'Государство'
@@ -323,6 +384,19 @@ export default function IndustryModal({
                           <div className="text-white/40 text-xs">
                             Стоимость: {Math.max(1, building?.cost ?? 1)}
                           </div>
+                          {card.kind === 'construction' && (
+                            <div className="mt-2">
+                              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-400/70"
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+                              <div className="text-white/50 text-[11px] mt-1">
+                                Прогресс: {progressPercent}%
+                              </div>
+                            </div>
+                          )}
                         </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -337,20 +411,37 @@ export default function IndustryModal({
                               Строительство
                             </div>
                           </div>
-                          <button
-                            onClick={() => {
-                              setConfirmTarget({
-                                provinceId: card.provinceId,
-                                buildingId: card.buildingId,
-                                buildingName: building?.name ?? card.buildingId,
-                                cost: demolishCost,
-                              });
-                            }}
-                            className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                            title="Снести"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {card.kind === 'construction' && (
+                            <button
+                              onClick={() =>
+                                onCancelConstruction(
+                                  card.provinceId,
+                                  card.buildingId,
+                                  card.index,
+                                )
+                              }
+                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-amber-400/40 hover:text-amber-300 flex items-center justify-center"
+                              title="Отменить строительство"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                          {card.kind === 'built' && (
+                            <button
+                              onClick={() => {
+                                setConfirmTarget({
+                                  provinceId: card.provinceId,
+                                  buildingId: card.buildingId,
+                                  buildingName: building?.name ?? card.buildingId,
+                                  cost: demolishCost,
+                                });
+                              }}
+                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                              title="Снести"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 text-white/60 text-xs">
@@ -367,16 +458,18 @@ export default function IndustryModal({
                         <div className="flex items-center gap-2">
                           <Factory className="w-3.5 h-3.5" />
                           <span className="text-white/40">Владелец:</span>
-                          <button
-                            onClick={() =>
-                              setOwnerEditor({
-                                key: card.key,
-                                provinceId: card.provinceId,
-                                builtIndex: card.builtIndex,
-                                type: card.owner.type,
-                                countryId:
-                                  card.owner.type === 'state'
-                                    ? card.owner.countryId
+                            <button
+                              onClick={() =>
+                                setOwnerEditor({
+                                  key: card.key,
+                                  provinceId: card.provinceId,
+                                  kind: card.kind,
+                                  buildingId: card.buildingId,
+                                  index: card.index,
+                                  type: card.owner.type,
+                                  countryId:
+                                    card.owner.type === 'state'
+                                      ? card.owner.countryId
                                     : countries[0]?.id ?? '',
                                 companyId:
                                   card.owner.type === 'company'
@@ -485,7 +578,9 @@ export default function IndustryModal({
                                 if (ownerEditor.type === 'state' && ownerEditor.countryId) {
                                   onChangeOwner(
                                     ownerEditor.provinceId,
-                                    ownerEditor.builtIndex,
+                                    ownerEditor.kind,
+                                    ownerEditor.buildingId,
+                                    ownerEditor.index,
                                     {
                                       type: 'state',
                                       countryId: ownerEditor.countryId,
@@ -497,7 +592,9 @@ export default function IndustryModal({
                                 ) {
                                   onChangeOwner(
                                     ownerEditor.provinceId,
-                                    ownerEditor.builtIndex,
+                                    ownerEditor.kind,
+                                    ownerEditor.buildingId,
+                                    ownerEditor.index,
                                     {
                                       type: 'company',
                                       companyId: ownerEditor.companyId,
