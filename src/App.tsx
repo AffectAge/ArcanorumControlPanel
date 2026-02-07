@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import TopBar from './components/TopBar';
 import LeftToolbar from './components/LeftToolbar';
 import InfoPanel from './components/InfoPanel';
-import RightQuickButtons from './components/RightQuickButtons';
 import BottomDock from './components/BottomDock';
 import HotseatPanel from './components/HotseatPanel';
 import SaveLoadPanel from './components/SaveLoadPanel';
@@ -1238,7 +1237,6 @@ function App() {
         />
       )}
 
-      <RightQuickButtons />
       <BottomDock onOpenSettings={() => setSettingsOpen(true)} />
       <EventLogPanel activeCountryId={activeCountryId} />
 

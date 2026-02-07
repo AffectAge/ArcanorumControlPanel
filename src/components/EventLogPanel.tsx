@@ -20,52 +20,96 @@ const CategoryIcon = ({ category }: { category: EventCategory }) => {
     switch (category) {
       case 'colonization':
         return (
-          <path
-            d="M6 18l12-12M8 6h4v4M10 14h4v4"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <>
+            <path
+              d="M6 18l12-12"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M8 7h5v5H8z"
+              stroke="currentColor"
+              strokeWidth="2"
+              fill="none"
+            />
+            <path
+              d="M11 11l4 4"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </>
         );
       case 'politics':
         return (
-          <path
-            d="M6 7h12M6 12h12M6 17h12"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
+          <>
+            <path
+              d="M6 18h12"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M7 18V9l5-3 5 3v9"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </>
         );
       case 'economy':
         return (
-          <path
-            d="M6 16l4-4 3 3 5-6"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <>
+            <path
+              d="M6 18v-6M11 18V9M16 18V6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M5 18h14"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </>
         );
       case 'military':
         return (
-          <path
-            d="M6 17l6-11 6 11M8 13h8"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <>
+            <path
+              d="M6 17l6-11 6 11"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M8 13h8"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </>
         );
       case 'diplomacy':
         return (
-          <path
-            d="M8 12h8M6 8l4 8M18 8l-4 8"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <>
+            <path
+              d="M8 12h8"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M6 9l4 6M18 9l-4 6"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </>
         );
       case 'system':
       default:
@@ -420,7 +464,8 @@ export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
                   return (
                     <div
                       key={entry.id}
-                      className="relative flex items-start gap-3 rounded-xl border border-white/5 bg-white/5 px-3 py-2"
+                      className="relative flex items-start gap-3 rounded-xl border bg-white/5 px-3 py-2"
+                      style={{ borderColor: `${meta.color}55` }}
                     >
                       <CategoryIcon category={entry.category} />
                       <div className="absolute right-2 top-2">
