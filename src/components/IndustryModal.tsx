@@ -12,6 +12,13 @@ type IndustryModalProps = {
   activeCountryPoints: number;
   demolitionCostPercent: number;
   onOpenConstruction: (provinceId: string) => void;
+  onChangeOwner: (
+    provinceId: string,
+    builtIndex: number,
+    owner:
+      | { type: 'state'; countryId: string }
+      | { type: 'company'; companyId: string },
+  ) => void;
   onDemolish: (provinceId: string, buildingId: string) => void;
   onClose: () => void;
 };
@@ -31,6 +38,7 @@ export default function IndustryModal({
   activeCountryPoints,
   demolitionCostPercent,
   onOpenConstruction,
+  onChangeOwner,
   onDemolish,
   onClose,
 }: IndustryModalProps) {
@@ -53,11 +61,21 @@ export default function IndustryModal({
     cost: number;
   } | null>(null);
 
+  const [ownerEditor, setOwnerEditor] = useState<{
+    key: string;
+    provinceId: string;
+    builtIndex: number;
+    type: 'state' | 'company';
+    countryId: string;
+    companyId: string;
+  } | null>(null);
+
   const cards = useMemo(
     () =>
       rows.flatMap((province) =>
         (province.buildingsBuilt ?? []).map((entry, index) => ({
           key: `${province.id}-${entry.buildingId}-${index}`,
+          builtIndex: index,
           provinceId: province.id,
           buildingId: entry.buildingId,
           owner: entry.owner,
@@ -279,6 +297,7 @@ export default function IndustryModal({
                       ? ownerCountry?.flagDataUrl
                       : companies.find((c) => c.id === card.owner.companyId)
                           ?.iconDataUrl;
+                  const isEditing = ownerEditor?.key === card.key;
                   return (
                     <div
                       key={card.key}
@@ -348,7 +367,26 @@ export default function IndustryModal({
                         <div className="flex items-center gap-2">
                           <Factory className="w-3.5 h-3.5" />
                           <span className="text-white/40">Владелец:</span>
-                          <span className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-white/70">
+                          <button
+                            onClick={() =>
+                              setOwnerEditor({
+                                key: card.key,
+                                provinceId: card.provinceId,
+                                builtIndex: card.builtIndex,
+                                type: card.owner.type,
+                                countryId:
+                                  card.owner.type === 'state'
+                                    ? card.owner.countryId
+                                    : countries[0]?.id ?? '',
+                                companyId:
+                                  card.owner.type === 'company'
+                                    ? card.owner.companyId
+                                    : companies[0]?.id ?? '',
+                              })
+                            }
+                            className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-white/70 hover:border-emerald-400/40"
+                            title="Изменить владельца"
+                          >
                             {ownerLogo && (
                               <img
                                 src={ownerLogo}
@@ -357,9 +395,124 @@ export default function IndustryModal({
                               />
                             )}
                             {ownerLabel}
-                          </span>
+                          </button>
                         </div>
                       </div>
+                      {isEditing && ownerEditor && (
+                        <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-3 text-xs text-white/70">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() =>
+                                setOwnerEditor({ ...ownerEditor, type: 'state' })
+                              }
+                              className={`px-2 h-7 rounded-lg border ${
+                                ownerEditor.type === 'state'
+                                  ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200'
+                                  : 'bg-black/30 border-white/10 text-white/60 hover:border-emerald-400/40'
+                              }`}
+                            >
+                              Государство
+                            </button>
+                            <button
+                              onClick={() =>
+                                setOwnerEditor({ ...ownerEditor, type: 'company' })
+                              }
+                              className={`px-2 h-7 rounded-lg border ${
+                                ownerEditor.type === 'company'
+                                  ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200'
+                                  : 'bg-black/30 border-white/10 text-white/60 hover:border-emerald-400/40'
+                              }`}
+                            >
+                              Компания
+                            </button>
+                          </div>
+
+                          {ownerEditor.type === 'state' && (
+                            <select
+                              value={ownerEditor.countryId}
+                              onChange={(event) =>
+                                setOwnerEditor({
+                                  ...ownerEditor,
+                                  countryId: event.target.value,
+                                })
+                              }
+                              className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                            >
+                              {countries.map((country) => (
+                                <option
+                                  key={country.id}
+                                  value={country.id}
+                                  className="bg-[#0b111b] text-white"
+                                >
+                                  {country.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+
+                          {ownerEditor.type === 'company' && (
+                            <select
+                              value={ownerEditor.companyId}
+                              onChange={(event) =>
+                                setOwnerEditor({
+                                  ...ownerEditor,
+                                  companyId: event.target.value,
+                                })
+                              }
+                              className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                            >
+                              {companies.map((company) => (
+                                <option
+                                  key={company.id}
+                                  value={company.id}
+                                  className="bg-[#0b111b] text-white"
+                                >
+                                  {company.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => setOwnerEditor(null)}
+                              className="h-8 px-3 rounded-lg border border-white/10 bg-black/30 text-white/60 hover:border-emerald-400/40"
+                            >
+                              Отмена
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (ownerEditor.type === 'state' && ownerEditor.countryId) {
+                                  onChangeOwner(
+                                    ownerEditor.provinceId,
+                                    ownerEditor.builtIndex,
+                                    {
+                                      type: 'state',
+                                      countryId: ownerEditor.countryId,
+                                    },
+                                  );
+                                } else if (
+                                  ownerEditor.type === 'company' &&
+                                  ownerEditor.companyId
+                                ) {
+                                  onChangeOwner(
+                                    ownerEditor.provinceId,
+                                    ownerEditor.builtIndex,
+                                    {
+                                      type: 'company',
+                                      companyId: ownerEditor.companyId,
+                                    },
+                                  );
+                                }
+                                setOwnerEditor(null);
+                              }}
+                              className="h-8 px-3 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30"
+                            >
+                              Сохранить
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

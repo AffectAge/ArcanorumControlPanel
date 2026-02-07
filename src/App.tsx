@@ -1740,6 +1740,24 @@ function App() {
           setConstructionModalOpen(true);
           setIndustryOpen(false);
         }}
+        onChangeOwner={(provinceId, builtIndex, owner) => {
+          setProvinces((prev) => {
+            const province = prev[provinceId];
+            if (!province || !province.buildingsBuilt) return prev;
+            if (builtIndex < 0 || builtIndex >= province.buildingsBuilt.length) {
+              return prev;
+            }
+            const nextBuilt = [...province.buildingsBuilt];
+            nextBuilt[builtIndex] = { ...nextBuilt[builtIndex], owner };
+            return {
+              ...prev,
+              [provinceId]: {
+                ...province,
+                buildingsBuilt: nextBuilt,
+              },
+            };
+          });
+        }}
         onDemolish={(provinceId, buildingId) => {
           const building = buildings.find((b) => b.id === buildingId);
           const baseCost = Math.max(1, building?.cost ?? 1);
