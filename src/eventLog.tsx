@@ -1,17 +1,24 @@
 import { createContext, useContext } from 'react';
-import type { EventCategory, EventLogEntry, EventLogState } from './types';
+import type {
+  EventCategory,
+  EventLogEntry,
+  EventLogState,
+  EventPriority,
+} from './types';
 
 export type AddEventPayload = {
   category: EventCategory;
   message: string;
   title?: string;
   countryId?: string;
+  priority?: EventPriority;
 };
 
 export type EventLogContextValue = {
   log: EventLogState;
   addEvent: (payload: AddEventPayload) => void;
   setFilters: (filters: EventLogState['filters']) => void;
+  setSortByPriority: (enabled: boolean) => void;
   clearLog: () => void;
   trimOld: () => void;
   toggleCollapsed: () => void;
@@ -40,4 +47,5 @@ export const createDefaultFilters = (): EventLogState['filters'] => ({
 export const createDefaultLog = (): EventLogState => ({
   entries: [],
   filters: createDefaultFilters(),
+  sortByPriority: false,
 });

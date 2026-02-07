@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useEventLog } from '../eventLog';
-import type { EventCategory } from '../types';
+import type { EventCategory, EventPriority } from '../types';
 
 const CATEGORY_META: Record<
   EventCategory,
@@ -35,13 +35,35 @@ const CategoryIcon = ({ category }: { category: EventCategory }) => {
 };
 
 export default function EventLogPanel() {
-  const { log, setFilters, clearLog, trimOld, collapsed, toggleCollapsed } =
-    useEventLog();
+  const {
+    log,
+    setFilters,
+    setSortByPriority,
+    clearLog,
+    trimOld,
+    collapsed,
+    toggleCollapsed,
+  } = useEventLog();
+
+  const priorityOrder: Record<EventPriority, number> = {
+    high: 3,
+    medium: 2,
+    low: 1,
+  };
 
   const entries = useMemo(
-    () =>
-      log.entries.filter((entry) => log.filters[entry.category] !== false),
-    [log.entries, log.filters],
+    () => {
+      const filtered = log.entries.filter(
+        (entry) => log.filters[entry.category] !== false,
+      );
+      if (!log.sortByPriority) return filtered;
+      return [...filtered].sort((a, b) => {
+        const diff = priorityOrder[b.priority] - priorityOrder[a.priority];
+        if (diff !== 0) return diff;
+        return b.turn - a.turn;
+      });
+    },
+    [log.entries, log.filters, log.sortByPriority],
   );
 
   return (
@@ -57,6 +79,12 @@ export default function EventLogPanel() {
               className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:border-emerald-400/40"
             >
               Скрыть старые
+            </button>
+            <button
+              onClick={() => setSortByPriority(!log.sortByPriority)}
+              className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:border-emerald-400/40"
+            >
+              {log.sortByPriority ? 'По времени' : 'По важности'}
             </button>
             <button
               onClick={clearLog}
@@ -110,12 +138,24 @@ export default function EventLogPanel() {
               ) : (
                 entries.map((entry) => {
                   const meta = CATEGORY_META[entry.category];
+                  const priorityColor =
+                    entry.priority === 'high'
+                      ? '#ef4444'
+                      : entry.priority === 'medium'
+                        ? '#facc15'
+                        : '#22c55e';
                   return (
                     <div
                       key={entry.id}
                       className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/5 px-3 py-2"
                     >
-                      <CategoryIcon category={entry.category} />
+                      <div className="flex flex-col items-center gap-2">
+                        <CategoryIcon category={entry.category} />
+                        <span
+                          className="h-2.5 w-2.5 rounded-full border border-white/10"
+                          style={{ backgroundColor: priorityColor }}
+                        />
+                      </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 text-[11px] text-white/50">
                           <span className="text-white/70">

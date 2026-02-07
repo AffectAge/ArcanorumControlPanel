@@ -43,13 +43,17 @@ const createId = () =>
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
-const normalizeEventLog = (log?: EventLogState): EventLogState => {
-  const base = createDefaultFilters();
-  const filters =
-    log && log.filters ? { ...base, ...log.filters } : createDefaultFilters();
-  const entries = Array.isArray(log?.entries) ? log?.entries : [];
-  return { entries, filters };
-};
+  const normalizeEventLog = (log?: EventLogState): EventLogState => {
+    const base = createDefaultFilters();
+    const filters =
+      log && log.filters ? { ...base, ...log.filters } : createDefaultFilters();
+    const rawEntries = Array.isArray(log?.entries) ? log?.entries : [];
+    const entries = rawEntries.map((entry) => ({
+      ...entry,
+      priority: entry.priority ?? 'medium',
+    }));
+    return { entries, filters, sortByPriority: log?.sortByPriority ?? false };
+  };
 
 const COST_STEP = 100;
 const COST_LEVELS = 10;
@@ -222,12 +226,14 @@ function App() {
     message: string;
     title?: string;
     countryId?: string;
+    priority?: 'low' | 'medium' | 'high';
   }) => {
     const entry: EventLogEntry = {
       id: createId(),
       turn,
       timestamp: new Date().toISOString(),
       category: payload.category,
+      priority: payload.priority ?? 'medium',
       title: payload.title,
       message: payload.message,
       countryId: payload.countryId,
@@ -244,6 +250,10 @@ function App() {
 
   const setEventFilters = (filters: EventLogState['filters']) => {
     setEventLog((prev) => ({ ...prev, filters }));
+  };
+
+  const setEventSortByPriority = (enabled: boolean) => {
+    setEventLog((prev) => ({ ...prev, sortByPriority: enabled }));
   };
 
   const clearEventLog = () => {
@@ -1078,6 +1088,7 @@ function App() {
       log: eventLog,
       addEvent,
       setFilters: setEventFilters,
+      setSortByPriority: setEventSortByPriority,
       clearLog: clearEventLog,
       trimOld: trimEventLog,
       toggleCollapsed: () => setEventLogCollapsed((prev) => !prev),
@@ -1087,6 +1098,7 @@ function App() {
       eventLog,
       addEvent,
       setEventFilters,
+      setEventSortByPriority,
       clearEventLog,
       trimEventLog,
       eventLogCollapsed,

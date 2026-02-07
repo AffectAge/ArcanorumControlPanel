@@ -75,11 +75,14 @@ export type EventCategory =
   | 'military'
   | 'diplomacy';
 
+export type EventPriority = 'low' | 'medium' | 'high';
+
 export type EventLogEntry = {
   id: string;
   turn: number;
   timestamp: string;
   category: EventCategory;
+  priority: EventPriority;
   title?: string;
   message: string;
   countryId?: string;
@@ -88,4 +91,5 @@ export type EventLogEntry = {
 export type EventLogState = {
   entries: EventLogEntry[];
   filters: Record<EventCategory, boolean>;
+  sortByPriority?: boolean;
 };
