@@ -544,7 +544,7 @@ export default function EventLogPanel({
                       </div>
                       <div className="flex items-center justify-end gap-2">
                         {entry.countryId && (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                          <span className="relative group flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-white/5">
                             {countries.find((c) => c.id === entry.countryId)
                               ?.flagDataUrl ? (
                               <img
@@ -565,6 +565,12 @@ export default function EventLogPanel({
                                 }}
                               />
                             )}
+                            <Tooltip
+                              label={
+                                countries.find((c) => c.id === entry.countryId)
+                                  ?.name ?? 'Страна'
+                              }
+                            />
                           </span>
                         )}
                         <div className="relative group">
