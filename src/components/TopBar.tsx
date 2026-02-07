@@ -153,20 +153,20 @@ export default function TopBar({
           <select
             value={activeCountryId ?? ''}
             onChange={(event) => onSelectCountry(event.target.value)}
-            className="bg-transparent text-white text-sm focus:outline-none"
+            className="h-8 rounded-lg bg-[#0b111b]/80 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
           >
             {!activeCountryId && countries.length > 0 && (
-              <option value="" disabled>
+              <option value="" disabled className="bg-[#0b111b] text-white">
                 Выберите страну
               </option>
             )}
             {countries.length === 0 && (
-              <option value="" disabled>
+              <option value="" disabled className="bg-[#0b111b] text-white">
                 Нет стран
               </option>
             )}
             {countries.map((country) => (
-              <option key={country.id} value={country.id} className="text-black">
+              <option key={country.id} value={country.id} className="bg-[#0b111b] text-white">
                 {country.name}
               </option>
             ))}

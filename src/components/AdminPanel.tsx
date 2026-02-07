@@ -245,7 +245,7 @@ export default function AdminPanel({
                 >
                   <option value="">Выберите провинцию</option>
                   {provinceIds.map((id) => (
-                    <option key={id} value={id} className="text-black">
+                    <option key={id} value={id} className="bg-[#0b111b] text-white">
                       {id}
                     </option>
                   ))}
@@ -268,7 +268,7 @@ export default function AdminPanel({
                     >
                       <option value="">Без владельца</option>
                       {countries.map((country) => (
-                        <option key={country.id} value={country.id} className="text-black">
+                        <option key={country.id} value={country.id} className="bg-[#0b111b] text-white">
                           {country.name}
                         </option>
                       ))}
@@ -289,7 +289,7 @@ export default function AdminPanel({
                     >
                       <option value="">Не назначен</option>
                       {climates.map((climate) => (
-                        <option key={climate.id} value={climate.id} className="text-black">
+                        <option key={climate.id} value={climate.id} className="bg-[#0b111b] text-white">
                           {climate.name}
                         </option>
                       ))}
@@ -310,7 +310,7 @@ export default function AdminPanel({
                     >
                       <option value="">Не назначена</option>
                       {religions.map((religion) => (
-                        <option key={religion.id} value={religion.id} className="text-black">
+                        <option key={religion.id} value={religion.id} className="bg-[#0b111b] text-white">
                           {religion.name}
                         </option>
                       ))}
@@ -334,7 +334,7 @@ export default function AdminPanel({
                         <option
                           key={landscape.id}
                           value={landscape.id}
-                          className="text-black"
+                          className="bg-[#0b111b] text-white"
                         >
                           {landscape.name}
                         </option>
@@ -356,7 +356,7 @@ export default function AdminPanel({
                     >
                       <option value="">Не назначена</option>
                       {cultures.map((culture) => (
-                        <option key={culture.id} value={culture.id} className="text-black">
+                        <option key={culture.id} value={culture.id} className="bg-[#0b111b] text-white">
                           {culture.name}
                         </option>
                       ))}
