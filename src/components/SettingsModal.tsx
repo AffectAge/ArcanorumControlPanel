@@ -52,8 +52,27 @@ export default function SettingsModal({
             />
           </label>
 
+          <label className="flex flex-col gap-2 text-white/70 text-sm">
+            Хранить события за последние (ходов)
+            <input
+              type="number"
+              min={1}
+              value={settings.eventLogRetainTurns ?? 3}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  eventLogRetainTurns: Math.max(
+                    1,
+                    Number(event.target.value) || 1,
+                  ),
+                })
+              }
+              className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+            />
+          </label>
+
           <div className="text-white/40 text-xs">
-            Подсказка: значение начисляется активной стране в начале ее хода.
+            Подсказка: очки колонизации и прогресс начисляются в конце глобального хода.
           </div>
         </div>
       </div>

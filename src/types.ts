@@ -64,6 +64,7 @@ export type Trait = {
 
 export type GameSettings = {
   colonizationPointsPerTurn: number;
+  eventLogRetainTurns?: number;
 };
 
 export type EventCategory =

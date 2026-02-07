@@ -101,6 +101,7 @@ const initialMapLayers: MapLayer[] = [
 function App() {
   const [gameSettings, setGameSettings] = useState<GameSettings>({
     colonizationPointsPerTurn: 10,
+    eventLogRetainTurns: 3,
   });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | undefined>(
@@ -206,6 +207,16 @@ function App() {
     setActiveCountryId(id);
   };
 
+  const pruneLogEntries = (
+    entries: EventLogEntry[],
+    currentTurn: number,
+    retainTurns: number,
+  ) => {
+    const limit = Math.max(1, Math.floor(retainTurns));
+    const cutoff = currentTurn - (limit - 1);
+    return entries.filter((entry) => entry.turn >= cutoff);
+  };
+
   const addEvent = (payload: {
     category: EventCategory;
     message: string;
@@ -221,10 +232,14 @@ function App() {
       message: payload.message,
       countryId: payload.countryId,
     };
-    setEventLog((prev) => ({
-      ...prev,
-      entries: [...prev.entries, entry].slice(-MAX_LOG_ENTRIES),
-    }));
+    setEventLog((prev) => {
+      const retainTurns = gameSettings.eventLogRetainTurns ?? 3;
+      const pruned = pruneLogEntries(prev.entries, turn, retainTurns);
+      return {
+        ...prev,
+        entries: [entry, ...pruned].slice(0, MAX_LOG_ENTRIES),
+      };
+    });
   };
 
   const setEventFilters = (filters: EventLogState['filters']) => {
@@ -238,7 +253,7 @@ function App() {
   const trimEventLog = () => {
     setEventLog((prev) => ({
       ...prev,
-      entries: prev.entries.slice(-TRIM_LOG_TO),
+      entries: prev.entries.slice(0, TRIM_LOG_TO),
     }));
   };
 
@@ -414,7 +429,12 @@ function App() {
     setLandscapes(save.data.landscapes ?? landscapes);
     setCultures(save.data.cultures ?? cultures);
     setResources(save.data.resources ?? resources);
-    setGameSettings(save.data.settings ?? { colonizationPointsPerTurn: 10 });
+    setGameSettings(
+      save.data.settings ?? {
+        colonizationPointsPerTurn: 10,
+        eventLogRetainTurns: 3,
+      },
+    );
     setEventLog(normalizeEventLog(save.data.eventLog));
     setSavePanelOpen(false);
   };
@@ -512,7 +532,7 @@ function App() {
       { id: createId(), name: 'Южане', color: '#f97316' },
     ]);
     setResources([]);
-    setGameSettings({ colonizationPointsPerTurn: 10 });
+    setGameSettings({ colonizationPointsPerTurn: 10, eventLogRetainTurns: 3 });
     setEventLog(createDefaultLog());
     setHotseatOpen(false);
   };
@@ -1044,6 +1064,14 @@ function App() {
     }
     setSelectedResourceId(resources[0]?.id);
   }, [resources, selectedResourceId]);
+
+  useEffect(() => {
+    const retainTurns = gameSettings.eventLogRetainTurns ?? 3;
+    setEventLog((prev) => ({
+      ...prev,
+      entries: pruneLogEntries(prev.entries, turn, retainTurns),
+    }));
+  }, [turn, gameSettings.eventLogRetainTurns]);
 
   const eventLogValue = useMemo(
     () => ({
