@@ -303,6 +303,7 @@ function App() {
             category: 'colonization',
             message: `${country.name} завершила колонизацию провинции ${provinceId}.`,
             countryId,
+            priority: 'high',
           });
         } else {
           province.colonizationProgress = progress;
@@ -332,6 +333,7 @@ function App() {
       addEvent({
         category: 'system',
         message: `Начался глобальный ход ${turn + 1}`,
+        priority: 'low',
       });
       countries.forEach((country) => {
         applyColonizationTurn(country.id);
@@ -900,6 +902,7 @@ function App() {
           category: 'colonization',
           message: `${country?.name ?? 'Страна'} начала колонизацию провинции ${provinceId}.`,
           countryId,
+          priority: 'medium',
         });
       }
       return {
@@ -924,6 +927,7 @@ function App() {
         category: 'colonization',
         message: `${country?.name ?? 'Страна'} отменила колонизацию провинции ${provinceId}.`,
         countryId,
+        priority: 'low',
       });
       return {
         ...prev,

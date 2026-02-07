@@ -34,6 +34,35 @@ const CategoryIcon = ({ category }: { category: EventCategory }) => {
   );
 };
 
+const PriorityIcon = ({ priority }: { priority: EventPriority }) => {
+  const color =
+    priority === 'high' ? '#ef4444' : priority === 'medium' ? '#facc15' : '#22c55e';
+  return (
+    <span
+      className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10"
+      style={{ backgroundColor: `${color}22`, color }}
+      title={
+        priority === 'high'
+          ? 'Высокая важность'
+          : priority === 'medium'
+            ? 'Средняя важность'
+            : 'Низкая важность'
+      }
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+        <path
+          d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Z"
+          fill="currentColor"
+        />
+        <path
+          d="M6 17h12l-1.6-2.4a6.5 6.5 0 0 1-1.1-3.6V9a5.3 5.3 0 0 0-10.6 0v2a6.5 6.5 0 0 1-1.1 3.6L6 17Z"
+          fill="currentColor"
+        />
+      </svg>
+    </span>
+  );
+};
+
 export default function EventLogPanel() {
   const {
     log,
@@ -138,23 +167,14 @@ export default function EventLogPanel() {
               ) : (
                 entries.map((entry) => {
                   const meta = CATEGORY_META[entry.category];
-                  const priorityColor =
-                    entry.priority === 'high'
-                      ? '#ef4444'
-                      : entry.priority === 'medium'
-                        ? '#facc15'
-                        : '#22c55e';
                   return (
                     <div
                       key={entry.id}
-                      className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/5 px-3 py-2"
+                      className="relative flex items-start gap-3 rounded-xl border border-white/5 bg-white/5 px-3 py-2"
                     >
-                      <div className="flex flex-col items-center gap-2">
-                        <CategoryIcon category={entry.category} />
-                        <span
-                          className="h-2.5 w-2.5 rounded-full border border-white/10"
-                          style={{ backgroundColor: priorityColor }}
-                        />
+                      <CategoryIcon category={entry.category} />
+                      <div className="absolute right-2 top-2">
+                        <PriorityIcon priority={entry.priority} />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 text-[11px] text-white/50">
