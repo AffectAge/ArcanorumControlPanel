@@ -1,4 +1,22 @@
 import { useMemo } from 'react';
+import {
+  Sliders,
+  MapPinned,
+  Landmark,
+  TrendingUp,
+  Shield,
+  Handshake,
+  Bell,
+  Lock,
+  Globe,
+  Filter,
+  ArrowUpDown,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  User,
+  Users,
+} from 'lucide-react';
 import { useEventLog } from '../eventLog';
 import type { EventCategory, EventPriority } from '../types';
 
@@ -16,114 +34,21 @@ const CATEGORY_META: Record<
 
 const CategoryIcon = ({ category }: { category: EventCategory }) => {
   const color = CATEGORY_META[category].color;
-  const icon = (() => {
+  const Icon = (() => {
     switch (category) {
       case 'colonization':
-        return (
-          <>
-            <path
-              d="M6 18l12-12"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <path
-              d="M8 7h5v5H8z"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            />
-            <path
-              d="M11 11l4 4"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </>
-        );
+        return MapPinned;
       case 'politics':
-        return (
-          <>
-            <path
-              d="M6 18h12"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <path
-              d="M7 18V9l5-3 5 3v9"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </>
-        );
+        return Landmark;
       case 'economy':
-        return (
-          <>
-            <path
-              d="M6 18v-6M11 18V9M16 18V6"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <path
-              d="M5 18h14"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </>
-        );
+        return TrendingUp;
       case 'military':
-        return (
-          <>
-            <path
-              d="M6 17l6-11 6 11"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M8 13h8"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </>
-        );
+        return Shield;
       case 'diplomacy':
-        return (
-          <>
-            <path
-              d="M8 12h8"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-            <path
-              d="M6 9l4 6M18 9l-4 6"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </>
-        );
+        return Handshake;
       case 'system':
       default:
-        return (
-          <>
-            <circle cx="12" cy="12" r="4" fill="currentColor" />
-            <path
-              d="M12 2v4M12 18v4M2 12h4M18 12h4"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </>
-        );
+        return Sliders;
     }
   })();
 
@@ -132,9 +57,7 @@ const CategoryIcon = ({ category }: { category: EventCategory }) => {
       className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10"
       style={{ backgroundColor: `${color}22`, color }}
     >
-      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-        {icon}
-      </svg>
+      <Icon className="h-4 w-4" aria-hidden />
     </span>
   );
 };
@@ -154,16 +77,7 @@ const PriorityIcon = ({ priority }: { priority: EventPriority }) => {
       className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10"
       style={{ backgroundColor: `${color}22`, color }}
     >
-      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-        <path
-          d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Z"
-          fill="currentColor"
-        />
-        <path
-          d="M6 17h12l-1.6-2.4a6.5 6.5 0 0 1-1.1-3.6V9a5.3 5.3 0 0 0-10.6 0v2a6.5 6.5 0 0 1-1.1 3.6L6 17Z"
-          fill="currentColor"
-        />
-      </svg>
+      <Bell className="h-4 w-4" aria-hidden />
     </span>
   );
 };
@@ -171,43 +85,13 @@ const PriorityIcon = ({ priority }: { priority: EventPriority }) => {
 const VisibilityIcon = ({ visibility }: { visibility: 'public' | 'private' }) => {
   const isPrivate = visibility === 'private';
   const color = isPrivate ? '#f97316' : '#38bdf8';
+  const Icon = isPrivate ? Lock : Globe;
   return (
     <span
       className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10"
       style={{ backgroundColor: `${color}22`, color }}
     >
-      <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-        {isPrivate ? (
-          <>
-            <rect
-              x="6"
-              y="11"
-              width="12"
-              height="9"
-              rx="2"
-              stroke="currentColor"
-              strokeWidth="2"
-              fill="none"
-            />
-            <path
-              d="M8.5 11V8.5a3.5 3.5 0 0 1 7 0V11"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </>
-        ) : (
-          <>
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none" />
-            <path
-              d="M3 12h18M12 3c3.5 3 3.5 15 0 18M12 3c-3.5 3-3.5 15 0 18"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </>
-        )}
-      </svg>
+      <Icon className="h-4 w-4" aria-hidden />
     </span>
   );
 };
@@ -218,120 +102,27 @@ type EventLogPanelProps = {
 };
 
 const ActionIcon = ({ name }: { name: 'trim' | 'sort' | 'clear' | 'collapse' | 'expand' }) => {
-  switch (name) {
-    case 'trim':
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <path
-            d="M4 4h16M6 8h12M8 12h8M10 16h4"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    case 'sort':
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <path
-            d="M7 4v16M7 20l-3-3M7 20l3-3M14 4h6M12 9h8M10 14h10M8 19h12"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
-    case 'clear':
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <path
-            d="M4 7h16M9 7V5h6v2M9 10v7M12 10v7M15 10v7"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <rect
-            x="6"
-            y="7"
-            width="12"
-            height="13"
-            rx="2"
-            stroke="currentColor"
-            strokeWidth="2"
-            fill="none"
-          />
-        </svg>
-      );
-    case 'expand':
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <path
-            d="M7 10l5 5 5-5"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
-    case 'collapse':
-    default:
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <path
-            d="M7 14l5-5 5 5"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
-  }
+  const Icon = (() => {
+    switch (name) {
+      case 'trim':
+        return Filter;
+      case 'sort':
+        return ArrowUpDown;
+      case 'clear':
+        return Trash2;
+      case 'expand':
+        return ChevronDown;
+      case 'collapse':
+      default:
+        return ChevronUp;
+    }
+  })();
+  return <Icon className="h-4 w-4" aria-hidden />;
 };
 
 const ScopeIcon = ({ scope }: { scope: 'all' | 'own' | 'others' }) => {
-  switch (scope) {
-    case 'own':
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <circle cx="12" cy="8" r="3" fill="currentColor" />
-          <path
-            d="M5 20c1.5-3.5 5-5 7-5s5.5 1.5 7 5"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    case 'others':
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <circle cx="9" cy="8" r="3" fill="currentColor" />
-          <circle cx="16" cy="10" r="2.5" fill="currentColor" />
-          <path
-            d="M3.5 20c1.2-3 4-4.5 5.5-4.5S13.3 17 14.5 20"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-    case 'all':
-    default:
-      return (
-        <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" fill="none" />
-          <path
-            d="M3 12h18M12 3c3.5 3 3.5 15 0 18M12 3c-3.5 3-3.5 15 0 18"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
-      );
-  }
+  const Icon = scope === 'own' ? User : scope === 'others' ? Users : Globe;
+  return <Icon className="h-4 w-4" aria-hidden />;
 };
 
 export default function EventLogPanel({
