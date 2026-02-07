@@ -25,7 +25,11 @@ const dockItems = [
   { id: 'settings', icon: Wrench, label: 'Settings' },
 ];
 
-export default function BottomDock() {
+type BottomDockProps = {
+  onOpenSettings: () => void;
+};
+
+export default function BottomDock({ onOpenSettings }: BottomDockProps) {
   const [activeItem, setActiveItem] = useState('research');
 
   return (
@@ -33,7 +37,10 @@ export default function BottomDock() {
       {dockItems.map((item, index) => (
         <button
           key={item.id}
-          onClick={() => setActiveItem(item.id)}
+          onClick={() => {
+          setActiveItem(item.id);
+          if (item.id === 'settings') onOpenSettings();
+        }}
           className={`
             w-11 h-11 rounded-xl border transition-all duration-200 flex items-center justify-center group relative
             ${

@@ -9,6 +9,7 @@ import SaveLoadPanel from './components/SaveLoadPanel';
 import MapView from './components/MapView';
 import AdminPanel from './components/AdminPanel';
 import ColonizationModal from './components/ColonizationModal';
+import SettingsModal from './components/SettingsModal';
 import ProvinceContextMenu from './components/ProvinceContextMenu';
 import type {
   Country,
@@ -19,6 +20,7 @@ import type {
   ProvinceRecord,
   ProvinceData,
   Trait,
+  GameSettings,
 } from './types';
 
 const STORAGE_KEY = 'civ.saves.v1';
@@ -78,6 +80,9 @@ const initialMapLayers: MapLayer[] = [
 ];
 
 function App() {
+  const [gameSettings, setGameSettings] = useState<GameSettings>({
+    colonizationPointsPerTurn: 10,
+  });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | undefined>(
     undefined,
@@ -94,6 +99,7 @@ function App() {
   const [mapLayers, setMapLayers] = useState<MapLayer[]>(initialMapLayers);
   const [provinces, setProvinces] = useState<ProvinceRecord>({});
   const [adminOpen, setAdminOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>([
     { id: createId(), name: 'Умеренный', color: '#38bdf8' },
     { id: createId(), name: 'Засушливый', color: '#f59e0b' },
@@ -234,11 +240,26 @@ function App() {
     );
     const safeIndex = currentIndex === -1 ? 0 : currentIndex;
     const nextIndex = safeIndex + 1;
+    const nextId =
+      nextIndex >= countries.length ? countries[0]?.id : countries[nextIndex].id;
     if (nextIndex >= countries.length) {
       setTurn((prev) => prev + 1);
-      setActiveCountryId(countries[0]?.id);
-    } else {
-      setActiveCountryId(countries[nextIndex].id);
+    }
+    setActiveCountryId(nextId);
+    if (nextId) {
+      const gain = Math.max(0, gameSettings.colonizationPointsPerTurn ?? 0);
+      if (gain > 0) {
+        setCountries((prev) =>
+          prev.map((country) =>
+            country.id === nextId
+              ? {
+                  ...country,
+                  colonizationPoints: (country.colonizationPoints ?? 0) + gain,
+                }
+              : country,
+          ),
+        );
+      }
     }
   };
 
@@ -255,6 +276,7 @@ function App() {
       landscapes,
       cultures,
       resources,
+      settings: gameSettings,
     }),
     [
       turn,
@@ -268,6 +290,7 @@ function App() {
       landscapes,
       cultures,
       resources,
+      gameSettings,
     ],
   );
 
@@ -324,6 +347,7 @@ function App() {
     setLandscapes(save.data.landscapes ?? landscapes);
     setCultures(save.data.cultures ?? cultures);
     setResources(save.data.resources ?? resources);
+    setGameSettings(save.data.settings ?? { colonizationPointsPerTurn: 10 });
     setSavePanelOpen(false);
   };
 
@@ -420,6 +444,7 @@ function App() {
       { id: createId(), name: 'Южане', color: '#f97316' },
     ]);
     setResources([]);
+    setGameSettings({ colonizationPointsPerTurn: 10 });
     setHotseatOpen(false);
   };
 
@@ -1057,7 +1082,7 @@ function App() {
       )}
 
       <RightQuickButtons />
-      <BottomDock />
+      <BottomDock onOpenSettings={() => setSettingsOpen(true)} />
 
       <ProvinceContextMenu
         open={Boolean(contextMenu)}
@@ -1123,6 +1148,13 @@ function App() {
             cancelColonization(selectedProvinceId, activeCountryId);
           }
         }}
+      />
+
+      <SettingsModal
+        open={settingsOpen}
+        settings={gameSettings}
+        onChange={setGameSettings}
+        onClose={() => setSettingsOpen(false)}
       />
 
       <AdminPanel

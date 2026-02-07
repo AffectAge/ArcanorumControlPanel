@@ -19,6 +19,7 @@ export type GameState = {
   cultures?: Trait[];
   landscapes?: Trait[];
   resources?: Trait[];
+  settings?: GameSettings;
 };
 
 export type SaveGame = {
@@ -58,4 +59,8 @@ export type Trait = {
   name: string;
   color: string;
   iconDataUrl?: string;
+};
+
+export type GameSettings = {
+  colonizationPointsPerTurn: number;
 };
