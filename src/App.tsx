@@ -240,23 +240,21 @@ function App() {
     );
     const safeIndex = currentIndex === -1 ? 0 : currentIndex;
     const nextIndex = safeIndex + 1;
-    const nextId =
-      nextIndex >= countries.length ? countries[0]?.id : countries[nextIndex].id;
-    if (nextIndex >= countries.length) {
+    const wraps = nextIndex >= countries.length;
+    const nextId = wraps ? countries[0]?.id : countries[nextIndex].id;
+    if (wraps) {
       setTurn((prev) => prev + 1);
     }
     setActiveCountryId(nextId);
-    if (nextId) {
+    if (wraps) {
       const gain = Math.max(0, gameSettings.colonizationPointsPerTurn ?? 0);
       if (gain > 0) {
         setCountries((prev) =>
           prev.map((country) =>
-            country.id === nextId
-              ? {
-                  ...country,
-                  colonizationPoints: (country.colonizationPoints ?? 0) + gain,
-                }
-              : country,
+            ({
+              ...country,
+              colonizationPoints: (country.colonizationPoints ?? 0) + gain,
+            }),
           ),
         );
       }
