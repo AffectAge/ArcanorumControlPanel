@@ -52,7 +52,12 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
       ...entry,
       priority: entry.priority ?? 'medium',
     }));
-    return { entries, filters, sortByPriority: log?.sortByPriority ?? false };
+    return {
+      entries,
+      filters,
+      sortByPriority: log?.sortByPriority ?? false,
+      countryScope: log?.countryScope ?? 'all',
+    };
   };
 
 const COST_STEP = 100;
@@ -254,6 +259,10 @@ function App() {
 
   const setEventSortByPriority = (enabled: boolean) => {
     setEventLog((prev) => ({ ...prev, sortByPriority: enabled }));
+  };
+
+  const setEventCountryScope = (scope: 'all' | 'own' | 'others') => {
+    setEventLog((prev) => ({ ...prev, countryScope: scope }));
   };
 
   const clearEventLog = () => {
@@ -1093,6 +1102,7 @@ function App() {
       addEvent,
       setFilters: setEventFilters,
       setSortByPriority: setEventSortByPriority,
+      setCountryScope: setEventCountryScope,
       clearLog: clearEventLog,
       trimOld: trimEventLog,
       toggleCollapsed: () => setEventLogCollapsed((prev) => !prev),
@@ -1230,7 +1240,7 @@ function App() {
 
       <RightQuickButtons />
       <BottomDock onOpenSettings={() => setSettingsOpen(true)} />
-      <EventLogPanel />
+      <EventLogPanel activeCountryId={activeCountryId} />
 
       <ProvinceContextMenu
         open={Boolean(contextMenu)}

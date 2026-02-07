@@ -19,6 +19,7 @@ export type EventLogContextValue = {
   addEvent: (payload: AddEventPayload) => void;
   setFilters: (filters: EventLogState['filters']) => void;
   setSortByPriority: (enabled: boolean) => void;
+  setCountryScope: (scope: 'all' | 'own' | 'others') => void;
   clearLog: () => void;
   trimOld: () => void;
   toggleCollapsed: () => void;
@@ -48,4 +49,5 @@ export const createDefaultLog = (): EventLogState => ({
   entries: [],
   filters: createDefaultFilters(),
   sortByPriority: false,
+  countryScope: 'all',
 });

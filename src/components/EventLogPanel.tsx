@@ -63,11 +63,16 @@ const PriorityIcon = ({ priority }: { priority: EventPriority }) => {
   );
 };
 
-export default function EventLogPanel() {
+type EventLogPanelProps = {
+  activeCountryId?: string;
+};
+
+export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
   const {
     log,
     setFilters,
     setSortByPriority,
+    setCountryScope,
     clearLog,
     trimOld,
     collapsed,
@@ -82,9 +87,16 @@ export default function EventLogPanel() {
 
   const entries = useMemo(
     () => {
-      const filtered = log.entries.filter(
-        (entry) => log.filters[entry.category] !== false,
-      );
+      const filtered = log.entries.filter((entry) => {
+        if (log.filters[entry.category] === false) return false;
+        const scope = log.countryScope ?? 'all';
+        if (scope === 'all') return true;
+        if (!entry.countryId) return false;
+        if (scope === 'own') {
+          return entry.countryId === activeCountryId;
+        }
+        return entry.countryId !== activeCountryId;
+      });
       if (!log.sortByPriority) return filtered;
       return [...filtered].sort((a, b) => {
         const diff = priorityOrder[b.priority] - priorityOrder[a.priority];
@@ -92,7 +104,7 @@ export default function EventLogPanel() {
         return b.turn - a.turn;
       });
     },
-    [log.entries, log.filters, log.sortByPriority],
+    [log.entries, log.filters, log.sortByPriority, log.countryScope, activeCountryId],
   );
 
   return (
@@ -156,6 +168,29 @@ export default function EventLogPanel() {
                       style={{ backgroundColor: meta.color }}
                     />
                     {meta.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-2 px-4 pb-2">
+              {([
+                { id: 'all', label: 'Все' },
+                { id: 'own', label: 'Наши' },
+                { id: 'others', label: 'Чужие' },
+              ] as const).map((scope) => {
+                const active = (log.countryScope ?? 'all') === scope.id;
+                return (
+                  <button
+                    key={scope.id}
+                    onClick={() => setCountryScope(scope.id)}
+                    className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                      active
+                        ? 'border-emerald-400/40 bg-emerald-500/10 text-white'
+                        : 'border-white/10 bg-white/5 text-white/60'
+                    }`}
+                  >
+                    {scope.label}
                   </button>
                 );
               })}

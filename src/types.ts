@@ -92,4 +92,5 @@ export type EventLogState = {
   entries: EventLogEntry[];
   filters: Record<EventCategory, boolean>;
   sortByPriority?: boolean;
+  countryScope?: 'all' | 'own' | 'others';
 };
