@@ -104,7 +104,7 @@ export default function EventLogPanel() {
               })}
             </div>
 
-            <div className="max-h-72 overflow-y-auto px-4 py-3 space-y-3 event-log-scroll">
+            <div className="max-h-72 overflow-y-auto px-4 py-3 space-y-3 legend-scroll">
               {entries.length === 0 ? (
                 <div className="text-xs text-white/50">Нет событий</div>
               ) : (

@@ -212,35 +212,3 @@ body {
     rgba(20, 184, 166, 0.8)
   );
 }
-
-.event-log-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.8) rgba(15, 23, 42, 0.6);
-}
-
-.event-log-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.event-log-scroll::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
-  border-radius: 999px;
-}
-
-.event-log-scroll::-webkit-scrollbar-thumb {
-  background: linear-gradient(
-    180deg,
-    rgba(148, 163, 184, 0.9),
-    rgba(100, 116, 139, 0.7)
-  );
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.event-log-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(
-    180deg,
-    rgba(226, 232, 240, 0.9),
-    rgba(148, 163, 184, 0.8)
-  );
-}
