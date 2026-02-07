@@ -1,4 +1,4 @@
-﻿import { Menu, RotateCcw, SkipForward } from 'lucide-react';
+﻿import { Menu, RotateCcw, SkipForward, Globe2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { Country } from '../types';
 
@@ -6,6 +6,7 @@ type TopBarProps = {
   turn: number;
   countries: Country[];
   activeCountryId?: string;
+  colonizationGainPerTurn: number;
   onSelectCountry: (id: string) => void;
   onEndTurn: () => void;
   onOpenHotseat: () => void;
@@ -19,6 +20,7 @@ export default function TopBar({
   turn,
   countries,
   activeCountryId,
+  colonizationGainPerTurn,
   onSelectCountry,
   onEndTurn,
   onOpenHotseat,
@@ -139,13 +141,22 @@ export default function TopBar({
 
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
-          <div className="w-5 h-5 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
-            <RotateCcw className="w-3 h-3 text-white/80" />
+          <div className="relative group">
+            <div className="w-5 h-5 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+              <Globe2 className="w-3 h-3 text-white/80" />
+            </div>
+            <div className="absolute -top-9 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              Очки колонизации
+            </div>
           </div>
-          <span className="text-white/60 text-sm">Очки колонизации:</span>
           <span className="text-white font-bold text-sm">
             {activeCountry?.colonizationPoints ?? 0}
           </span>
+          {colonizationGainPerTurn > 0 && (
+            <span className="text-emerald-400 text-xs font-semibold">
+              +{colonizationGainPerTurn}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">

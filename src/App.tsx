@@ -1004,6 +1004,7 @@ function App() {
         turn={turn}
         countries={countries}
         activeCountryId={activeCountryId}
+        colonizationGainPerTurn={gameSettings.colonizationPointsPerTurn}
         onSelectCountry={selectCountry}
         onEndTurn={endTurn}
         onOpenHotseat={() => setHotseatOpen(true)}
