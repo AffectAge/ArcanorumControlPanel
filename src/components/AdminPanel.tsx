@@ -12,8 +12,16 @@ import {
   Image as ImageIcon,
   Building2,
   Briefcase,
+  Factory,
 } from 'lucide-react';
-import type { Country, ProvinceRecord, Trait, BuildingDefinition, Company } from '../types';
+import type {
+  Country,
+  ProvinceRecord,
+  Trait,
+  BuildingDefinition,
+  Company,
+  Industry,
+} from '../types';
 
 type AdminTab =
   | 'provinces'
@@ -23,7 +31,8 @@ type AdminTab =
   | 'cultures'
   | 'resources'
   | 'buildings'
-  | 'companies';
+  | 'companies'
+  | 'industries';
 
 type AdminPanelProps = {
   open: boolean;
@@ -36,6 +45,7 @@ type AdminPanelProps = {
   cultures: Trait[];
   resources: Trait[];
   buildings: BuildingDefinition[];
+  industries: Industry[];
   companies: Company[];
   onClose: () => void;
   onAssignOwner: (provinceId: string, ownerId?: string) => void;
@@ -55,19 +65,28 @@ type AdminPanelProps = {
   onAddLandscape: (name: string, color: string) => void;
   onAddCulture: (name: string, color: string, iconDataUrl?: string) => void;
   onAddResource: (name: string, color: string, iconDataUrl?: string) => void;
-  onAddBuilding: (name: string, cost: number, iconDataUrl?: string) => void;
+  onAddBuilding: (
+    name: string,
+    cost: number,
+    iconDataUrl?: string,
+    industryId?: string,
+  ) => void;
+  onAddIndustry: (name: string, iconDataUrl?: string) => void;
   onAddCompany: (name: string, countryId: string, iconDataUrl?: string) => void;
   onUpdateCompanyIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateReligionIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateCultureIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateResourceIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateBuildingIcon: (id: string, iconDataUrl?: string) => void;
+  onUpdateIndustryIcon: (id: string, iconDataUrl?: string) => void;
+  onUpdateBuildingIndustry: (id: string, industryId?: string) => void;
   onDeleteClimate: (id: string) => void;
   onDeleteReligion: (id: string) => void;
   onDeleteLandscape: (id: string) => void;
   onDeleteCulture: (id: string) => void;
   onDeleteResource: (id: string) => void;
   onDeleteBuilding: (id: string) => void;
+  onDeleteIndustry: (id: string) => void;
   onDeleteCompany: (id: string) => void;
 };
 
@@ -84,6 +103,7 @@ export default function AdminPanel({
   cultures,
   resources,
   buildings,
+  industries,
   companies,
   onClose,
   onAssignOwner,
@@ -100,18 +120,22 @@ export default function AdminPanel({
   onAddCulture,
   onAddResource,
   onAddBuilding,
+  onAddIndustry,
   onAddCompany,
   onUpdateCompanyIcon,
   onUpdateReligionIcon,
   onUpdateCultureIcon,
   onUpdateResourceIcon,
   onUpdateBuildingIcon,
+  onUpdateIndustryIcon,
+  onUpdateBuildingIndustry,
   onDeleteClimate,
   onDeleteReligion,
   onDeleteLandscape,
   onDeleteCulture,
   onDeleteResource,
   onDeleteBuilding,
+  onDeleteIndustry,
   onDeleteCompany,
 }: AdminPanelProps) {
   const [tab, setTab] = useState<AdminTab>('provinces');
@@ -130,6 +154,9 @@ export default function AdminPanel({
   const [buildingName, setBuildingName] = useState('');
   const [buildingCost, setBuildingCost] = useState(100);
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
+  const [buildingIndustryId, setBuildingIndustryId] = useState<string>('');
+  const [industryName, setIndustryName] = useState('');
+  const [industryIcon, setIndustryIcon] = useState<string | undefined>(undefined);
   const [companyName, setCompanyName] = useState('');
   const [companyCountryId, setCompanyCountryId] = useState<string>('');
   const [companyIcon, setCompanyIcon] = useState<string | undefined>(undefined);
@@ -189,10 +216,24 @@ export default function AdminPanel({
   const handleAddBuilding = () => {
     const name = buildingName.trim();
     if (!name) return;
-    onAddBuilding(name, Math.max(1, Number(buildingCost) || 1), buildingIcon);
+    onAddBuilding(
+      name,
+      Math.max(1, Number(buildingCost) || 1),
+      buildingIcon,
+      buildingIndustryId || undefined,
+    );
     setBuildingName('');
     setBuildingCost(100);
     setBuildingIcon(undefined);
+    setBuildingIndustryId('');
+  };
+
+  const handleAddIndustry = () => {
+    const name = industryName.trim();
+    if (!name) return;
+    onAddIndustry(name, industryIcon);
+    setIndustryName('');
+    setIndustryIcon(undefined);
   };
 
   const handleAddCompany = () => {
@@ -303,6 +344,17 @@ export default function AdminPanel({
           >
             <Building2 className="w-4 h-4" />
             Здания
+          </button>
+          <button
+            onClick={() => setTab('industries')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'industries'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Factory className="w-4 h-4" />
+            Отрасли
           </button>
           <button
             onClick={() => setTab('companies')}
@@ -1138,6 +1190,27 @@ export default function AdminPanel({
                     className="w-24 h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
+                  Отрасль
+                  <select
+                    value={buildingIndustryId}
+                    onChange={(event) => setBuildingIndustryId(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  >
+                    <option value="" className="bg-[#0b111b] text-white">
+                      Без отрасли
+                    </option>
+                    {industries.map((industry) => (
+                      <option
+                        key={industry.id}
+                        value={industry.id}
+                        className="bg-[#0b111b] text-white"
+                      >
+                        {industry.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Логотип
                   <div className="flex items-center gap-2">
@@ -1199,9 +1272,37 @@ export default function AdminPanel({
                           <div className="text-white/50 text-xs">
                             Стоимость: {Math.max(1, building.cost ?? 1)}
                           </div>
+                          <div className="text-white/40 text-xs">
+                            Отрасль:{' '}
+                            {industries.find((i) => i.id === building.industryId)
+                              ?.name ?? '—'}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <select
+                          value={building.industryId ?? ''}
+                          onChange={(event) =>
+                            onUpdateBuildingIndustry(
+                              building.id,
+                              event.target.value || undefined,
+                            )
+                          }
+                          className="h-7 rounded-lg bg-black/30 border border-white/10 px-2 text-white/70 text-[11px] focus:outline-none focus:border-emerald-400/40"
+                        >
+                          <option value="" className="bg-[#0b111b] text-white">
+                            Без отрасли
+                          </option>
+                          {industries.map((industry) => (
+                            <option
+                              key={industry.id}
+                              value={industry.id}
+                              className="bg-[#0b111b] text-white"
+                            >
+                              {industry.name}
+                            </option>
+                          ))}
+                        </select>
                         <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
                           <input
                             type="file"
@@ -1244,6 +1345,121 @@ export default function AdminPanel({
             </div>
           )}
 
+          {tab === 'industries' && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Отрасли</h2>
+                <p className="text-white/60 text-sm">
+                  Добавляйте отрасли и логотипы для зданий.
+                </p>
+              </div>
+
+              <div className="flex gap-3 items-end flex-wrap">
+                <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
+                  Название
+                  <input
+                    value={industryName}
+                    onChange={(event) => setIndustryName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Логотип
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        handleIconUpload(event.target.files?.[0], setIndustryIcon)
+                      }
+                      className="hidden"
+                      id="industry-icon"
+                    />
+                    <label
+                      htmlFor="industry-icon"
+                      className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Выбрать
+                    </label>
+                    {industryIcon && (
+                      <img
+                        src={industryIcon}
+                        alt=""
+                        className="w-8 h-8 rounded-lg object-cover border border-white/10"
+                      />
+                    )}
+                  </div>
+                </label>
+                <button
+                  onClick={handleAddIndustry}
+                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {industries.length > 0 ? (
+                  industries.map((industry) => (
+                    <div
+                      key={industry.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                    >
+                      <div className="flex items-center gap-3">
+                        {industry.iconDataUrl ? (
+                          <img
+                            src={industry.iconDataUrl}
+                            alt=""
+                            className="w-6 h-6 rounded-md object-cover border border-white/10"
+                          />
+                        ) : (
+                          <Factory className="w-4 h-4 text-white/60" />
+                        )}
+                        <span className="text-white/80 text-sm">
+                          {industry.name}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              handleIconUpload(
+                                event.target.files?.[0],
+                                (value) => onUpdateIndustryIcon(industry.id, value),
+                              )
+                            }
+                          />
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          Изменить логотип
+                        </label>
+                        {industry.iconDataUrl && (
+                          <button
+                            onClick={() => onUpdateIndustryIcon(industry.id, undefined)}
+                            className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                          >
+                            Удалить логотип
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onDeleteIndustry(industry.id)}
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                        >
+                          <Trash2 className="w-4 h-4 text-white/60" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-white/50 text-sm">Нет отраслей</div>
+                )}
+              </div>
+            </div>
+          )}
           {tab === 'companies' && (
             <div className="space-y-4">
               <div>

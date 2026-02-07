@@ -1,11 +1,18 @@
-import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon } from 'lucide-react';
+import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { BuildingDefinition, Country, ProvinceRecord, Company } from '../types';
+import type {
+  BuildingDefinition,
+  Country,
+  ProvinceRecord,
+  Company,
+  Industry,
+} from '../types';
 
 type IndustryModalProps = {
   open: boolean;
   provinces: ProvinceRecord;
   buildings: BuildingDefinition[];
+  industries: Industry[];
   countries: Country[];
   companies: Company[];
   activeCountryId?: string;
@@ -35,6 +42,7 @@ export default function IndustryModal({
   open,
   provinces,
   buildings,
+  industries,
   countries,
   companies,
   activeCountryId,
@@ -55,6 +63,7 @@ export default function IndustryModal({
   const [filterProvinceId, setFilterProvinceId] = useState('');
   const [filterCompanyId, setFilterCompanyId] = useState('');
   const [filterCompanyCountryId, setFilterCompanyCountryId] = useState('');
+  const [filterIndustryId, setFilterIndustryId] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'construction' | 'built'>('all');
   const [sortBy, setSortBy] = useState<'building' | 'province' | 'company'>(
     'building',
@@ -64,6 +73,12 @@ export default function IndustryModal({
     buildingId: string;
     buildingName: string;
     cost: number;
+  } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<{
+    provinceId: string;
+    buildingId: string;
+    buildingName: string;
+    index: number;
   } | null>(null);
 
   const [ownerEditor, setOwnerEditor] = useState<{
@@ -107,13 +122,42 @@ export default function IndustryModal({
       ),
     );
 
-    return [...builtCards, ...constructionCards];
-  }, [rows]);
+    const emptyCards = rows
+      .filter((province) => {
+        if (!filterProvinceId) return false;
+        if (province.id !== filterProvinceId) return false;
+        const builtCount = province.buildingsBuilt?.length ?? 0;
+        const progressCount = Object.values(
+          province.constructionProgress ?? {},
+        ).reduce((sum, entries) => sum + entries.length, 0);
+        return builtCount === 0 && progressCount === 0;
+      })
+      .map((province) => ({
+        key: `${province.id}-empty`,
+        kind: 'empty' as const,
+        index: -1,
+        provinceId: province.id,
+        buildingId: '',
+        owner: undefined,
+        countryId: province.ownerCountryId,
+        progress: undefined as number | undefined,
+      }));
+
+    return [...builtCards, ...constructionCards, ...emptyCards];
+  }, [rows, filterProvinceId]);
 
   const filteredCards = useMemo(() => {
     const filtered = cards.filter((card) => {
       if (filterBuildingId && card.buildingId !== filterBuildingId) return false;
       if (filterProvinceId && card.provinceId !== filterProvinceId) return false;
+      if (card.kind === 'empty') {
+        if (!filterProvinceId || card.provinceId !== filterProvinceId) return false;
+        if (filterBuildingId || filterCompanyId || filterCompanyCountryId || filterIndustryId) {
+          return false;
+        }
+        if (filterStatus !== 'all') return false;
+        return true;
+      }
       if (filterCompanyId) {
         if (card.owner.type !== 'company') return false;
         if (card.owner.companyId !== filterCompanyId) return false;
@@ -122,6 +166,10 @@ export default function IndustryModal({
         if (card.owner.type !== 'company') return false;
         const company = companies.find((c) => c.id === card.owner.companyId);
         if (!company || company.countryId !== filterCompanyCountryId) return false;
+      }
+      if (filterIndustryId) {
+        const building = buildings.find((b) => b.id === card.buildingId);
+        if (!building || building.industryId !== filterIndustryId) return false;
       }
       if (filterStatus !== 'all' && card.kind !== filterStatus) return false;
       return true;
@@ -150,8 +198,11 @@ export default function IndustryModal({
     filterProvinceId,
     filterCompanyId,
     filterCompanyCountryId,
+    filterIndustryId,
+    filterStatus,
     sortBy,
     companies,
+    buildings,
   ]);
 
   return (
@@ -164,16 +215,36 @@ export default function IndustryModal({
               Все построенные здания по провинциям
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:border-emerald-400/50 hover:bg-emerald-400/10 transition-all"
-          >
-            <X className="w-4 h-4 text-white/70" />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative group">
+              <button
+                onClick={() => {
+                  if (filterProvinceId) onOpenConstruction(filterProvinceId);
+                }}
+                disabled={!filterProvinceId}
+                className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
+                  filterProvinceId
+                    ? 'bg-black/40 border-white/10 text-white/60 hover:border-emerald-400/50 hover:text-emerald-300'
+                    : 'bg-black/30 border-white/5 text-white/30 cursor-not-allowed'
+                }`}
+              >
+                <HammerIcon className="w-4 h-4" />
+              </button>
+              <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                Строительство
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:border-emerald-400/50 hover:bg-emerald-400/10 transition-all"
+            >
+              <X className="w-4 h-4 text-white/70" />
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-3 flex-1 min-h-0">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
             <label className="flex flex-col gap-2 text-white/70 text-xs">
               Фильтр по зданию
               <select
@@ -266,6 +337,28 @@ export default function IndustryModal({
             </label>
 
             <label className="flex flex-col gap-2 text-white/70 text-xs">
+              Фильтр по отрасли
+              <select
+                value={filterIndustryId}
+                onChange={(event) => setFilterIndustryId(event.target.value)}
+                className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+              >
+                <option value="" className="bg-[#0b111b] text-white">
+                  Все отрасли
+                </option>
+                {industries.map((industry) => (
+                  <option
+                    key={industry.id}
+                    value={industry.id}
+                    className="bg-[#0b111b] text-white"
+                  >
+                    {industry.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-2 text-white/70 text-xs">
               Статус
               <select
                 value={filterStatus}
@@ -290,7 +383,10 @@ export default function IndustryModal({
           </div>
 
           <div className="flex items-center justify-between gap-3 text-white/60 text-xs">
-            <div>Всего: {filteredCards.length}</div>
+            <div>
+              Всего
+              {filterProvinceId ? ` (${filterProvinceId})` : ''}: {filteredCards.length}
+            </div>
             <label className="flex items-center gap-2">
               Сортировка
               <select
@@ -332,9 +428,33 @@ export default function IndustryModal({
             )}
 
             {filteredCards.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[70vh] overflow-y-auto pr-1 legend-scroll">
                 {filteredCards.map((card) => {
+                  if (card.kind === 'empty') {
+                    return (
+                      <button
+                        key={card.key}
+                        onClick={() => onOpenConstruction(card.provinceId)}
+                        className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col items-center justify-center gap-3 shadow-lg shadow-black/30 hover:border-emerald-400/40"
+                        title="Открыть строительство"
+                      >
+                        <div className="w-12 h-12 rounded-xl border border-white/10 bg-black/30 flex items-center justify-center">
+                          <Plus className="w-6 h-6 text-emerald-300" />
+                        </div>
+                        <div className="text-white/70 text-sm text-center">
+                          {card.provinceId}
+                        </div>
+                        <div className="text-white/40 text-xs">
+                          Нет построек
+                        </div>
+                      </button>
+                    );
+                  }
+
                   const building = buildings.find((b) => b.id === card.buildingId);
+                  const industry = industries.find(
+                    (item) => item.id === building?.industryId,
+                  );
                   const country = countries.find((c) => c.id === card.countryId);
                   const ownerCountry =
                     card.owner.type === 'state'
@@ -362,7 +482,11 @@ export default function IndustryModal({
                   return (
                     <div
                       key={card.key}
-                      className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col gap-4 shadow-lg shadow-black/30"
+                      className={`rounded-2xl border bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col gap-4 shadow-lg shadow-black/30 ${
+                        card.kind === 'construction'
+                          ? 'border-amber-400/50'
+                          : 'border-white/10'
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
@@ -400,27 +524,18 @@ export default function IndustryModal({
                         </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="relative group">
-                            <button
-                              onClick={() => onOpenConstruction(card.provinceId)}
-                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-emerald-400/40 hover:text-emerald-300 flex items-center justify-center"
-                            >
-                              <HammerIcon className="w-4 h-4" />
-                            </button>
-                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                              Строительство
-                            </div>
-                          </div>
+                          <div />
                           {card.kind === 'construction' && (
                             <button
                               onClick={() =>
-                                onCancelConstruction(
-                                  card.provinceId,
-                                  card.buildingId,
-                                  card.index,
-                                )
+                                setCancelTarget({
+                                  provinceId: card.provinceId,
+                                  buildingId: card.buildingId,
+                                  buildingName: building?.name ?? card.buildingId,
+                                  index: card.index,
+                                })
                               }
-                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-amber-400/40 hover:text-amber-300 flex items-center justify-center"
+                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
                               title="Отменить строительство"
                             >
                               <X className="w-4 h-4" />
@@ -445,6 +560,24 @@ export default function IndustryModal({
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 text-white/60 text-xs">
+                        {industry && (
+                          <div className="flex items-center gap-2">
+                            <Factory className="w-3.5 h-3.5" />
+                            <span className="text-white/40">Отрасль:</span>
+                            <span className="flex items-center gap-2">
+                              {industry.iconDataUrl ? (
+                                <img
+                                  src={industry.iconDataUrl}
+                                  alt=""
+                                  className="w-4 h-4 object-contain"
+                                />
+                              ) : (
+                                <Factory className="w-3.5 h-3.5 text-white/50" />
+                              )}
+                              {industry.name}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
                           <MapPin className="w-3.5 h-3.5" />
                           <span className="text-white/40">Провинция:</span>
@@ -664,6 +797,53 @@ export default function IndustryModal({
                   disabled={activeCountryPoints < confirmTarget.cost}
                 >
                   Снести
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelTarget && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-[420px] max-w-[92vw] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div className="text-white/90 text-base font-semibold">
+                Отменить строительство
+              </div>
+              <button
+                onClick={() => setCancelTarget(null)}
+                className="w-8 h-8 rounded-lg bg-black/30 border border-white/10 flex items-center justify-center hover:border-red-400/50 hover:bg-red-400/10 transition-all"
+              >
+                <X className="w-4 h-4 text-white/70" />
+              </button>
+            </div>
+            <div className="p-5 space-y-3 text-sm text-white/70">
+              <div>
+                Отменить строительство{' '}
+                <span className="text-white">{cancelTarget.buildingName}</span>{' '}
+                в провинции{' '}
+                <span className="text-white">{cancelTarget.provinceId}</span>?
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setCancelTarget(null)}
+                  className="h-9 px-4 rounded-lg border border-white/10 bg-black/30 text-white/60 hover:border-emerald-400/40"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={() => {
+                    onCancelConstruction(
+                      cancelTarget.provinceId,
+                      cancelTarget.buildingId,
+                      cancelTarget.index,
+                    );
+                    setCancelTarget(null);
+                  }}
+                  className="h-9 px-4 rounded-lg border border-red-400/40 bg-red-500/20 text-red-200 hover:bg-red-500/30"
+                >
+                  Отменить
                 </button>
               </div>
             </div>

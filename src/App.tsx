@@ -29,6 +29,7 @@ import type {
   Trait,
   GameSettings,
   BuildingDefinition,
+  Industry,
   Company,
   BuildingOwner,
   EventLogEntry,
@@ -237,6 +238,7 @@ function App() {
   ]);
   const [resources, setResources] = useState<Trait[]>([]);
   const [buildings, setBuildings] = useState<BuildingDefinition[]>([]);
+  const [industries, setIndustries] = useState<Industry[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -563,6 +565,7 @@ function App() {
       cultures,
       resources,
       buildings,
+      industries,
       companies,
       settings: gameSettings,
       eventLog,
@@ -580,6 +583,7 @@ function App() {
       cultures,
       resources,
       buildings,
+      industries,
       companies,
       gameSettings,
       eventLog,
@@ -640,6 +644,7 @@ function App() {
     setCultures(save.data.cultures ?? cultures);
     setResources(save.data.resources ?? resources);
     setBuildings(save.data.buildings ?? buildings);
+    setIndustries(save.data.industries ?? industries);
     setCompanies(save.data.companies ?? companies);
     setGameSettings(
       save.data.settings ?? {
@@ -747,6 +752,7 @@ function App() {
     ]);
     setResources([]);
     setBuildings([]);
+    setIndustries([]);
     setCompanies([]);
     setGameSettings({
       colonizationPointsPerTurn: 10,
@@ -1176,8 +1182,37 @@ function App() {
   };
 
 
-  const addBuilding = (name: string, cost: number, iconDataUrl?: string) => {
-    setBuildings((prev) => [...prev, { id: createId(), name, cost, iconDataUrl }]);
+  const addBuilding = (
+    name: string,
+    cost: number,
+    iconDataUrl?: string,
+    industryId?: string,
+  ) => {
+    setBuildings((prev) => [
+      ...prev,
+      { id: createId(), name, cost, iconDataUrl, industryId },
+    ]);
+  };
+
+  const addIndustry = (name: string, iconDataUrl?: string) => {
+    setIndustries((prev) => [...prev, { id: createId(), name, iconDataUrl }]);
+  };
+
+  const updateIndustryIcon = (id: string, iconDataUrl?: string) => {
+    setIndustries((prev) =>
+      prev.map((industry) =>
+        industry.id === id ? { ...industry, iconDataUrl } : industry,
+      ),
+    );
+  };
+
+  const deleteIndustry = (id: string) => {
+    setIndustries((prev) => prev.filter((industry) => industry.id !== id));
+    setBuildings((prev) =>
+      prev.map((building) =>
+        building.industryId === id ? { ...building, industryId: undefined } : building,
+      ),
+    );
   };
 
   const addCompany = (name: string, countryId: string, iconDataUrl?: string) => {
@@ -1234,6 +1269,14 @@ function App() {
   const updateBuildingIcon = (id: string, iconDataUrl?: string) => {
     setBuildings((prev) =>
       prev.map((item) => (item.id === id ? { ...item, iconDataUrl } : item)),
+    );
+  };
+
+  const updateBuildingIndustry = (id: string, industryId?: string) => {
+    setBuildings((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, industryId } : item,
+      ),
     );
   };
 
@@ -1696,6 +1739,7 @@ function App() {
         provinceId={selectedProvinceId}
         province={selectedProvince}
         buildings={buildings}
+        industries={industries}
         companies={companies}
         countries={countries}
         activeCountryId={activeCountryId}
@@ -1727,6 +1771,7 @@ function App() {
         open={industryOpen}
         provinces={provinces}
         buildings={buildings}
+        industries={industries}
         countries={countries}
         companies={companies}
         activeCountryId={activeCountryId}
@@ -1889,6 +1934,7 @@ function App() {
         cultures={cultures}
         resources={resources}
         buildings={buildings}
+        industries={industries}
         companies={companies}
         onClose={() => setAdminOpen(false)}
         onAssignOwner={assignOwner}
@@ -1905,18 +1951,22 @@ function App() {
         onAddCulture={addCulture}
         onAddResource={addResource}
         onAddBuilding={addBuilding}
+        onAddIndustry={addIndustry}
+        onUpdateIndustryIcon={updateIndustryIcon}
         onAddCompany={addCompany}
         onUpdateCompanyIcon={updateCompanyIcon}
         onUpdateReligionIcon={updateReligionIcon}
         onUpdateCultureIcon={updateCultureIcon}
         onUpdateResourceIcon={updateResourceIcon}
         onUpdateBuildingIcon={updateBuildingIcon}
+        onUpdateBuildingIndustry={updateBuildingIndustry}
         onDeleteClimate={deleteClimate}
         onDeleteReligion={deleteReligion}
         onDeleteLandscape={deleteLandscape}
         onDeleteCulture={deleteCulture}
         onDeleteResource={deleteResource}
         onDeleteBuilding={deleteBuilding}
+        onDeleteIndustry={deleteIndustry}
         onDeleteCompany={deleteCompany}
       />
     </div>

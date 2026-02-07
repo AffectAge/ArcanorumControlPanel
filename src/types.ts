@@ -21,6 +21,7 @@ export type GameState = {
   landscapes?: Trait[];
   resources?: Trait[];
   buildings?: BuildingDefinition[];
+  industries?: Industry[];
   companies?: Company[];
   settings?: GameSettings;
   eventLog?: EventLogState;
@@ -78,6 +79,13 @@ export type BuildingDefinition = {
   id: string;
   name: string;
   cost: number;
+  iconDataUrl?: string;
+  industryId?: string;
+};
+
+export type Industry = {
+  id: string;
+  name: string;
   iconDataUrl?: string;
 };
 
