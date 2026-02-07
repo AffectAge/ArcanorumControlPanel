@@ -57,4 +57,5 @@ export type Trait = {
   id: string;
   name: string;
   color: string;
+  iconDataUrl?: string;
 };

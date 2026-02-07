@@ -803,20 +803,38 @@ function App() {
     setClimates((prev) => [...prev, { id: createId(), name, color }]);
   };
 
-  const addReligion = (name: string, color: string) => {
-    setReligions((prev) => [...prev, { id: createId(), name, color }]);
+  const addReligion = (name: string, color: string, iconDataUrl?: string) => {
+    setReligions((prev) => [...prev, { id: createId(), name, color, iconDataUrl }]);
   };
 
   const addLandscape = (name: string, color: string) => {
     setLandscapes((prev) => [...prev, { id: createId(), name, color }]);
   };
 
-  const addCulture = (name: string, color: string) => {
-    setCultures((prev) => [...prev, { id: createId(), name, color }]);
+  const addCulture = (name: string, color: string, iconDataUrl?: string) => {
+    setCultures((prev) => [...prev, { id: createId(), name, color, iconDataUrl }]);
   };
 
-  const addResource = (name: string, color: string) => {
-    setResources((prev) => [...prev, { id: createId(), name, color }]);
+  const addResource = (name: string, color: string, iconDataUrl?: string) => {
+    setResources((prev) => [...prev, { id: createId(), name, color, iconDataUrl }]);
+  };
+
+  const updateReligionIcon = (id: string, iconDataUrl?: string) => {
+    setReligions((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, iconDataUrl } : item)),
+    );
+  };
+
+  const updateCultureIcon = (id: string, iconDataUrl?: string) => {
+    setCultures((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, iconDataUrl } : item)),
+    );
+  };
+
+  const updateResourceIcon = (id: string, iconDataUrl?: string) => {
+    setResources((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, iconDataUrl } : item)),
+    );
   };
 
   const deleteClimate = (id: string) => {
@@ -1131,6 +1149,9 @@ function App() {
         onAddLandscape={addLandscape}
         onAddCulture={addCulture}
         onAddResource={addResource}
+        onUpdateReligionIcon={updateReligionIcon}
+        onUpdateCultureIcon={updateCultureIcon}
+        onUpdateResourceIcon={updateResourceIcon}
         onDeleteClimate={deleteClimate}
         onDeleteReligion={deleteReligion}
         onDeleteLandscape={deleteLandscape}
