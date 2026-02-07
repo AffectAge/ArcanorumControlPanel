@@ -282,12 +282,28 @@ export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
         }
         return entry.countryId !== activeCountryId;
       });
-      if (!log.sortByPriority) return filtered;
-      return [...filtered].sort((a, b) => {
+      const ordered = log.sortByPriority
+        ? [...filtered].sort((a, b) => {
         const diff = priorityOrder[b.priority] - priorityOrder[a.priority];
         if (diff !== 0) return diff;
         return b.turn - a.turn;
+      })
+        : filtered;
+
+      const grouped: Array<{ entry: (typeof ordered)[number]; count: number }> = [];
+      const indexByKey = new Map<string, number>();
+      ordered.forEach((entry) => {
+        const key = `${entry.turn}|${entry.category}|${entry.priority}|${entry.title ?? ''}|${entry.message}|${entry.countryId ?? ''}`;
+        const existingIndex = indexByKey.get(key);
+        if (existingIndex !== undefined) {
+          grouped[existingIndex].count += 1;
+          return;
+        }
+        indexByKey.set(key, grouped.length);
+        grouped.push({ entry, count: 1 });
       });
+
+      return grouped;
     },
     [log.entries, log.filters, log.sortByPriority, log.countryScope, activeCountryId],
   );
@@ -399,7 +415,7 @@ export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
               {entries.length === 0 ? (
                 <div className="text-xs text-white/50">Нет событий</div>
               ) : (
-                entries.map((entry) => {
+                entries.map(({ entry, count }) => {
                   const meta = CATEGORY_META[entry.category];
                   return (
                     <div
@@ -417,6 +433,14 @@ export default function EventLogPanel({ activeCountryId }: EventLogPanelProps) {
                           </span>
                           <span className="text-white/40">•</span>
                           <span style={{ color: meta.color }}>{meta.label}</span>
+                          {count > 1 && (
+                            <>
+                              <span className="text-white/40">•</span>
+                              <span className="rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[10px] text-white/80">
+                                x{count}
+                              </span>
+                            </>
+                          )}
                         </div>
                         {entry.title && (
                           <div className="text-sm text-white/90 font-semibold">
