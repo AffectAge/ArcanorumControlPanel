@@ -524,21 +524,20 @@ export default function AdminPanel({
                     {buildings.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {buildings.map((building) => {
-                          const built = activeProvince.buildingsBuilt?.includes(
-                            building.id,
-                          );
+                          const builtCount =
+                            activeProvince.buildingsBuilt?.[building.id] ?? 0;
                           const cost = Math.max(1, building.cost ?? 1);
-                          const hasProgress =
-                            activeProvince.constructionProgress != null &&
-                            building.id in activeProvince.constructionProgress;
-                          const progress = hasProgress
-                            ? activeProvince.constructionProgress?.[building.id] ?? 0
-                            : 0;
-                          const inProgress = Boolean(hasProgress && !built);
-                          const percent = Math.min(
-                            100,
-                            Math.round((progress / cost) * 100),
+                          const progressEntries =
+                            activeProvince.constructionProgress?.[building.id] ?? [];
+                          const inProgressCount = progressEntries.length;
+                          const progressSum = progressEntries.reduce(
+                            (sum, value) => sum + value,
+                            0,
                           );
+                          const average = inProgressCount
+                            ? Math.min(100, Math.round((progressSum / inProgressCount / cost) * 100))
+                            : 0;
+                          const inProgress = inProgressCount > 0;
 
                           return (
                             <div
@@ -565,11 +564,16 @@ export default function AdminPanel({
                                 </div>
                               </div>
                               <div className="text-white/50 text-xs">
-                                {built
-                                  ? 'Построено'
-                                  : inProgress
-                                    ? `Прогресс: ${percent}%`
-                                    : 'Не построено'}
+                                {builtCount > 0 || inProgress
+                                  ? `Построено: ${builtCount}${
+                                      inProgress ? `, в стройке: ${inProgressCount}` : ''
+                                    }`
+                                  : 'Не построено'}
+                                {inProgress && (
+                                  <span className="ml-2 text-white/40">
+                                    Ср. прогресс: {average}%
+                                  </span>
+                                )}
                               </div>
                             </div>
                           );

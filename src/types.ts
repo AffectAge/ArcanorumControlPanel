@@ -53,8 +53,8 @@ export type ProvinceData = {
   colonizationCost?: number;
   colonizationProgress?: Record<string, number>;
   colonizationDisabled?: boolean;
-  buildingsBuilt?: string[];
-  constructionProgress?: Record<string, number>;
+  buildingsBuilt?: Record<string, number>;
+  constructionProgress?: Record<string, number[]>;
 };
 
 export type ProvinceRecord = Record<string, ProvinceData>;

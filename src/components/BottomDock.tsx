@@ -27,9 +27,10 @@ const dockItems = [
 
 type BottomDockProps = {
   onOpenSettings: () => void;
+  onOpenIndustry: () => void;
 };
 
-export default function BottomDock({ onOpenSettings }: BottomDockProps) {
+export default function BottomDock({ onOpenSettings, onOpenIndustry }: BottomDockProps) {
   const [activeItem, setActiveItem] = useState('research');
 
   return (
@@ -38,9 +39,10 @@ export default function BottomDock({ onOpenSettings }: BottomDockProps) {
         <button
           key={item.id}
           onClick={() => {
-          setActiveItem(item.id);
-          if (item.id === 'settings') onOpenSettings();
-        }}
+            setActiveItem(item.id);
+            if (item.id === 'settings') onOpenSettings();
+            if (item.id === 'industry') onOpenIndustry();
+          }}
           className={`
             w-11 h-11 rounded-xl border transition-all duration-200 flex items-center justify-center group relative
             ${

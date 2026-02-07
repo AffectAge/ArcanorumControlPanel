@@ -12,6 +12,7 @@ import ConstructionModal from './components/ConstructionModal';
 import SettingsModal from './components/SettingsModal';
 import ProvinceContextMenu from './components/ProvinceContextMenu';
 import EventLogPanel from './components/EventLogPanel';
+import IndustryModal from './components/IndustryModal';
 import {
   EventLogContext,
   createDefaultLog,
@@ -43,6 +44,39 @@ const createId = () =>
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
+  const next: ProvinceRecord = { ...record };
+  Object.values(next).forEach((province) => {
+    if (!province) return;
+    if (!province.buildingsBuilt) {
+      province.buildingsBuilt = {};
+    } else if (Array.isArray(province.buildingsBuilt)) {
+      const map: Record<string, number> = {};
+      province.buildingsBuilt.forEach((id) => {
+        map[id] = (map[id] ?? 0) + 1;
+      });
+      province.buildingsBuilt = map;
+    }
+
+    if (!province.constructionProgress) {
+      province.constructionProgress = {};
+    } else {
+      const converted: Record<string, number[]> = {};
+      Object.entries(province.constructionProgress).forEach(
+        ([buildingId, value]) => {
+          if (Array.isArray(value)) {
+            converted[buildingId] = value;
+          } else if (typeof value === 'number') {
+            converted[buildingId] = [value];
+          }
+        },
+      );
+      province.constructionProgress = converted;
+    }
+  });
+  return next;
+};
 
   const normalizeEventLog = (log?: EventLogState): EventLogState => {
     const base = createDefaultFilters();
@@ -135,6 +169,7 @@ function App() {
   const [eventLogCollapsed, setEventLogCollapsed] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [industryOpen, setIndustryOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>([
     { id: createId(), name: 'Умеренный', color: '#38bdf8' },
     { id: createId(), name: 'Засушливый', color: '#f59e0b' },
@@ -341,46 +376,68 @@ function App() {
     const available = country?.constructionPoints ?? 0;
     if (!country || available <= 0) return;
 
-    const tasks: { provinceId: string; buildingId: string }[] = [];
+    let tasksCount = 0;
     Object.values(provinces).forEach((province) => {
       if (province.ownerCountryId !== countryId) return;
       const progress = province.constructionProgress ?? {};
-      Object.keys(progress).forEach((buildingId) => {
-        tasks.push({ provinceId: province.id, buildingId });
+      Object.values(progress).forEach((entries) => {
+        tasksCount += entries.length;
       });
     });
 
-    if (tasks.length === 0) return;
+    if (tasksCount === 0) return;
 
-    const share = available / tasks.length;
+    const share = available / tasksCount;
 
     setProvinces((prev) => {
       const next: ProvinceRecord = { ...prev };
-      tasks.forEach(({ provinceId, buildingId }) => {
-        const province = next[provinceId];
-        if (!province) return;
-        const built = new Set(province.buildingsBuilt ?? []);
-        if (built.has(buildingId)) return;
+      Object.values(next).forEach((province) => {
+        if (province.ownerCountryId !== countryId) return;
         const progress = { ...(province.constructionProgress ?? {}) };
-        const current = progress[buildingId] ?? 0;
-        const cost = buildings.find((b) => b.id === buildingId)?.cost ?? 100;
-        const updated = current + share;
-        if (updated >= cost) {
-          built.add(buildingId);
-          delete progress[buildingId];
-          province.buildingsBuilt = Array.from(built);
-          province.constructionProgress = progress;
+        const builtMap = { ...(province.buildingsBuilt ?? {}) };
+        let progressChanged = false;
+        let builtChanged = false;
+
+        Object.entries(progress).forEach(([buildingId, entries]) => {
+          const cost = buildings.find((b) => b.id === buildingId)?.cost ?? 100;
           const buildingName =
             buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
-          addEvent({
-            category: 'economy',
-            message: `Строительство завершено: ${buildingName} в провинции ${provinceId}.`,
-            countryId,
-            priority: 'medium',
+          const remaining: number[] = [];
+          let completed = 0;
+
+          entries.forEach((value) => {
+            const updated = value + share;
+            if (updated >= cost) {
+              completed += 1;
+            } else {
+              remaining.push(updated);
+            }
           });
-        } else {
-          progress[buildingId] = updated;
+
+          if (completed > 0) {
+            builtMap[buildingId] = (builtMap[buildingId] ?? 0) + completed;
+            builtChanged = true;
+            addEvent({
+              category: 'economy',
+              message: `Строительство завершено: ${buildingName} x${completed} в провинции ${province.id}.`,
+              countryId,
+              priority: 'medium',
+            });
+          }
+
+          if (remaining.length > 0) {
+            progress[buildingId] = remaining;
+          } else {
+            delete progress[buildingId];
+          }
+          progressChanged = true;
+        });
+
+        if (progressChanged) {
           province.constructionProgress = progress;
+        }
+        if (builtChanged) {
+          province.buildingsBuilt = builtMap;
         }
       });
       return next;
@@ -521,7 +578,7 @@ function App() {
     );
     setMapLayers(save.data.mapLayers ?? initialMapLayers);
     setSelectedProvinceId(save.data.selectedProvinceId);
-    setProvinces(save.data.provinces ?? {});
+    setProvinces(normalizeProvinceRecord(save.data.provinces ?? {}));
     setClimates(save.data.climates ?? climates);
     setReligions(save.data.religions ?? religions);
     setLandscapes(save.data.landscapes ?? landscapes);
@@ -662,7 +719,7 @@ function App() {
             colonizationCost: 100,
             colonizationProgress: {},
             colonizationDisabled: false,
-            buildingsBuilt: [],
+            buildingsBuilt: {},
             constructionProgress: {},
           };
           changed = true;
@@ -685,12 +742,36 @@ function App() {
           updated = true;
         }
         if (!existing.buildingsBuilt) {
-          existing.buildingsBuilt = [];
+          existing.buildingsBuilt = {};
+          updated = true;
+        } else if (Array.isArray(existing.buildingsBuilt)) {
+          const map: Record<string, number> = {};
+          existing.buildingsBuilt.forEach((id) => {
+            map[id] = (map[id] ?? 0) + 1;
+          });
+          existing.buildingsBuilt = map;
           updated = true;
         }
         if (!existing.constructionProgress) {
           existing.constructionProgress = {};
           updated = true;
+        } else {
+          const converted: Record<string, number[]> = {};
+          let changedProgress = false;
+          Object.entries(existing.constructionProgress).forEach(
+            ([buildingId, value]) => {
+              if (Array.isArray(value)) {
+                converted[buildingId] = value;
+              } else if (typeof value === 'number') {
+                converted[buildingId] = [value];
+                changedProgress = true;
+              }
+            },
+          );
+          if (changedProgress) {
+            existing.constructionProgress = converted;
+            updated = true;
+          }
         }
         if (!existing.resourceAmounts) {
           if ((existing as any).resourceIds) {
@@ -1071,8 +1152,10 @@ function App() {
     setProvinces((prev) => {
       const next: ProvinceRecord = { ...prev };
       Object.values(next).forEach((province) => {
-        if (province.buildingsBuilt?.includes(id)) {
-          province.buildingsBuilt = province.buildingsBuilt.filter((b) => b !== id);
+        if (province.buildingsBuilt && id in province.buildingsBuilt) {
+          const built = { ...province.buildingsBuilt };
+          delete built[id];
+          province.buildingsBuilt = built;
         }
         if (province.constructionProgress && id in province.constructionProgress) {
           const progress = { ...province.constructionProgress };
@@ -1091,11 +1174,12 @@ function App() {
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId == null) return prev;
-      const built = new Set(province.buildingsBuilt ?? []);
-      if (built.has(buildingId)) return prev;
       const progress = { ...(province.constructionProgress ?? {}) };
-      if (progress[buildingId] != null) return prev;
-      progress[buildingId] = 0;
+      const entries = Array.isArray(progress[buildingId])
+        ? [...progress[buildingId]]
+        : [];
+      entries.push(0);
+      progress[buildingId] = entries;
       addEvent({
         category: 'economy',
         message: `${country?.name ?? 'Страна'} начала строительство ${buildingName} в провинции ${provinceId}.`,
@@ -1121,7 +1205,16 @@ function App() {
       if (!province || !province.constructionProgress) return prev;
       if (!(buildingId in province.constructionProgress)) return prev;
       const progress = { ...province.constructionProgress };
-      delete progress[buildingId];
+      const entries = Array.isArray(progress[buildingId])
+        ? [...progress[buildingId]]
+        : [];
+      if (entries.length === 0) return prev;
+      entries.pop();
+      if (entries.length > 0) {
+        progress[buildingId] = entries;
+      } else {
+        delete progress[buildingId];
+      }
       addEvent({
         category: 'economy',
         message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId}.`,
@@ -1414,7 +1507,10 @@ function App() {
         />
       )}
 
-      <BottomDock onOpenSettings={() => setSettingsOpen(true)} />
+      <BottomDock
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenIndustry={() => setIndustryOpen(true)}
+      />
       <EventLogPanel activeCountryId={activeCountryId} countries={countries} />
 
       <ProvinceContextMenu
@@ -1517,6 +1613,15 @@ function App() {
         settings={gameSettings}
         onChange={setGameSettings}
         onClose={() => setSettingsOpen(false)}
+      />
+
+      <IndustryModal
+        open={industryOpen}
+        provinces={provinces}
+        buildings={buildings}
+        countries={countries}
+        activeCountryId={activeCountryId}
+        onClose={() => setIndustryOpen(false)}
       />
 
       <AdminPanel
