@@ -295,9 +295,6 @@ function App() {
 
   const endTurn = () => {
     if (countries.length === 0) return;
-    if (activeCountryId) {
-      applyColonizationTurn(activeCountryId);
-    }
     const currentIndex = countries.findIndex(
       (country) => country.id === activeCountryId,
     );
@@ -310,6 +307,9 @@ function App() {
       addEvent({
         category: 'system',
         message: `Начался глобальный ход ${turn + 1}`,
+      });
+      countries.forEach((country) => {
+        applyColonizationTurn(country.id);
       });
     }
     setActiveCountryId(nextId);
