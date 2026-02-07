@@ -60,7 +60,13 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
       } else {
         const converted: { buildingId: string; owner: BuildingOwner }[] = [];
         (province.buildingsBuilt as unknown as string[]).forEach((id) => {
-          converted.push({ buildingId: id, owner: { type: 'state' } });
+          converted.push({
+            buildingId: id,
+            owner: {
+              type: 'state',
+              countryId: province.ownerCountryId ?? 'state',
+            },
+          });
         });
         province.buildingsBuilt = converted;
       }
@@ -70,7 +76,13 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
         .forEach(([id, count]) => {
           const safe = Math.max(0, Math.floor(count ?? 0));
           for (let i = 0; i < safe; i += 1) {
-            converted.push({ buildingId: id, owner: { type: 'state' } });
+            converted.push({
+              buildingId: id,
+              owner: {
+                type: 'state',
+                countryId: province.ownerCountryId ?? 'state',
+              },
+            });
           }
         });
       province.buildingsBuilt = converted;
@@ -89,11 +101,22 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
             } else {
               converted[buildingId] = (value as number[]).map((progress) => ({
                 progress,
-                owner: { type: 'state' },
+                owner: {
+                  type: 'state',
+                  countryId: province.ownerCountryId ?? 'state',
+                },
               }));
             }
           } else if (typeof value === 'number') {
-            converted[buildingId] = [{ progress: value, owner: { type: 'state' } }];
+            converted[buildingId] = [
+              {
+                progress: value,
+                owner: {
+                  type: 'state',
+                  countryId: province.ownerCountryId ?? 'state',
+                },
+              },
+            ];
           }
         },
       );
@@ -1244,7 +1267,8 @@ function App() {
     const country = countries.find((c) => c.id === activeCountryId);
     const ownerLabel =
       owner.type === 'state'
-        ? 'государство'
+        ? countries.find((item) => item.id === owner.countryId)?.name ??
+          'государство'
         : companies.find((item) => item.id === owner.companyId)?.name ??
           'компания';
     setProvinces((prev) => {
@@ -1288,7 +1312,8 @@ function App() {
       const removed = entries.pop();
       const ownerLabel =
         removed?.owner.type === 'state'
-          ? 'государство'
+          ? countries.find((item) => item.id === removed?.owner.countryId)?.name ??
+            'государство'
           : companies.find((item) => item.id === removed?.owner.companyId)?.name ??
             'компания';
       if (entries.length > 0) {
@@ -1672,6 +1697,7 @@ function App() {
         province={selectedProvince}
         buildings={buildings}
         companies={companies}
+        countries={countries}
         activeCountryId={activeCountryId}
         activeCountryPoints={
           countries.find((country) => country.id === activeCountryId)
@@ -1709,6 +1735,11 @@ function App() {
             ?.constructionPoints ?? 0
         }
         demolitionCostPercent={gameSettings.demolitionCostPercent ?? 20}
+        onOpenConstruction={(provinceId) => {
+          setSelectedProvinceId(provinceId);
+          setConstructionModalOpen(true);
+          setIndustryOpen(false);
+        }}
         onDemolish={(provinceId, buildingId) => {
           const building = buildings.find((b) => b.id === buildingId);
           const baseCost = Math.max(1, building?.cost ?? 1);

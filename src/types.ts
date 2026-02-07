@@ -89,7 +89,7 @@ export type Company = {
 };
 
 export type BuildingOwner =
-  | { type: 'state' }
+  | { type: 'state'; countryId: string }
   | { type: 'company'; companyId: string };
 
 export type ConstructionEntry = {

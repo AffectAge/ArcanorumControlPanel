@@ -1,6 +1,12 @@
 import { X, Hammer, Ban } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { BuildingDefinition, Company, ProvinceData, BuildingOwner } from '../types';
+import type {
+  BuildingDefinition,
+  Company,
+  ProvinceData,
+  BuildingOwner,
+  Country,
+} from '../types';
 
 type ConstructionModalProps = {
   open: boolean;
@@ -8,6 +14,7 @@ type ConstructionModalProps = {
   province?: ProvinceData;
   buildings: BuildingDefinition[];
   companies: Company[];
+  countries: Country[];
   activeCountryId?: string;
   activeCountryPoints: number;
   onClose: () => void;
@@ -21,6 +28,7 @@ export default function ConstructionModal({
   province,
   buildings,
   companies,
+  countries,
   activeCountryId,
   activeCountryPoints,
   onClose,
@@ -34,14 +42,17 @@ export default function ConstructionModal({
   );
   const [ownerType, setOwnerType] = useState<'state' | 'company'>('state');
   const [companyId, setCompanyId] = useState('');
+  const [stateCountryId, setStateCountryId] = useState('');
   const availableCompanies = useMemo(
     () => companies.filter((company) => company.countryId === activeCountryId),
     [companies, activeCountryId],
   );
+  const resolvedStateCountryId =
+    stateCountryId || activeCountryId || countries[0]?.id || 'state';
   const owner: BuildingOwner =
     ownerType === 'company' && companyId
       ? { type: 'company', companyId }
-      : { type: 'state' };
+      : { type: 'state', countryId: resolvedStateCountryId };
   const progressMap = province.constructionProgress ?? {};
   const builtList = province.buildingsBuilt ?? [];
   const activeTasks = Object.values(progressMap).reduce(
@@ -52,8 +63,8 @@ export default function ConstructionModal({
     activeTasks > 0 ? Math.max(0, activeCountryPoints) / activeTasks : 0;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
-      <div className="w-[860px] max-w-[96vw] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl">
+    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm animate-fadeIn">
+      <div className="absolute inset-4 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0e1523]">
           <div>
             <h2 className="text-white text-lg font-semibold">
@@ -76,7 +87,7 @@ export default function ConstructionModal({
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3 flex-1 min-h-0">
           {!isOwner && (
             <div className="text-white/60 text-sm border border-white/10 bg-white/5 rounded-xl p-3">
               Строительство доступно только владельцу провинции.
@@ -126,6 +137,49 @@ export default function ConstructionModal({
                 ))}
               </select>
             )}
+            {ownerType === 'state' && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={resolvedStateCountryId}
+                  onChange={(event) => setStateCountryId(event.target.value)}
+                  className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                >
+                  {countries.map((country) => (
+                    <option
+                      key={country.id}
+                      value={country.id}
+                      className="bg-[#0b111b] text-white"
+                    >
+                      {country.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-2 max-w-full flex-wrap">
+                  {countries.map((country) => (
+                    <button
+                      key={country.id}
+                      onClick={() => setStateCountryId(country.id)}
+                      className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                        resolvedStateCountryId === country.id
+                          ? 'border-emerald-400/60 bg-emerald-500/20'
+                          : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
+                      }`}
+                      title={country.name}
+                    >
+                      {country.flagDataUrl ? (
+                        <img
+                          src={country.flagDataUrl}
+                          alt=""
+                          className="w-6 h-6 rounded object-contain"
+                        />
+                      ) : (
+                        <span className="text-white/50 text-[10px]">Flag</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {ownerType === 'company' && (
               <div className="flex items-center gap-2 max-w-full flex-wrap">
                 {availableCompanies.map((company) => (
@@ -161,7 +215,7 @@ export default function ConstructionModal({
             <div className="col-span-2 text-right">Действия</div>
           </div>
 
-          <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1 legend-scroll">
+          <div className="space-y-2 overflow-y-auto pr-1 legend-scroll flex-1 min-h-0">
             {buildings.length === 0 && (
               <div className="text-white/50 text-sm border border-dashed border-white/10 rounded-xl p-4">
                 Нет доступных зданий.

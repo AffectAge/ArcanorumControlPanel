@@ -1,4 +1,4 @@
-import { X, Hammer, Factory, MapPin, Building, Trash2 } from 'lucide-react';
+import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { BuildingDefinition, Country, ProvinceRecord, Company } from '../types';
 
@@ -11,6 +11,7 @@ type IndustryModalProps = {
   activeCountryId?: string;
   activeCountryPoints: number;
   demolitionCostPercent: number;
+  onOpenConstruction: (provinceId: string) => void;
   onDemolish: (provinceId: string, buildingId: string) => void;
   onClose: () => void;
 };
@@ -29,6 +30,7 @@ export default function IndustryModal({
   activeCountryId,
   activeCountryPoints,
   demolitionCostPercent,
+  onOpenConstruction,
   onDemolish,
   onClose,
 }: IndustryModalProps) {
@@ -259,18 +261,22 @@ export default function IndustryModal({
                 {filteredCards.map((card) => {
                   const building = buildings.find((b) => b.id === card.buildingId);
                   const country = countries.find((c) => c.id === card.countryId);
+                  const ownerCountry =
+                    card.owner.type === 'state'
+                      ? countries.find((c) => c.id === card.owner.countryId)
+                      : undefined;
                   const baseCost = Math.max(1, building?.cost ?? 1);
                   const demolishCost = Math.ceil(
                     (baseCost * (demolitionCostPercent ?? 0)) / 100,
                   );
                   const ownerLabel =
                     card.owner.type === 'state'
-                      ? country?.name ?? 'Государство'
+                      ? ownerCountry?.name ?? 'Государство'
                       : companies.find((c) => c.id === card.owner.companyId)?.name ??
                         'Компания';
                   const ownerLogo =
                     card.owner.type === 'state'
-                      ? country?.flagDataUrl
+                      ? ownerCountry?.flagDataUrl
                       : companies.find((c) => c.id === card.owner.companyId)
                           ?.iconDataUrl;
                   return (
@@ -300,20 +306,33 @@ export default function IndustryModal({
                           </div>
                         </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            setConfirmTarget({
-                              provinceId: card.provinceId,
-                              buildingId: card.buildingId,
-                              buildingName: building?.name ?? card.buildingId,
-                              cost: demolishCost,
-                            });
-                          }}
-                          className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                          title="Снести"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <div className="relative group">
+                            <button
+                              onClick={() => onOpenConstruction(card.provinceId)}
+                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-emerald-400/40 hover:text-emerald-300 flex items-center justify-center"
+                            >
+                              <HammerIcon className="w-4 h-4" />
+                            </button>
+                            <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                              Строительство
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setConfirmTarget({
+                                provinceId: card.provinceId,
+                                buildingId: card.buildingId,
+                                buildingName: building?.name ?? card.buildingId,
+                                cost: demolishCost,
+                              });
+                            }}
+                            className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                            title="Снести"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                       <div className="flex flex-col gap-2 text-white/60 text-xs">
                         <div className="flex items-center gap-2">
