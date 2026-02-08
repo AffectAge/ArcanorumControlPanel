@@ -9,6 +9,7 @@ import {
   Mountain,
   Palette,
   Package,
+  Sliders,
   Image as ImageIcon,
   Building2,
   Briefcase,
@@ -763,10 +764,12 @@ export default function AdminPanel({
           </select>
           <button
             onClick={() => setEditReqLogic((prev) => removeNodeAt(prev, path))}
-            className="h-8 w-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-            title="Удалить условие"
+            className="h-8 w-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
           >
             <Trash2 className="w-4 h-4 text-white/60" />
+            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+              Удалить условие
+            </span>
           </button>
         </div>
       );
@@ -880,10 +883,12 @@ export default function AdminPanel({
               onClick={() =>
                 setEditReqLogic((prev) => removeNodeAt(prev, path))
               }
-              className="ml-auto h-8 w-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-              title="Удалить группу"
+              className="ml-auto h-8 w-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
             >
               <Trash2 className="w-4 h-4 text-white/60" />
+              <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                Удалить группу
+              </span>
             </button>
           )}
         </div>
@@ -1517,29 +1522,38 @@ export default function AdminPanel({
                         }
                         className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                       />
-                      <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) =>
-                            handleIconUpload(
-                              event.target.files?.[0],
-                              (value) => onUpdateReligionIcon(religion.id, value),
-                            )
-                          }
-                        />
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        Изменить логотип
-                      </label>
-                      {religion.iconDataUrl && (
-                        <button
-                          onClick={() => onUpdateReligionIcon(religion.id, undefined)}
-                          className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                      <div className="flex items-center gap-2 flex-row-reverse">
+                        {religion.iconDataUrl && (
+                          <button
+                            onClick={() => onUpdateReligionIcon(religion.id, undefined)}
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
+                          >
+                            <Trash2 className="w-4 h-4 text-white/60" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Удалить логотип
+                            </span>
+                          </button>
+                        )}
+                        <label
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group"
                         >
-                          Удалить логотип
-                        </button>
-                      )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              handleIconUpload(
+                                event.target.files?.[0],
+                                (value) => onUpdateReligionIcon(religion.id, value),
+                              )
+                            }
+                          />
+                          <ImageIcon className="w-4 h-4" />
+                          <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            Изменить логотип
+                          </span>
+                        </label>
+                      </div>
                     </div>
                     <button
                       onClick={() => onDeleteReligion(religion.id)}
@@ -1715,29 +1729,38 @@ export default function AdminPanel({
                         }
                         className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                       />
-                      <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) =>
-                            handleIconUpload(
-                              event.target.files?.[0],
-                              (value) => onUpdateCultureIcon(culture.id, value),
-                            )
-                          }
-                        />
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        Изменить логотип
-                      </label>
-                      {culture.iconDataUrl && (
-                        <button
-                          onClick={() => onUpdateCultureIcon(culture.id, undefined)}
-                          className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                      <div className="flex items-center gap-2 flex-row-reverse">
+                        {culture.iconDataUrl && (
+                          <button
+                            onClick={() => onUpdateCultureIcon(culture.id, undefined)}
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
+                          >
+                            <Trash2 className="w-4 h-4 text-white/60" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Удалить логотип
+                            </span>
+                          </button>
+                        )}
+                        <label
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group"
                         >
-                          Удалить логотип
-                        </button>
-                      )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              handleIconUpload(
+                                event.target.files?.[0],
+                                (value) => onUpdateCultureIcon(culture.id, value),
+                              )
+                            }
+                          />
+                          <ImageIcon className="w-4 h-4" />
+                          <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            Изменить логотип
+                          </span>
+                        </label>
+                      </div>
                     </div>
                     <button
                       onClick={() => onDeleteCulture(culture.id)}
@@ -1845,29 +1868,38 @@ export default function AdminPanel({
                         }
                         className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                       />
-                      <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) =>
-                            handleIconUpload(
-                              event.target.files?.[0],
-                              (value) => onUpdateResourceIcon(resource.id, value),
-                            )
-                          }
-                        />
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        Изменить логотип
-                      </label>
-                      {resource.iconDataUrl && (
-                        <button
-                          onClick={() => onUpdateResourceIcon(resource.id, undefined)}
-                          className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                      <div className="flex items-center gap-2 flex-row-reverse">
+                        {resource.iconDataUrl && (
+                          <button
+                            onClick={() => onUpdateResourceIcon(resource.id, undefined)}
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
+                          >
+                            <Trash2 className="w-4 h-4 text-white/60" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Удалить логотип
+                            </span>
+                          </button>
+                        )}
+                        <label
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group"
                         >
-                          Удалить логотип
-                        </button>
-                      )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              handleIconUpload(
+                                event.target.files?.[0],
+                                (value) => onUpdateResourceIcon(resource.id, value),
+                              )
+                            }
+                          />
+                          <ImageIcon className="w-4 h-4" />
+                          <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            Изменить логотип
+                          </span>
+                        </label>
+                      </div>
                     </div>
                     <button
                       onClick={() => onDeleteResource(resource.id)}
@@ -2024,38 +2056,50 @@ export default function AdminPanel({
                             </option>
                           ))}
                         </select>
-                        <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              handleIconUpload(
-                                event.target.files?.[0],
-                                (value) =>
-                                  onUpdateBuildingIcon(building.id, value),
-                              )
-                            }
-                          />
-                          <ImageIcon className="w-3.5 h-3.5" />
-                          Изменить логотип
-                        </label>
-                        {building.iconDataUrl && (
-                          <button
-                            onClick={() =>
-                              onUpdateBuildingIcon(building.id, undefined)
-                            }
-                            className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                        <div className="flex items-center gap-2 flex-row-reverse">
+                          {building.iconDataUrl && (
+                            <button
+                              onClick={() =>
+                                onUpdateBuildingIcon(building.id, undefined)
+                              }
+                              className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
+                            >
+                              <Trash2 className="w-4 h-4 text-white/60" />
+                              <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                Удалить логотип
+                              </span>
+                            </button>
+                          )}
+                          <label
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group"
                           >
-                            Удалить логотип
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) =>
+                                handleIconUpload(
+                                  event.target.files?.[0],
+                                  (value) =>
+                                    onUpdateBuildingIcon(building.id, value),
+                                )
+                              }
+                            />
+                            <ImageIcon className="w-4 h-4" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Изменить логотип
+                            </span>
+                          </label>
+                          <button
+                            onClick={() => openEditRequirements(building)}
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-emerald-400/40 relative group"
+                          >
+                            <Sliders className="w-4 h-4 text-white/60" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Критерии
+                            </span>
                           </button>
-                        )}
-                        <button
-                          onClick={() => openEditRequirements(building)}
-                          className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-emerald-400/40"
-                        >
-                          Критерии
-                        </button>
+                        </div>
                         <button
                           onClick={() => onDeleteBuilding(building.id)}
                           className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
@@ -2171,29 +2215,38 @@ export default function AdminPanel({
                           }
                           className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                         />
-                        <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              handleIconUpload(
-                                event.target.files?.[0],
-                                (value) => onUpdateIndustryIcon(industry.id, value),
-                              )
-                            }
-                          />
-                          <ImageIcon className="w-3.5 h-3.5" />
-                          Изменить логотип
-                        </label>
-                        {industry.iconDataUrl && (
-                          <button
-                            onClick={() => onUpdateIndustryIcon(industry.id, undefined)}
-                            className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                        <div className="flex items-center gap-2 flex-row-reverse">
+                          {industry.iconDataUrl && (
+                            <button
+                              onClick={() => onUpdateIndustryIcon(industry.id, undefined)}
+                              className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
+                            >
+                              <Trash2 className="w-4 h-4 text-white/60" />
+                              <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                Удалить логотип
+                              </span>
+                            </button>
+                          )}
+                          <label
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group"
                           >
-                            Удалить логотип
-                          </button>
-                        )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) =>
+                                handleIconUpload(
+                                  event.target.files?.[0],
+                                  (value) => onUpdateIndustryIcon(industry.id, value),
+                                )
+                              }
+                            />
+                            <ImageIcon className="w-4 h-4" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Изменить логотип
+                            </span>
+                          </label>
+                        </div>
                         <button
                           onClick={() => onDeleteIndustry(industry.id)}
                           className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
@@ -2334,29 +2387,38 @@ export default function AdminPanel({
                             }
                             className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                           />
-                          <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(event) =>
-                                handleIconUpload(
-                                  event.target.files?.[0],
-                                  (value) => onUpdateCompanyIcon(company.id, value),
-                                )
-                              }
-                            />
-                            <ImageIcon className="w-3.5 h-3.5" />
-                            Изменить логотип
-                          </label>
-                          {company.iconDataUrl && (
-                            <button
-                              onClick={() => onUpdateCompanyIcon(company.id, undefined)}
-                              className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                          <div className="flex items-center gap-2 flex-row-reverse">
+                            {company.iconDataUrl && (
+                              <button
+                                onClick={() => onUpdateCompanyIcon(company.id, undefined)}
+                                className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
+                              >
+                                <Trash2 className="w-4 h-4 text-white/60" />
+                                <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Удалить логотип
+                                </span>
+                              </button>
+                            )}
+                            <label
+                              className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group"
                             >
-                              Удалить логотип
-                            </button>
-                          )}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(event) =>
+                                  handleIconUpload(
+                                    event.target.files?.[0],
+                                    (value) => onUpdateCompanyIcon(company.id, value),
+                                  )
+                                }
+                              />
+                              <ImageIcon className="w-4 h-4" />
+                              <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                Изменить логотип
+                              </span>
+                            </label>
+                          </div>
                         </div>
                         <button
                           onClick={() => onDeleteCompany(company.id)}
