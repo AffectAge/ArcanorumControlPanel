@@ -24,6 +24,7 @@ export type GameState = {
   industries?: Industry[];
   companies?: Company[];
   diplomacy?: DiplomacyAgreement[];
+  diplomacyProposals?: DiplomacyProposal[];
   settings?: GameSettings;
   eventLog?: EventLogState;
 };
@@ -162,6 +163,15 @@ export type DiplomacyAgreement = {
     perCountry?: number;
     global?: number;
   };
+};
+
+export type DiplomacyProposal = {
+  id: string;
+  fromCountryId: string;
+  toCountryId: string;
+  agreement: Omit<DiplomacyAgreement, 'id'>;
+  reciprocal: boolean;
+  createdTurn: number;
 };
 
 export type BuildingOwner =

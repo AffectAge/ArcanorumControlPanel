@@ -7,6 +7,7 @@ import type {
   ProvinceRecord,
   BuildingDefinition,
   Company,
+  DiplomacyProposal,
 } from '../types';
 
 type DiplomacyModalProps = {
@@ -18,7 +19,9 @@ type DiplomacyModalProps = {
   companies: Company[];
   agreements: DiplomacyAgreement[];
   onClose: () => void;
-  onAddAgreement: (agreement: Omit<DiplomacyAgreement, 'id'>, reciprocal: boolean) => void;
+  onCreateProposal: (
+    proposal: Omit<DiplomacyProposal, 'id' | 'createdTurn'>,
+  ) => void;
   onDeleteAgreement: (id: string) => void;
 };
 
@@ -31,7 +34,7 @@ export default function DiplomacyModal({
   companies,
   agreements,
   onClose,
-  onAddAgreement,
+  onCreateProposal,
   onDeleteAgreement,
 }: DiplomacyModalProps) {
   const treatyTypes = [
@@ -181,8 +184,10 @@ export default function DiplomacyModal({
     if (hostId === guestId) return;
     if (!allowState && !allowCompanies) return;
     if (allowCompanies && !allCompanies && selectedCompanyIds.size === 0) return;
-    onAddAgreement(
-      {
+    onCreateProposal({
+      fromCountryId: guestId,
+      toCountryId: hostId,
+      agreement: {
         hostCountryId: hostId,
         guestCountryId: guestId,
         allowState,
@@ -209,7 +214,7 @@ export default function DiplomacyModal({
         },
       },
       reciprocal,
-    );
+    });
     setSelectedIndustries(new Set());
     setLimitProvince(0);
     setLimitCountry(0);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Handshake } from 'lucide-react';
 import TopBar from './components/TopBar';
 import LeftToolbar from './components/LeftToolbar';
 import InfoPanel from './components/InfoPanel';
@@ -14,6 +15,7 @@ import ProvinceContextMenu from './components/ProvinceContextMenu';
 import EventLogPanel from './components/EventLogPanel';
 import IndustryModal from './components/IndustryModal';
 import DiplomacyModal from './components/DiplomacyModal';
+import DiplomacyProposalsModal from './components/DiplomacyProposalsModal';
 import {
   EventLogContext,
   createDefaultLog,
@@ -36,6 +38,7 @@ import type {
   TraitCriteria,
   RequirementNode,
   DiplomacyAgreement,
+  DiplomacyProposal,
   EventLogEntry,
   EventCategory,
   EventLogState,
@@ -268,6 +271,17 @@ function App() {
   const [diplomacyAgreements, setDiplomacyAgreements] = useState<
     DiplomacyAgreement[]
   >([]);
+  const [diplomacyProposals, setDiplomacyProposals] = useState<
+    DiplomacyProposal[]
+  >([]);
+  const [diplomacyInboxOpen, setDiplomacyInboxOpen] = useState(false);
+  const pendingDiplomacyProposals = useMemo(
+    () =>
+      diplomacyProposals.filter(
+        (proposal) => proposal.toCountryId === activeCountryId,
+      ),
+    [diplomacyProposals, activeCountryId],
+  );
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -596,6 +610,7 @@ function App() {
       industries,
       companies,
       diplomacy: diplomacyAgreements,
+      diplomacyProposals,
       settings: gameSettings,
       eventLog,
     }),
@@ -615,6 +630,7 @@ function App() {
       industries,
       companies,
       diplomacyAgreements,
+      diplomacyProposals,
       gameSettings,
       eventLog,
     ],
@@ -677,6 +693,7 @@ function App() {
     setIndustries(save.data.industries ?? industries);
     setCompanies(save.data.companies ?? companies);
     setDiplomacyAgreements(save.data.diplomacy ?? []);
+    setDiplomacyProposals(save.data.diplomacyProposals ?? []);
     setGameSettings(
       save.data.settings ?? {
         colonizationPointsPerTurn: 10,
@@ -786,6 +803,7 @@ function App() {
     setIndustries([]);
     setCompanies([]);
     setDiplomacyAgreements([]);
+    setDiplomacyProposals([]);
     setGameSettings({
       colonizationPointsPerTurn: 10,
       constructionPointsPerTurn: 10,
@@ -1383,16 +1401,13 @@ function App() {
     });
   };
 
-  const addDiplomacyAgreement = (
+  const applyDiplomacyAgreement = (
     payload: Omit<DiplomacyAgreement, 'id'>,
     reciprocal: boolean,
   ) => {
     setDiplomacyAgreements((prev) => {
       const next = [...prev, { ...payload, id: createId() }];
-      if (
-        reciprocal &&
-        payload.hostCountryId !== payload.guestCountryId
-      ) {
+      if (reciprocal && payload.hostCountryId !== payload.guestCountryId) {
         next.push({
           ...payload,
           id: createId(),
@@ -1402,6 +1417,34 @@ function App() {
       }
       return next;
     });
+  };
+
+  const addDiplomacyProposal = (
+    payload: Omit<DiplomacyProposal, 'id' | 'createdTurn'>,
+  ) => {
+    setDiplomacyProposals((prev) => [
+      ...prev,
+      {
+        ...payload,
+        id: createId(),
+        createdTurn: turn,
+      },
+    ]);
+  };
+
+  const acceptDiplomacyProposal = (proposalId: string) => {
+    const proposal = diplomacyProposals.find((entry) => entry.id === proposalId);
+    if (!proposal) return;
+    applyDiplomacyAgreement(proposal.agreement, proposal.reciprocal);
+    setDiplomacyProposals((prev) =>
+      prev.filter((entry) => entry.id !== proposalId),
+    );
+  };
+
+  const declineDiplomacyProposal = (proposalId: string) => {
+    setDiplomacyProposals((prev) =>
+      prev.filter((entry) => entry.id !== proposalId),
+    );
   };
 
   const deleteDiplomacyAgreement = (id: string) => {
@@ -2207,6 +2250,15 @@ function App() {
         }}
         onOpenAdmin={() => setAdminOpen(true)}
       />
+      {pendingDiplomacyProposals.length > 0 && (
+        <button
+          onClick={() => setDiplomacyInboxOpen(true)}
+          className="absolute left-1/2 -translate-x-1/2 top-[88px] h-9 px-4 rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-200 text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400/20 hover:border-emerald-300/60 transition-colors z-40"
+        >
+          <Handshake className="w-4 h-4" />
+          Договоры ({pendingDiplomacyProposals.length})
+        </button>
+      )}
       <LeftToolbar />
 
       {infoPanelOpen && (
@@ -2550,8 +2602,24 @@ function App() {
         companies={companies}
         agreements={diplomacyAgreements}
         onClose={() => setDiplomacyOpen(false)}
-        onAddAgreement={addDiplomacyAgreement}
+        onCreateProposal={addDiplomacyProposal}
         onDeleteAgreement={deleteDiplomacyAgreement}
+      />
+      <DiplomacyProposalsModal
+        open={diplomacyInboxOpen}
+        proposals={pendingDiplomacyProposals}
+        countries={countries}
+        industries={industries}
+        companies={companies}
+        onAccept={(id) => {
+          acceptDiplomacyProposal(id);
+          setDiplomacyInboxOpen(false);
+        }}
+        onDecline={(id) => {
+          declineDiplomacyProposal(id);
+          setDiplomacyInboxOpen(false);
+        }}
+        onClose={() => setDiplomacyInboxOpen(false)}
       />
 
       <AdminPanel
