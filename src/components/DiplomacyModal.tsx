@@ -42,7 +42,12 @@ export default function DiplomacyModal({
     },
   ];
   const [activeTreatyType, setActiveTreatyType] = useState(treatyTypes[0].id);
-  const [kind, setKind] = useState<'company' | 'state'>('company');
+  const [allowState, setAllowState] = useState(true);
+  const [allowCompanies, setAllowCompanies] = useState(true);
+  const [allCompanies, setAllCompanies] = useState(true);
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [hostId, setHostId] = useState('');
   const [guestId, setGuestId] = useState('');
   const [reciprocal, setReciprocal] = useState(false);
@@ -63,6 +68,10 @@ export default function DiplomacyModal({
     companies.forEach((company) => map.set(company.id, company.countryId));
     return map;
   }, [companies]);
+  const guestCompanies = useMemo(
+    () => companies.filter((company) => company.countryId === guestId),
+    [companies, guestId],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -70,6 +79,25 @@ export default function DiplomacyModal({
     if (!hostId) setHostId(countries[0].id);
     if (!guestId) setGuestId(countries[1]?.id ?? countries[0].id);
   }, [open, countries, hostId, guestId]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (allCompanies) {
+      setSelectedCompanyIds(new Set());
+      return;
+    }
+    setSelectedCompanyIds((prev) => {
+      if (!guestId) return prev;
+      const allowed = new Set(
+        companies.filter((c) => c.countryId === guestId).map((c) => c.id),
+      );
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (allowed.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [open, allCompanies, guestId, companies]);
 
   if (!open) return null;
 
@@ -84,13 +112,24 @@ export default function DiplomacyModal({
       provinceOwnerId?: string,
     ) => {
       if (!provinceOwnerId || provinceOwnerId !== agreement.hostCountryId) return false;
-      if (agreement.kind === 'state' && owner.type !== 'state') return false;
-      if (agreement.kind === 'company' && owner.type !== 'company') return false;
+      const allowsState = agreement.allowState ?? agreement.kind === 'state';
+      const allowsCompanies =
+        agreement.allowCompanies ?? agreement.kind === 'company';
+      if (owner.type === 'state' && !allowsState) return false;
+      if (owner.type === 'company' && !allowsCompanies) return false;
       const guestId =
         owner.type === 'state'
           ? owner.countryId
           : companyCountryMap.get(owner.companyId);
       if (!guestId || guestId !== agreement.guestCountryId) return false;
+      if (
+        owner.type === 'company' &&
+        agreement.companyIds &&
+        agreement.companyIds.length > 0 &&
+        !agreement.companyIds.includes(owner.companyId)
+      ) {
+        return false;
+      }
       if (agreement.industries && agreement.industries.length > 0) {
         const industryId = buildingIndustryMap.get(buildingId);
         if (!industryId || !agreement.industries.includes(industryId)) {
@@ -140,11 +179,18 @@ export default function DiplomacyModal({
   const handleAdd = () => {
     if (!hostId || !guestId) return;
     if (hostId === guestId) return;
+    if (!allowState && !allowCompanies) return;
+    if (allowCompanies && !allCompanies && selectedCompanyIds.size === 0) return;
     onAddAgreement(
       {
-        kind,
         hostCountryId: hostId,
         guestCountryId: guestId,
+        allowState,
+        allowCompanies,
+        companyIds:
+          allowCompanies && !allCompanies
+            ? Array.from(selectedCompanyIds)
+            : undefined,
         industries:
           selectedIndustries.size > 0 ? Array.from(selectedIndustries) : undefined,
         limits: {
@@ -169,7 +215,14 @@ export default function DiplomacyModal({
     setLimitCountry(0);
     setLimitGlobal(0);
     setReciprocal(false);
+    setAllCompanies(true);
+    setSelectedCompanyIds(new Set());
   };
+
+  const canAddAgreement =
+    Boolean(hostId && guestId && hostId !== guestId) &&
+    (allowState || allowCompanies) &&
+    (!allowCompanies || allCompanies || selectedCompanyIds.size > 0);
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -232,32 +285,82 @@ export default function DiplomacyModal({
               <div className="space-y-4">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
                 <div className="text-white/80 text-sm font-semibold">Новое соглашение</div>
-                <div className="grid grid-cols-1 gap-2">
-                  <label className="flex flex-col gap-1 text-white/70 text-sm">
-                    Тип
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setKind('company')}
-                        className={`h-8 px-3 rounded-lg border text-xs ${
-                          kind === 'company'
-                            ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200'
-                            : 'bg-black/30 border-white/10 text-white/60'
-                        }`}
-                      >
-                        Компании
-                      </button>
-                      <button
-                        onClick={() => setKind('state')}
-                        className={`h-8 px-3 rounded-lg border text-xs ${
-                          kind === 'state'
-                            ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200'
-                            : 'bg-black/30 border-white/10 text-white/60'
-                        }`}
-                      >
-                        Государство
-                      </button>
-                    </div>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="text-white/70 text-sm">Разрешить строить</div>
+                  <label className="flex items-center gap-2 text-white/70 text-sm">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-emerald-500"
+                      checked={allowState}
+                      onChange={(event) => setAllowState(event.target.checked)}
+                    />
+                    Государству
                   </label>
+                  <label className="flex items-center gap-2 text-white/70 text-sm">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-emerald-500"
+                      checked={allowCompanies}
+                      onChange={(event) => setAllowCompanies(event.target.checked)}
+                    />
+                    Компаниям
+                  </label>
+                  {allowCompanies && (
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <label className="flex items-center gap-2 text-white/70 text-xs">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 accent-emerald-500"
+                          checked={allCompanies}
+                          onChange={(event) => setAllCompanies(event.target.checked)}
+                        />
+                        Все компании страны-гостя
+                      </label>
+                      {!allCompanies && (
+                        <div className="max-h-32 overflow-y-auto legend-scroll space-y-2 pr-1">
+                          {guestCompanies.length > 0 ? (
+                            guestCompanies.map((company) => (
+                              <label
+                                key={company.id}
+                                className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-white/70 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 accent-emerald-500"
+                                  checked={selectedCompanyIds.has(company.id)}
+                                  onChange={(event) =>
+                                    setSelectedCompanyIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (event.target.checked) {
+                                        next.add(company.id);
+                                      } else {
+                                        next.delete(company.id);
+                                      }
+                                      return next;
+                                    })
+                                  }
+                                />
+                                {company.iconDataUrl ? (
+                                  <img
+                                    src={company.iconDataUrl}
+                                    alt=""
+                                    className="w-4 h-4 rounded object-cover border border-white/10"
+                                  />
+                                ) : (
+                                  <span className="w-3 h-3 rounded-full border border-white/10 bg-white/20" />
+                                )}
+                                <span>{company.name}</span>
+                              </label>
+                            ))
+                          ) : (
+                            <div className="text-white/40 text-xs">
+                              Нет компаний этой страны
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -399,7 +502,12 @@ export default function DiplomacyModal({
 
               <button
                 onClick={handleAdd}
-                className="h-9 px-3 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm flex items-center gap-2"
+                disabled={!canAddAgreement}
+                className={`h-9 px-3 rounded-lg border text-sm flex items-center gap-2 ${
+                  canAddAgreement
+                    ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200'
+                    : 'bg-black/30 border-white/10 text-white/40 cursor-not-allowed'
+                }`}
               >
                 <Plus className="w-4 h-4" />
                 Добавить
@@ -424,6 +532,19 @@ export default function DiplomacyModal({
                     const limitLabel = (value: number) =>
                       value && value > 0 ? value : '∞';
                     const usage = getAgreementUsage(agreement);
+                    const resolvedAllowState =
+                      agreement.allowState ?? agreement.kind === 'state';
+                    const resolvedAllowCompanies =
+                      agreement.allowCompanies ?? agreement.kind === 'company';
+                    const allowedCompaniesLabel =
+                      agreement.companyIds && agreement.companyIds.length > 0
+                        ? agreement.companyIds
+                            .map(
+                              (id) =>
+                                companies.find((item) => item.id === id)?.name ?? id,
+                            )
+                            .join(', ')
+                        : 'Все компании';
                     return (
                       <div
                         key={agreement.id}
@@ -435,8 +556,16 @@ export default function DiplomacyModal({
                             {guest?.name ?? agreement.guestCountryId}
                           </div>
                           <div className="text-white/50 text-xs">
-                            Тип: {agreement.kind === 'company' ? 'Компании' : 'Государство'}
+                            Разрешено:{' '}
+                            {resolvedAllowState ? 'Государство' : ''}
+                            {resolvedAllowState && resolvedAllowCompanies ? ' + ' : ''}
+                            {resolvedAllowCompanies ? 'Компании' : ''}
                           </div>
+                          {resolvedAllowCompanies && (
+                            <div className="text-white/50 text-xs">
+                              Компании: {allowedCompaniesLabel}
+                            </div>
+                          )}
                           <div className="text-white/50 text-xs">
                             Отрасли: {industryNames}
                           </div>

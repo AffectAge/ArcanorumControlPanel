@@ -147,7 +147,9 @@ export default function ConstructionModal({
           diplomacyAgreements.some(
             (agreement) =>
               agreement.hostCountryId === province.ownerCountryId &&
-              agreement.guestCountryId === activeCountryId,
+              agreement.guestCountryId === activeCountryId &&
+              ((agreement.allowState ?? agreement.kind === 'state') ||
+                (agreement.allowCompanies ?? agreement.kind === 'company')),
           )),
     );
   const progressMap = province.constructionProgress ?? {};
@@ -161,10 +163,8 @@ export default function ConstructionModal({
     const ownerCountryId = getOwnerCountryId(target);
     if (!hostId || !ownerCountryId) return false;
     if (hostId === ownerCountryId) return true;
-    const kind = target.type === 'state' ? 'state' : 'company';
     const agreements = diplomacyAgreements.filter(
       (agreement) =>
-        agreement.kind === kind &&
         agreement.hostCountryId === hostId &&
         agreement.guestCountryId === ownerCountryId,
     );
@@ -175,28 +175,55 @@ export default function ConstructionModal({
         buildings.find((item) => item.id === id)?.industryId ?? undefined;
       return Boolean(industryId && agreement.industries.includes(industryId));
     };
+    const ownerAllowed = (agreement: DiplomacyAgreement) => {
+      const allowsState = agreement.allowState ?? agreement.kind === 'state';
+      const allowsCompanies =
+        agreement.allowCompanies ?? agreement.kind === 'company';
+      if (target.type === 'state') return allowsState;
+      if (!allowsCompanies) return false;
+      if (agreement.companyIds && agreement.companyIds.length > 0) {
+        return agreement.companyIds.includes(target.companyId);
+      }
+      return true;
+    };
+    const agreementMatch = (
+      owner: BuildingOwner,
+      agreementsToUse: DiplomacyAgreement[],
+    ) =>
+      agreementsToUse.find((agreement) => {
+        const allowsState = agreement.allowState ?? agreement.kind === 'state';
+        const allowsCompanies =
+          agreement.allowCompanies ?? agreement.kind === 'company';
+        if (owner.type === 'state') {
+          if (!allowsState) return false;
+        } else {
+          if (!allowsCompanies) return false;
+          if (agreement.companyIds && agreement.companyIds.length > 0) {
+            if (!agreement.companyIds.includes(owner.companyId)) return false;
+          }
+        }
+        return true;
+      });
     const countAgreementEntries = (
       agreementsToUse: DiplomacyAgreement[],
       provinceList: ProvinceData[],
     ) =>
       provinceList.reduce((sum, prov) => {
         const built = (prov.buildingsBuilt ?? []).filter((entry) => {
-          if (entry.owner.type !== kind) return false;
+          const match = agreementMatch(entry.owner, agreementsToUse);
+          if (!match) return false;
           const entryCountryId = getOwnerCountryId(entry.owner);
           if (entryCountryId !== ownerCountryId) return false;
-          return agreementsToUse.some((agreement) =>
-            industryAllowed(agreement, entry.buildingId),
-          );
+          return industryAllowed(match, entry.buildingId);
         }).length;
         const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
           (sumProgress, [entryBuildingId, entries]) => {
             const filtered = entries.filter((entry) => {
-              if (entry.owner.type !== kind) return false;
+              const match = agreementMatch(entry.owner, agreementsToUse);
+              if (!match) return false;
               const entryCountryId = getOwnerCountryId(entry.owner);
               if (entryCountryId !== ownerCountryId) return false;
-              return agreementsToUse.some((agreement) =>
-                industryAllowed(agreement, entryBuildingId),
-              );
+              return industryAllowed(match, entryBuildingId);
             });
             return sumProgress + filtered.length;
           },
@@ -206,6 +233,7 @@ export default function ConstructionModal({
       }, 0);
 
     return agreements.some((agreement) => {
+      if (!ownerAllowed(agreement)) return false;
       if (!industryAllowed(agreement, building.id)) return false;
       const limits = agreement.limits ?? {};
       const perProvince = limits.perProvince ?? 0;
@@ -237,13 +265,22 @@ export default function ConstructionModal({
     const ownerCountry = getOwnerCountryId(target);
     if (!hostId || !ownerCountry) return 'Нет владельца провинции';
     if (hostId === ownerCountry) return null;
-    const kind = target.type === 'state' ? 'state' : 'company';
     const agreements = diplomacyAgreements.filter(
       (agreement) =>
-        agreement.kind === kind &&
         agreement.hostCountryId === hostId &&
         agreement.guestCountryId === ownerCountry,
     );
+    const ownerAllowed = (agreement: DiplomacyAgreement) => {
+      const allowsState = agreement.allowState ?? agreement.kind === 'state';
+      const allowsCompanies =
+        agreement.allowCompanies ?? agreement.kind === 'company';
+      if (target.type === 'state') return allowsState;
+      if (!allowsCompanies) return false;
+      if (agreement.companyIds && agreement.companyIds.length > 0) {
+        return agreement.companyIds.includes(target.companyId);
+      }
+      return true;
+    };
     if (agreements.length === 0) return 'Нет дипломатического разрешения';
     if (hasDiplomaticAccess(building, target)) return null;
     return 'Превышен лимит дипломатического соглашения';

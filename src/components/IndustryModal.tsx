@@ -334,14 +334,14 @@ const isBuildingActiveForProvince = (
   const hostId = province.ownerCountryId;
   const ownerCountryId = getOwnerCountryId(owner, companies);
   if (hostId && ownerCountryId && hostId !== ownerCountryId) {
-    const kind = owner.type === 'state' ? 'state' : 'company';
     const agreements = diplomacyAgreements.filter(
       (agreement) =>
-        agreement.kind === kind &&
         agreement.hostCountryId === hostId &&
         agreement.guestCountryId === ownerCountryId,
     );
     if (agreements.length === 0) return false;
+    const hasOwnerAccess = agreements.some((agreement) => ownerAllowed(agreement, owner));
+    if (!hasOwnerAccess) return false;
 
     const industryAllowed = (agreement: DiplomacyAgreement, id: string) => {
       if (!agreement.industries || agreement.industries.length === 0) return true;
@@ -349,6 +349,21 @@ const isBuildingActiveForProvince = (
         allBuildings.find((item) => item.id === id)?.industryId ?? undefined;
       return Boolean(industryId && agreement.industries.includes(industryId));
     };
+    const ownerAllowed = (agreement: DiplomacyAgreement, target: BuildingOwner) => {
+      const allowsState = agreement.allowState ?? agreement.kind === 'state';
+      const allowsCompanies =
+        agreement.allowCompanies ?? agreement.kind === 'company';
+      if (target.type === 'state') return allowsState;
+      if (!allowsCompanies) return false;
+      if (agreement.companyIds && agreement.companyIds.length > 0) {
+        return agreement.companyIds.includes(target.companyId);
+      }
+      return true;
+    };
+    const agreementMatch = (
+      target: BuildingOwner,
+      agreementsToUse: DiplomacyAgreement[],
+    ) => agreementsToUse.find((agreement) => ownerAllowed(agreement, target));
 
     const countAgreementEntries = (
       agreementsToUse: DiplomacyAgreement[],
@@ -356,22 +371,20 @@ const isBuildingActiveForProvince = (
     ) =>
       provinceList.reduce((sum, prov) => {
         const built = (prov.buildingsBuilt ?? []).filter((entry) => {
-          if (entry.owner.type !== kind) return false;
+          const match = agreementMatch(entry.owner, agreementsToUse);
+          if (!match) return false;
           const entryCountryId = getOwnerCountryId(entry.owner, companies);
           if (entryCountryId !== ownerCountryId) return false;
-          return agreementsToUse.some((agreement) =>
-            industryAllowed(agreement, entry.buildingId),
-          );
+          return industryAllowed(match, entry.buildingId);
         }).length;
         const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
           (sumProgress, [entryBuildingId, entries]) => {
             const filtered = entries.filter((entry) => {
-              if (entry.owner.type !== kind) return false;
+              const match = agreementMatch(entry.owner, agreementsToUse);
+              if (!match) return false;
               const entryCountryId = getOwnerCountryId(entry.owner, companies);
               if (entryCountryId !== ownerCountryId) return false;
-              return agreementsToUse.some((agreement) =>
-                industryAllowed(agreement, entryBuildingId),
-              );
+              return industryAllowed(match, entryBuildingId);
             });
             return sumProgress + filtered.length;
           },
@@ -381,6 +394,7 @@ const isBuildingActiveForProvince = (
       }, 0);
 
     const allowed = agreements.some((agreement) => {
+      if (!ownerAllowed(agreement, owner)) return false;
       if (!industryAllowed(agreement, building.id)) return false;
       const limits = agreement.limits ?? {};
       const perProvince = limits.perProvince ?? 0;
@@ -653,44 +667,60 @@ const getInactiveReasons = (
   const hostId = province.ownerCountryId;
   const ownerCountryId = getOwnerCountryId(owner, companies);
   if (hostId && ownerCountryId && hostId !== ownerCountryId) {
-    const kind = owner.type === 'state' ? 'state' : 'company';
     const agreements = diplomacyAgreements.filter(
       (agreement) =>
-        agreement.kind === kind &&
         agreement.hostCountryId === hostId &&
         agreement.guestCountryId === ownerCountryId,
     );
     if (agreements.length === 0) {
       reasons.push('Нет дипломатического разрешения');
     } else {
+
+      const hasOwnerAccess = agreements.some((agreement) => ownerAllowed(agreement, owner));
+      if (!hasOwnerAccess) {
+        reasons.push('??? ???????????????? ??????????');
+      }
       const industryAllowed = (agreement: DiplomacyAgreement, id: string) => {
         if (!agreement.industries || agreement.industries.length === 0) return true;
         const industryId =
           allBuildings.find((item) => item.id === id)?.industryId ?? undefined;
         return Boolean(industryId && agreement.industries.includes(industryId));
       };
+      const ownerAllowed = (agreement: DiplomacyAgreement, target: BuildingOwner) => {
+        const allowsState = agreement.allowState ?? agreement.kind === 'state';
+        const allowsCompanies =
+          agreement.allowCompanies ?? agreement.kind === 'company';
+        if (target.type === 'state') return allowsState;
+        if (!allowsCompanies) return false;
+        if (agreement.companyIds && agreement.companyIds.length > 0) {
+          return agreement.companyIds.includes(target.companyId);
+        }
+        return true;
+      };
+      const agreementMatch = (
+        target: BuildingOwner,
+        agreementsToUse: DiplomacyAgreement[],
+      ) => agreementsToUse.find((agreement) => ownerAllowed(agreement, target));
       const countAgreementEntries = (
         agreementsToUse: DiplomacyAgreement[],
         provinceList: ProvinceData[],
       ) =>
         provinceList.reduce((sum, prov) => {
           const built = (prov.buildingsBuilt ?? []).filter((entry) => {
-            if (entry.owner.type !== kind) return false;
+            const match = agreementMatch(entry.owner, agreementsToUse);
+            if (!match) return false;
             const entryCountryId = getOwnerCountryId(entry.owner, companies);
             if (entryCountryId !== ownerCountryId) return false;
-            return agreementsToUse.some((agreement) =>
-              industryAllowed(agreement, entry.buildingId),
-            );
+            return industryAllowed(match, entry.buildingId);
           }).length;
           const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
             (sumProgress, [entryBuildingId, entries]) => {
               const filtered = entries.filter((entry) => {
-                if (entry.owner.type !== kind) return false;
+                const match = agreementMatch(entry.owner, agreementsToUse);
+                if (!match) return false;
                 const entryCountryId = getOwnerCountryId(entry.owner, companies);
                 if (entryCountryId !== ownerCountryId) return false;
-                return agreementsToUse.some((agreement) =>
-                  industryAllowed(agreement, entryBuildingId),
-                );
+                return industryAllowed(match, entryBuildingId);
               });
               return sumProgress + filtered.length;
             },
@@ -700,6 +730,7 @@ const getInactiveReasons = (
         }, 0);
 
       const allowed = agreements.some((agreement) => {
+        if (!ownerAllowed(agreement, owner)) return false;
         if (!industryAllowed(agreement, building?.id ?? '')) return false;
         const limits = agreement.limits ?? {};
         const perProvince = limits.perProvince ?? 0;

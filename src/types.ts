@@ -150,9 +150,12 @@ export type Company = {
 
 export type DiplomacyAgreement = {
   id: string;
-  kind: 'company' | 'state';
   hostCountryId: string;
   guestCountryId: string;
+  kind?: 'company' | 'state';
+  allowState?: boolean;
+  allowCompanies?: boolean;
+  companyIds?: string[];
   industries?: string[];
   limits?: {
     perProvince?: number;
