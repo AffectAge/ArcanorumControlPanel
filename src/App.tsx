@@ -1598,13 +1598,72 @@ function App() {
       }
       if (requirements?.resources) {
         const amounts = province.resourceAmounts ?? {};
-        const ok = Object.entries(requirements.resources).every(
-          ([resourceId, amount]) =>
-            (amounts[resourceId] ?? 0) >= Math.max(0, amount),
+        const legacyRequired = Object.entries(requirements.resources)
+          .filter(([, value]) => typeof value === 'number' && value > 0)
+          .map(([id]) => id);
+        const required = requirements.resources.anyOf ?? legacyRequired;
+        const forbidden = requirements.resources.noneOf ?? [];
+        if (
+          required.length > 0 &&
+          !required.every((id) => (amounts[id] ?? 0) > 0)
+        ) {
+          return prev;
+        }
+        if (
+          forbidden.length > 0 &&
+          forbidden.some((id) => (amounts[id] ?? 0) > 0)
+        ) {
+          return prev;
+        }
+      }
+      if (requirements?.buildings) {
+        const ownerCountryId =
+          owner.type === 'state'
+            ? owner.countryId
+            : companies.find((c) => c.id === owner.companyId)?.countryId;
+        const ok = Object.entries(requirements.buildings).every(
+          ([depId, constraint]) => {
+            const provinceCount = builtCount(depId);
+            const countryCount = ownerCountryId
+              ? Object.values(prev).reduce((sum, prov) => {
+                  const list = prov.buildingsBuilt ?? [];
+                  return (
+                    sum +
+                    list.filter((entry) => {
+                      if (entry.buildingId !== depId) return false;
+                      if (entry.owner.type === 'state') {
+                        return entry.owner.countryId === ownerCountryId;
+                      }
+                      const companyCountry = companies.find(
+                        (c) => c.id === entry.owner.companyId,
+                      )?.countryId;
+                      return companyCountry === ownerCountryId;
+                    }).length
+                  );
+                }, 0)
+              : 0;
+            const globalCount = Object.values(prev).reduce(
+              (sum, prov) =>
+                sum +
+                (prov.buildingsBuilt ?? []).filter(
+                  (entry) => entry.buildingId === depId,
+                ).length,
+              0,
+            );
+            const province = (constraint as any).province ?? constraint;
+            const country = (constraint as any).country;
+            const global = (constraint as any).global;
+            if (province?.min != null && provinceCount < province.min) return false;
+            if (province?.max != null && provinceCount > province.max) return false;
+            if (country?.min != null && countryCount < country.min) return false;
+            if (country?.max != null && countryCount > country.max) return false;
+            if (global?.min != null && globalCount < global.min) return false;
+            if (global?.max != null && globalCount > global.max) return false;
+            return true;
+          },
         );
         if (!ok) return prev;
-      }
-      if (requirements?.dependencies) {
+      } else if (requirements?.dependencies) {
         const ok = requirements.dependencies.every((depId) => builtCount(depId) > 0);
         if (!ok) return prev;
       }
@@ -2031,6 +2090,7 @@ function App() {
         province={selectedProvince}
         provinces={provinces}
         buildings={buildings}
+        resources={resources}
         companies={companies}
         countries={countries}
         activeCountryId={activeCountryId}

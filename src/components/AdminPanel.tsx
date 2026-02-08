@@ -186,12 +186,22 @@ export default function AdminPanel({
   const [editReqMaxPerProvince, setEditReqMaxPerProvince] = useState<number | ''>(0);
   const [editReqMaxPerCountry, setEditReqMaxPerCountry] = useState<number | ''>(0);
   const [editReqMaxGlobal, setEditReqMaxGlobal] = useState<number | ''>(0);
-  const [editReqResources, setEditReqResources] = useState<Record<string, number>>(
-    {},
-  );
-  const [editReqDependencies, setEditReqDependencies] = useState<Set<string>>(
+  const [editReqResourceAny, setEditReqResourceAny] = useState<Set<string>>(
     () => new Set(),
   );
+  const [editReqResourceNone, setEditReqResourceNone] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [editReqBuildingCriteria, setEditReqBuildingCriteria] = useState<
+    Record<
+      string,
+      {
+        province?: { min?: number; max?: number };
+        country?: { min?: number; max?: number };
+        global?: { min?: number; max?: number };
+      }
+    >
+  >({});
   const [editReqLogic, setEditReqLogic] = useState<RequirementNode>({
     type: 'group',
     op: 'and',
@@ -361,8 +371,53 @@ export default function AdminPanel({
     );
     setEditReqMaxPerCountry(requirements?.maxPerCountry ?? 0);
     setEditReqMaxGlobal(requirements?.maxGlobal ?? 0);
-    setEditReqResources(requirements?.resources ?? {});
-    setEditReqDependencies(new Set(requirements?.dependencies ?? []));
+    const legacyResourceAny = requirements?.resources
+      ? Object.entries(requirements.resources)
+          .filter(([, value]) => typeof value === 'number' && value > 0)
+          .map(([id]) => id)
+      : [];
+    setEditReqResourceAny(
+      new Set(requirements?.resources?.anyOf ?? legacyResourceAny),
+    );
+    setEditReqResourceNone(
+      new Set(requirements?.resources?.noneOf ?? []),
+    );
+    const legacyBuildingCriteria: Record<
+      string,
+      { province?: { min?: number; max?: number } }
+    > = {};
+    (requirements?.dependencies ?? []).forEach((id) => {
+      legacyBuildingCriteria[id] = { province: { min: 1 } };
+    });
+    const normalizedBuildings: Record<
+      string,
+      {
+        province?: { min?: number; max?: number };
+        country?: { min?: number; max?: number };
+        global?: { min?: number; max?: number };
+      }
+    > = {};
+    Object.entries(requirements?.buildings ?? {}).forEach(([id, value]) => {
+      const hasScope =
+        typeof (value as any)?.province !== 'undefined' ||
+        typeof (value as any)?.country !== 'undefined' ||
+        typeof (value as any)?.global !== 'undefined';
+      if (hasScope) {
+        normalizedBuildings[id] = value as {
+          province?: { min?: number; max?: number };
+          country?: { min?: number; max?: number };
+          global?: { min?: number; max?: number };
+        };
+      } else {
+        const legacy = value as { min?: number; max?: number };
+        normalizedBuildings[id] = { province: { ...legacy } };
+      }
+    });
+    setEditReqBuildingCriteria(
+      Object.keys(normalizedBuildings).length > 0
+        ? normalizedBuildings
+        : legacyBuildingCriteria,
+    );
     setEditReqLogic(derivedLogic);
   };
 
@@ -374,14 +429,54 @@ export default function AdminPanel({
     if (!editingBuildingId) return;
     const requirements = {
       resources:
-        Object.keys(editReqResources).length > 0 ? editReqResources : undefined,
+        editReqResourceAny.size > 0 || editReqResourceNone.size > 0
+          ? {
+              anyOf:
+                editReqResourceAny.size > 0
+                  ? Array.from(editReqResourceAny)
+                  : undefined,
+              noneOf:
+                editReqResourceNone.size > 0
+                  ? Array.from(editReqResourceNone)
+                  : undefined,
+            }
+          : undefined,
+      buildings:
+        Object.keys(editReqBuildingCriteria).length > 0
+          ? Object.fromEntries(
+              Object.entries(editReqBuildingCriteria)
+                .map(([id, value]) => {
+                  const normalize = (entry?: { min?: number; max?: number }) => {
+                    const min =
+                      entry?.min == null || entry.min <= 0
+                        ? undefined
+                        : Math.max(1, Number(entry.min));
+                    const max =
+                      entry?.max == null || entry.max <= 0
+                        ? undefined
+                        : Math.max(1, Number(entry.max));
+                    return min == null && max == null ? undefined : { min, max };
+                  };
+                  const province = normalize(value.province);
+                  const country = normalize(value.country);
+                  const global = normalize(value.global);
+                  const payload = {
+                    province,
+                    country,
+                    global,
+                  };
+                  return [id, payload];
+                })
+                .filter(([, value]) =>
+                  Boolean(value.province || value.country || value.global),
+                ),
+            )
+          : undefined,
       logic:
         editReqLogic &&
         (editReqLogic.type !== 'group' || editReqLogic.children.length > 0)
           ? editReqLogic
           : undefined,
-      dependencies:
-        editReqDependencies.size > 0 ? Array.from(editReqDependencies) : undefined,
       maxPerProvince:
         editReqMaxPerProvince === '' || Number(editReqMaxPerProvince) <= 0
           ? undefined
@@ -2264,69 +2359,275 @@ export default function AdminPanel({
                   {renderLogicNode(editReqLogic)}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="text-white/70 text-sm">Ресурсы</div>
-                  {resources.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {resources.map((resource) => (
-                        <label
-                          key={resource.id}
-                          className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
-                        >
-                          <span className="flex-1">{resource.name}</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={editReqResources[resource.id] ?? 0}
-                            onChange={(event) =>
-                              setEditReqResources((prev) => {
-                                const next = { ...prev };
-                                const value = Math.max(
-                                  0,
-                                  Number(event.target.value) || 0,
-                                );
-                                if (value > 0) next[resource.id] = value;
-                                else delete next[resource.id];
-                                return next;
-                              })
-                            }
-                            className="w-20 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white focus:outline-none focus:border-emerald-400/60"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-white/50 text-sm">Нет ресурсов</div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-white/70 text-sm">Зависимости</div>
-                  {buildings.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {buildings
-                        .filter((b) => b.id !== editingBuildingId)
-                        .map((b) => (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <div className="text-white/50 text-xs">Должны быть</div>
+                      {resources.length > 0 ? (
+                        resources.map((resource) => (
                           <label
-                            key={b.id}
+                            key={resource.id}
                             className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
                           >
                             <input
                               type="checkbox"
-                              checked={editReqDependencies.has(b.id)}
+                              checked={editReqResourceAny.has(resource.id)}
                               onChange={(event) =>
-                                setEditReqDependencies((prev) => {
+                                setEditReqResourceAny((prev) => {
                                   const next = new Set(prev);
-                                  if (event.target.checked) next.add(b.id);
-                                  else next.delete(b.id);
+                                  if (event.target.checked) {
+                                    next.add(resource.id);
+                                    setEditReqResourceNone((prevNone) => {
+                                      const nextNone = new Set(prevNone);
+                                      nextNone.delete(resource.id);
+                                      return nextNone;
+                                    });
+                                  } else {
+                                    next.delete(resource.id);
+                                  }
                                   return next;
                                 })
                               }
                               className="w-4 h-4 accent-emerald-500"
                             />
-                            <span>{b.name}</span>
+                            <span>{resource.name}</span>
                           </label>
-                        ))}
+                        ))
+                      ) : (
+                        <div className="text-white/50 text-sm">Нет ресурсов</div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-white/50 text-xs">Запрещены</div>
+                      {resources.length > 0 ? (
+                        resources.map((resource) => (
+                          <label
+                            key={resource.id}
+                            className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={editReqResourceNone.has(resource.id)}
+                              onChange={(event) =>
+                                setEditReqResourceNone((prev) => {
+                                  const next = new Set(prev);
+                                  if (event.target.checked) {
+                                    next.add(resource.id);
+                                    setEditReqResourceAny((prevAny) => {
+                                      const nextAny = new Set(prevAny);
+                                      nextAny.delete(resource.id);
+                                      return nextAny;
+                                    });
+                                  } else {
+                                    next.delete(resource.id);
+                                  }
+                                  return next;
+                                })
+                              }
+                              className="w-4 h-4 accent-rose-400"
+                            />
+                            <span>{resource.name}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="text-white/50 text-sm">Нет ресурсов</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-white/70 text-sm">
+                    Требования по зданиям
+                  </div>
+                  {buildings.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {buildings
+                        .filter((b) => b.id !== editingBuildingId)
+                        .map((b) => {
+                          const current = editReqBuildingCriteria[b.id] ?? {};
+                          const province = current.province ?? {};
+                          const country = current.country ?? {};
+                          const global = current.global ?? {};
+                          return (
+                            <div
+                              key={b.id}
+                              className="rounded-lg border border-white/10 bg-black/30 p-3 text-white/70 text-sm space-y-2"
+                            >
+                              <div className="text-white/80 text-sm font-medium">
+                                {b.name}
+                              </div>
+                              <div className="grid grid-cols-1 gap-3 text-xs">
+                                <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                                  <div className="text-white/60 text-[11px]">
+                                    Провинция
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2">
+                                    <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                                      Мин
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={province.min ?? 0}
+                                        onChange={(event) =>
+                                          setEditReqBuildingCriteria((prev) => ({
+                                            ...prev,
+                                            [b.id]: {
+                                              ...prev[b.id],
+                                              province: {
+                                                ...prev[b.id]?.province,
+                                                min: Math.max(
+                                                  0,
+                                                  Number(event.target.value) || 0,
+                                                ),
+                                              },
+                                            },
+                                          }))
+                                        }
+                                        className="w-full h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm placeholder-white/40 focus:outline-none focus:border-emerald-400/60"
+                                      />
+                                    </label>
+                                    <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                                      Макс
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={province.max ?? 0}
+                                        onChange={(event) =>
+                                          setEditReqBuildingCriteria((prev) => ({
+                                            ...prev,
+                                            [b.id]: {
+                                              ...prev[b.id],
+                                              province: {
+                                                ...prev[b.id]?.province,
+                                                max: Math.max(
+                                                  0,
+                                                  Number(event.target.value) || 0,
+                                                ),
+                                              },
+                                            },
+                                          }))
+                                        }
+                                        className="w-full h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm placeholder-white/40 focus:outline-none focus:border-emerald-400/60"
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                                  <div className="text-white/60 text-[11px]">
+                                    Государство
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2">
+                                    <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                                      Мин
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={country.min ?? 0}
+                                        onChange={(event) =>
+                                          setEditReqBuildingCriteria((prev) => ({
+                                            ...prev,
+                                            [b.id]: {
+                                              ...prev[b.id],
+                                              country: {
+                                                ...prev[b.id]?.country,
+                                                min: Math.max(
+                                                  0,
+                                                  Number(event.target.value) || 0,
+                                                ),
+                                              },
+                                            },
+                                          }))
+                                        }
+                                        className="w-full h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm placeholder-white/40 focus:outline-none focus:border-emerald-400/60"
+                                      />
+                                    </label>
+                                    <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                                      Макс
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={country.max ?? 0}
+                                        onChange={(event) =>
+                                          setEditReqBuildingCriteria((prev) => ({
+                                            ...prev,
+                                            [b.id]: {
+                                              ...prev[b.id],
+                                              country: {
+                                                ...prev[b.id]?.country,
+                                                max: Math.max(
+                                                  0,
+                                                  Number(event.target.value) || 0,
+                                                ),
+                                              },
+                                            },
+                                          }))
+                                        }
+                                        className="w-full h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm placeholder-white/40 focus:outline-none focus:border-emerald-400/60"
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                                <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                                  <div className="text-white/60 text-[11px]">
+                                    Мир
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2">
+                                    <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                                      Мин
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={global.min ?? 0}
+                                        onChange={(event) =>
+                                          setEditReqBuildingCriteria((prev) => ({
+                                            ...prev,
+                                            [b.id]: {
+                                              ...prev[b.id],
+                                              global: {
+                                                ...prev[b.id]?.global,
+                                                min: Math.max(
+                                                  0,
+                                                  Number(event.target.value) || 0,
+                                                ),
+                                              },
+                                            },
+                                          }))
+                                        }
+                                        className="w-full h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm placeholder-white/40 focus:outline-none focus:border-emerald-400/60"
+                                      />
+                                    </label>
+                                    <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                                      Макс
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        value={global.max ?? 0}
+                                        onChange={(event) =>
+                                          setEditReqBuildingCriteria((prev) => ({
+                                            ...prev,
+                                            [b.id]: {
+                                              ...prev[b.id],
+                                              global: {
+                                                ...prev[b.id]?.global,
+                                                max: Math.max(
+                                                  0,
+                                                  Number(event.target.value) || 0,
+                                                ),
+                                              },
+                                            },
+                                          }))
+                                        }
+                                        className="w-full h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm placeholder-white/40 focus:outline-none focus:border-emerald-400/60"
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   ) : (
                     <div className="text-white/50 text-sm">Нет зданий</div>

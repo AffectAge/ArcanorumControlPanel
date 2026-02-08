@@ -8,6 +8,7 @@ import type {
   Country,
   TraitCriteria,
   RequirementNode,
+  Trait,
 } from '../types';
 
 type ConstructionModalProps = {
@@ -16,6 +17,7 @@ type ConstructionModalProps = {
   province?: ProvinceData;
   provinces?: Record<string, ProvinceData>;
   buildings: BuildingDefinition[];
+  resources: Trait[];
   companies: Company[];
   countries: Country[];
   activeCountryId?: string;
@@ -31,6 +33,7 @@ export default function ConstructionModal({
   province,
   provinces,
   buildings,
+  resources,
   companies,
   countries,
   activeCountryId,
@@ -311,11 +314,16 @@ export default function ConstructionModal({
                 ? Math.min(100, Math.round((progressSum / entries.length / cost) * 100))
                 : 0;
               const requirements = building.requirements;
-              const issues: string[] = [];
+              const issues = {
+                logic: [] as string[],
+                resources: [] as string[],
+                buildings: [] as string[],
+                other: [] as string[],
+              };
               if (requirements?.maxPerProvince != null) {
                 const limit = requirements.maxPerProvince;
                 if (limit > 0 && builtCount + entries.length >= limit) {
-                  issues.push(`Лимит на провинцию: ${limit}`);
+                  issues.other.push(`Лимит на провинцию: ${limit}`);
                 }
               }
               if (requirements?.maxPerCountry != null) {
@@ -359,7 +367,7 @@ export default function ConstructionModal({
                       );
                     }, 0);
                     if (countryBuilt + countryInProgress >= limit) {
-                      issues.push(`Лимит на государство: ${limit}`);
+                      issues.other.push(`Лимит на государство: ${limit}`);
                     }
                   }
                 }
@@ -380,7 +388,7 @@ export default function ConstructionModal({
                     return sum + prog.length;
                   }, 0);
                   if (globalBuilt + globalInProgress >= limit) {
-                    issues.push(`Лимит на мир: ${limit}`);
+                    issues.other.push(`Лимит на мир: ${limit}`);
                   }
                 }
               }
@@ -388,7 +396,7 @@ export default function ConstructionModal({
                 ? evaluateRequirementNode(requirements.logic, province)
                 : true;
               if (!logicOk) {
-                issues.push('Не выполнены логические критерии');
+                issues.logic.push('Не выполнены логические критерии');
               }
 
               if (!requirements?.logic) {
@@ -401,14 +409,14 @@ export default function ConstructionModal({
                   (!province.climateId ||
                     !climateReq.anyOf.includes(province.climateId))
                 ) {
-                  issues.push('Нужен другой климат');
+                  issues.logic.push('Нужен другой климат');
                 }
                 if (
                   climateReq.noneOf.length > 0 &&
                   province.climateId &&
                   climateReq.noneOf.includes(province.climateId)
                 ) {
-                  issues.push('Запрещенный климат');
+                  issues.logic.push('Запрещенный климат');
                 }
 
                 const landscapeReq = normalizeTraitCriteria(
@@ -420,14 +428,14 @@ export default function ConstructionModal({
                   (!province.landscapeId ||
                     !landscapeReq.anyOf.includes(province.landscapeId))
                 ) {
-                  issues.push('Нужен другой ландшафт');
+                  issues.logic.push('Нужен другой ландшафт');
                 }
                 if (
                   landscapeReq.noneOf.length > 0 &&
                   province.landscapeId &&
                   landscapeReq.noneOf.includes(province.landscapeId)
                 ) {
-                  issues.push('Запрещенный ландшафт');
+                  issues.logic.push('Запрещенный ландшафт');
                 }
 
                 const cultureReq = normalizeTraitCriteria(
@@ -439,14 +447,14 @@ export default function ConstructionModal({
                   (!province.cultureId ||
                     !cultureReq.anyOf.includes(province.cultureId))
                 ) {
-                  issues.push('Нужна другая культура');
+                  issues.logic.push('Нужна другая культура');
                 }
                 if (
                   cultureReq.noneOf.length > 0 &&
                   province.cultureId &&
                   cultureReq.noneOf.includes(province.cultureId)
                 ) {
-                  issues.push('Запрещенная культура');
+                  issues.logic.push('Запрещенная культура');
                 }
 
                 const religionReq = normalizeTraitCriteria(
@@ -458,31 +466,134 @@ export default function ConstructionModal({
                   (!province.religionId ||
                     !religionReq.anyOf.includes(province.religionId))
                 ) {
-                  issues.push('Нужна другая религия');
+                  issues.logic.push('Нужна другая религия');
                 }
                 if (
                   religionReq.noneOf.length > 0 &&
                   province.religionId &&
                   religionReq.noneOf.includes(province.religionId)
                 ) {
-                  issues.push('Запрещенная религия');
+                  issues.logic.push('Запрещенная религия');
                 }
               }
               if (requirements?.resources) {
                 const amounts = province.resourceAmounts ?? {};
-                Object.entries(requirements.resources).forEach(([id, amount]) => {
-                  if ((amounts[id] ?? 0) < Math.max(0, amount)) {
-                    issues.push('Недостаточно ресурсов');
+                const legacyRequired = Object.entries(requirements.resources)
+                  .filter(([, value]) => typeof value === 'number' && value > 0)
+                  .map(([id]) => id);
+                const required =
+                  requirements.resources.anyOf ?? legacyRequired;
+                const forbidden = requirements.resources.noneOf ?? [];
+                if (required.length > 0) {
+                  const missing = required.filter(
+                    (id) => (amounts[id] ?? 0) <= 0,
+                  );
+                  if (missing.length > 0) {
+                    const names = missing
+                      .map((id) => resources.find((r) => r.id === id)?.name ?? id)
+                      .join(', ');
+                    issues.resources.push(`Нет ресурсов: ${names}`);
                   }
-                });
+                }
+                if (forbidden.length > 0) {
+                  const present = forbidden.filter(
+                    (id) => (amounts[id] ?? 0) > 0,
+                  );
+                  if (present.length > 0) {
+                    const names = present
+                      .map((id) => resources.find((r) => r.id === id)?.name ?? id)
+                      .join(', ');
+                    issues.resources.push(`Запрещены ресурсы: ${names}`);
+                  }
+                }
               }
-              if (requirements?.dependencies) {
+              if (requirements?.buildings) {
+                Object.entries(requirements.buildings).forEach(
+                  ([depId, constraint]) => {
+                    const name =
+                      buildings.find((b) => b.id === depId)?.name ?? depId;
+                    const provinceCount = builtList.filter(
+                      (entry) => entry.buildingId === depId,
+                    ).length;
+                    const ownerCountryId =
+                      owner.type === 'state'
+                        ? owner.countryId
+                        : companies.find((c) => c.id === owner.companyId)
+                            ?.countryId;
+                    const countryCount = ownerCountryId
+                      ? provincesList.reduce((sum, prov) => {
+                          const list = prov.buildingsBuilt ?? [];
+                          return (
+                            sum +
+                            list.filter((entry) => {
+                              if (entry.buildingId !== depId) return false;
+                              if (entry.owner.type === 'state') {
+                                return entry.owner.countryId === ownerCountryId;
+                              }
+                              const companyCountry = companies.find(
+                                (c) => c.id === entry.owner.companyId,
+                              )?.countryId;
+                              return companyCountry === ownerCountryId;
+                            }).length
+                          );
+                        }, 0)
+                      : 0;
+                    const globalCount = provincesList.reduce((sum, prov) => {
+                      const list = prov.buildingsBuilt ?? [];
+                      return (
+                        sum +
+                        list.filter((entry) => entry.buildingId === depId).length
+                      );
+                    }, 0);
+
+                    const province = (constraint as any).province ?? constraint;
+                    const country = (constraint as any).country;
+                    const global = (constraint as any).global;
+
+                    if (province?.min != null && provinceCount < province.min) {
+                      issues.buildings.push(
+                        `Провинция: нужно ${province.min} "${name}" (есть ${provinceCount})`,
+                      );
+                    }
+                    if (province?.max != null && provinceCount > province.max) {
+                      issues.buildings.push(
+                        `Провинция: не больше ${province.max} "${name}" (есть ${provinceCount})`,
+                      );
+                    }
+                    if (country?.min != null && countryCount < country.min) {
+                      issues.buildings.push(
+                        `Государство: нужно ${country.min} "${name}" (есть ${countryCount})`,
+                      );
+                    }
+                    if (country?.max != null && countryCount > country.max) {
+                      issues.buildings.push(
+                        `Государство: не больше ${country.max} "${name}" (есть ${countryCount})`,
+                      );
+                    }
+                    if (global?.min != null && globalCount < global.min) {
+                      issues.buildings.push(
+                        `Мир: нужно ${global.min} "${name}" (есть ${globalCount})`,
+                      );
+                    }
+                    if (global?.max != null && globalCount > global.max) {
+                      issues.buildings.push(
+                        `Мир: не больше ${global.max} "${name}" (есть ${globalCount})`,
+                      );
+                    }
+                  },
+                );
+              } else if (requirements?.dependencies) {
                 const ok = requirements.dependencies.every(
                   (depId) =>
                     builtList.filter((entry) => entry.buildingId === depId).length > 0,
                 );
-                if (!ok) issues.push('Нет требуемых зданий');
+                if (!ok) issues.buildings.push('Нет требуемых зданий');
               }
+              const hasIssues =
+                issues.logic.length > 0 ||
+                issues.resources.length > 0 ||
+                issues.buildings.length > 0 ||
+                issues.other.length > 0;
               const canStart = isOwner;
               const canCancel = isOwner && hasProgress;
 
@@ -526,9 +637,48 @@ export default function ConstructionModal({
                       {builtCount > 0 && !hasProgress ? '100%' : `${average}%`}
                       {hasProgress && ` (ср.)`}
                     </div>
-                    {issues.length > 0 && (
-                      <div className="text-red-300 text-[11px] mt-1">
-                        {Array.from(new Set(issues)).join(', ')}
+                    {hasIssues && (
+                      <div className="text-red-300 text-[11px] mt-2 space-y-1">
+                        {issues.logic.length > 0 && (
+                          <div>
+                            <div className="text-red-200/90 font-semibold">
+                              Логика
+                            </div>
+                            <div>
+                              {Array.from(new Set(issues.logic)).join(', ')}
+                            </div>
+                          </div>
+                        )}
+                        {issues.resources.length > 0 && (
+                          <div>
+                            <div className="text-red-200/90 font-semibold">
+                              Ресурсы
+                            </div>
+                            <div>
+                              {Array.from(new Set(issues.resources)).join(', ')}
+                            </div>
+                          </div>
+                        )}
+                        {issues.buildings.length > 0 && (
+                          <div>
+                            <div className="text-red-200/90 font-semibold">
+                              Здания
+                            </div>
+                            <div>
+                              {Array.from(new Set(issues.buildings)).join(', ')}
+                            </div>
+                          </div>
+                        )}
+                        {issues.other.length > 0 && (
+                          <div>
+                            <div className="text-red-200/90 font-semibold">
+                              Лимиты
+                            </div>
+                            <div>
+                              {Array.from(new Set(issues.other)).join(', ')}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -538,7 +688,7 @@ export default function ConstructionModal({
                       onClick={() => onStart(building.id, owner)}
                       disabled={
                         !canStart ||
-                        issues.length > 0 ||
+                        hasIssues ||
                         (ownerType === 'company' && !companyId)
                       }
                       className={`h-8 px-2 rounded-lg border text-[11px] flex items-center gap-1 ${

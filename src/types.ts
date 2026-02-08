@@ -82,7 +82,15 @@ export type BuildingDefinition = {
   iconDataUrl?: string;
   industryId?: string;
   requirements?: {
-    resources?: Record<string, number>;
+    resources?: TraitCriteria;
+    buildings?: Record<
+      string,
+      {
+        province?: { min?: number; max?: number };
+        country?: { min?: number; max?: number };
+        global?: { min?: number; max?: number };
+      }
+    >;
     logic?: RequirementNode;
     climate?: TraitCriteria;
     landscape?: TraitCriteria;
