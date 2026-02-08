@@ -317,6 +317,13 @@ export default function DiplomacyModal({
     (allBuildings || selectedBuildingIds.size > 0) &&
     (allProvinces || selectedProvinceIds.size > 0);
 
+  const visibleAgreements = agreements.filter(
+    (agreement) =>
+      !activeCountryId ||
+      agreement.hostCountryId === activeCountryId ||
+      agreement.guestCountryId === activeCountryId,
+  );
+
   return (
     <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm animate-fadeIn">
       <div className="absolute inset-4 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden flex flex-col">
@@ -703,8 +710,8 @@ export default function DiplomacyModal({
             </div>
 
               <div className="space-y-3">
-                {agreements.length > 0 ? (
-                  agreements.map((agreement) => {
+                {visibleAgreements.length > 0 ? (
+                  visibleAgreements.map((agreement) => {
                     const host = countries.find((c) => c.id === agreement.hostCountryId);
                     const guest = countries.find((c) => c.id === agreement.guestCountryId);
                     const industryNames = agreement.industries?.length
