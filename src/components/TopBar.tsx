@@ -78,6 +78,21 @@ export default function TopBar({
     setHoverTip((prev) => ({ ...prev, visible: false }));
   };
 
+  const formatPoints = (value: number) => {
+    const abs = Math.abs(value);
+    if (abs < 1000) return `${value}`;
+    if (abs >= 1_000_000) {
+      const m = value / 1_000_000;
+      if (Math.abs(m) >= 100) return `${Math.round(m)}M`;
+      const formatted = m.toFixed(1);
+      return `${formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted}M`;
+    }
+    const k = value / 1000;
+    if (Math.abs(k) >= 100) return `${Math.round(k)}k`;
+    const formatted = k.toFixed(1);
+    return `${formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted}k`;
+  };
+
   return (
     <div className="absolute left-4 right-4 top-3 h-14 flex items-center justify-between px-4 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl z-50 animate-slideDown">
       <div className="flex items-center gap-3">
@@ -195,11 +210,11 @@ export default function TopBar({
             </div>
           </div>
           <span className="text-emerald-100 font-bold text-sm">
-            {activeCountry?.colonizationPoints ?? 0}
+            {formatPoints(activeCountry?.colonizationPoints ?? 0)}
           </span>
           {colonizationGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
-              +{colonizationGainPerTurn}
+              +{formatPoints(colonizationGainPerTurn)}
             </span>
           )}
         </div>
@@ -216,11 +231,11 @@ export default function TopBar({
             </div>
           </div>
           <span className="text-amber-100 font-bold text-sm">
-            {activeCountry?.constructionPoints ?? 0}
+            {formatPoints(activeCountry?.constructionPoints ?? 0)}
           </span>
           {constructionGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
-              +{constructionGainPerTurn}
+              +{formatPoints(constructionGainPerTurn)}
             </span>
           )}
         </div>
@@ -237,11 +252,11 @@ export default function TopBar({
             </div>
           </div>
           <span className="text-sky-100 font-bold text-sm">
-            {activeCountry?.sciencePoints ?? 0}
+            {formatPoints(activeCountry?.sciencePoints ?? 0)}
           </span>
           {scienceGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
-              +{scienceGainPerTurn}
+              +{formatPoints(scienceGainPerTurn)}
             </span>
           )}
         </div>
@@ -258,11 +273,11 @@ export default function TopBar({
             </div>
           </div>
           <span className="text-rose-100 font-bold text-sm">
-            {activeCountry?.culturePoints ?? 0}
+            {formatPoints(activeCountry?.culturePoints ?? 0)}
           </span>
           {cultureGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
-              +{cultureGainPerTurn}
+              +{formatPoints(cultureGainPerTurn)}
             </span>
           )}
         </div>
@@ -279,11 +294,11 @@ export default function TopBar({
             </div>
           </div>
           <span className="text-violet-100 font-bold text-sm">
-            {activeCountry?.religionPoints ?? 0}
+            {formatPoints(activeCountry?.religionPoints ?? 0)}
           </span>
           {religionGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
-              +{religionGainPerTurn}
+              +{formatPoints(religionGainPerTurn)}
             </span>
           )}
         </div>
@@ -300,11 +315,11 @@ export default function TopBar({
             </div>
           </div>
           <span className="text-yellow-100 font-bold text-sm">
-            {activeCountry?.gold ?? 0}
+            {formatPoints(activeCountry?.gold ?? 0)}
           </span>
           {goldGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
-              +{goldGainPerTurn}
+              +{formatPoints(goldGainPerTurn)}
             </span>
           )}
         </div>
@@ -321,11 +336,11 @@ export default function TopBar({
             </div>
           </div>
           <span className="text-cyan-100 font-bold text-sm">
-            {activeCountry?.ducats ?? 0}
+            {formatPoints(activeCountry?.ducats ?? 0)}
           </span>
           {ducatsGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
-              +{ducatsGainPerTurn}
+              +{formatPoints(ducatsGainPerTurn)}
             </span>
           )}
         </div>
