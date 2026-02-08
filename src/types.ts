@@ -91,6 +91,10 @@ export type BuildingDefinition = {
         global?: { min?: number; max?: number };
       }
     >;
+    allowedCountries?: string[];
+    allowedCompanies?: string[];
+    allowedCountriesMode?: 'allow' | 'deny';
+    allowedCompaniesMode?: 'allow' | 'deny';
     logic?: RequirementNode;
     climate?: TraitCriteria;
     landscape?: TraitCriteria;

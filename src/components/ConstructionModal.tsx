@@ -133,6 +133,22 @@ export default function ConstructionModal({
   const progressMap = province.constructionProgress ?? {};
   const builtList = province.buildingsBuilt ?? [];
   const provincesList = provinces ? Object.values(provinces) : [province];
+  const isOwnerAllowed = (building: BuildingDefinition, target: BuildingOwner) => {
+    const rules = building.requirements;
+    if (!rules?.allowedCountries && !rules?.allowedCompanies) return true;
+    if (target.type === 'state') {
+      const mode = rules.allowedCountriesMode ?? 'allow';
+      const list = rules.allowedCountries ?? [];
+      if (list.length === 0) return mode !== 'allow';
+      const included = list.includes(target.countryId);
+      return mode === 'allow' ? included : !included;
+    }
+    const mode = rules.allowedCompaniesMode ?? 'allow';
+    const list = rules.allowedCompanies ?? [];
+    if (list.length === 0) return mode !== 'allow';
+    const included = list.includes(target.companyId);
+    return mode === 'allow' ? included : !included;
+  };
   const activeTasks = Object.values(progressMap).reduce(
     (sum, entries) => sum + entries.length,
     0,
@@ -507,6 +523,10 @@ export default function ConstructionModal({
                   }
                 }
               }
+              const ownerAllowed = isOwnerAllowed(building, owner);
+              if (!ownerAllowed) {
+                issues.other.push('Владелец не может строить это здание');
+              }
               if (requirements?.buildings) {
                 Object.entries(requirements.buildings).forEach(
                   ([depId, constraint]) => {
@@ -600,7 +620,9 @@ export default function ConstructionModal({
               return (
                 <div
                   key={building.id}
-                  className="grid grid-cols-12 items-center gap-2 px-3 py-3 rounded-xl bg-white/5 border border-white/10"
+                  className={`grid grid-cols-12 items-center gap-2 px-3 py-3 rounded-xl bg-white/5 border ${
+                    ownerAllowed ? 'border-white/10' : 'border-red-400/50'
+                  }`}
                 >
                   <div className="col-span-5 flex items-center gap-3">
                     {building.iconDataUrl ? (
@@ -613,7 +635,14 @@ export default function ConstructionModal({
                       <Hammer className="w-5 h-5 text-white/60" />
                     )}
                     <div>
-                      <div className="text-white/80 text-sm">{building.name}</div>
+                      <div className="text-white/80 text-sm flex items-center gap-2">
+                        <span>{building.name}</span>
+                        {!ownerAllowed && (
+                          <span className="px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
+                            Недоступно
+                          </span>
+                        )}
+                      </div>
                       <div className="text-white/40 text-xs">
                         {builtCount > 0 || hasProgress
                           ? `Построено: ${builtCount}${

@@ -1616,6 +1616,31 @@ function App() {
           return prev;
         }
       }
+      if (requirements?.allowedCountries || requirements?.allowedCompanies) {
+        if (owner.type === 'state') {
+          const mode = requirements.allowedCountriesMode ?? 'allow';
+          const list = requirements.allowedCountries ?? [];
+          if (list.length === 0) {
+            if (mode === 'allow') return prev;
+          } else {
+            const included = list.includes(owner.countryId);
+            if ((mode === 'allow' && !included) || (mode === 'deny' && included)) {
+              return prev;
+            }
+          }
+        } else if (owner.type === 'company') {
+          const mode = requirements.allowedCompaniesMode ?? 'allow';
+          const list = requirements.allowedCompanies ?? [];
+          if (list.length === 0) {
+            if (mode === 'allow') return prev;
+          } else {
+            const included = list.includes(owner.companyId);
+            if ((mode === 'allow' && !included) || (mode === 'deny' && included)) {
+              return prev;
+            }
+          }
+        }
+      }
       if (requirements?.buildings) {
         const ownerCountryId =
           owner.type === 'state'

@@ -202,6 +202,18 @@ export default function AdminPanel({
       }
     >
   >({});
+  const [editReqAllowedCountries, setEditReqAllowedCountries] = useState<
+    Set<string>
+  >(() => new Set());
+  const [editReqAllowedCompanies, setEditReqAllowedCompanies] = useState<
+    Set<string>
+  >(() => new Set());
+  const [editReqAllowedCountriesMode, setEditReqAllowedCountriesMode] = useState<
+    'allow' | 'deny'
+  >('allow');
+  const [editReqAllowedCompaniesMode, setEditReqAllowedCompaniesMode] = useState<
+    'allow' | 'deny'
+  >('allow');
   const [editReqLogic, setEditReqLogic] = useState<RequirementNode>({
     type: 'group',
     op: 'and',
@@ -371,6 +383,10 @@ export default function AdminPanel({
     );
     setEditReqMaxPerCountry(requirements?.maxPerCountry ?? 0);
     setEditReqMaxGlobal(requirements?.maxGlobal ?? 0);
+    setEditReqAllowedCountries(new Set(requirements?.allowedCountries ?? []));
+    setEditReqAllowedCompanies(new Set(requirements?.allowedCompanies ?? []));
+    setEditReqAllowedCountriesMode(requirements?.allowedCountriesMode ?? 'allow');
+    setEditReqAllowedCompaniesMode(requirements?.allowedCompaniesMode ?? 'allow');
     const legacyResourceAny = requirements?.resources
       ? Object.entries(requirements.resources)
           .filter(([, value]) => typeof value === 'number' && value > 0)
@@ -441,6 +457,16 @@ export default function AdminPanel({
                   : undefined,
             }
           : undefined,
+      allowedCountries:
+        editReqAllowedCountries.size > 0
+          ? Array.from(editReqAllowedCountries)
+          : undefined,
+      allowedCompanies:
+        editReqAllowedCompanies.size > 0
+          ? Array.from(editReqAllowedCompanies)
+          : undefined,
+      allowedCountriesMode: editReqAllowedCountriesMode,
+      allowedCompaniesMode: editReqAllowedCompaniesMode,
       buildings:
         Object.keys(editReqBuildingCriteria).length > 0
           ? Object.fromEntries(
@@ -2277,8 +2303,8 @@ export default function AdminPanel({
         </div>
       </div>
       {editingBuildingId && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-[720px] max-w-[92vw] max-h-[90vh] bg-[#0b111b] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="absolute inset-4 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl flex flex-col overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
               <div>
                 <div className="text-white text-lg font-semibold">
@@ -2357,6 +2383,110 @@ export default function AdminPanel({
                     Логические группы (климат/ландшафт/культура/религия)
                   </div>
                   {renderLogicNode(editReqLogic)}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-white/70 text-sm">
+                    Ограничение по владельцу
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-white/50 text-xs">Страны</div>
+                        <select
+                          value={editReqAllowedCountriesMode}
+                          onChange={(event) =>
+                            setEditReqAllowedCountriesMode(
+                              event.target.value as 'allow' | 'deny',
+                            )
+                          }
+                          className="h-7 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        >
+                          <option value="allow" className="bg-[#0b111b] text-white">
+                            Белый список
+                          </option>
+                          <option value="deny" className="bg-[#0b111b] text-white">
+                            Черный список
+                          </option>
+                        </select>
+                      </div>
+                      {countries.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {countries.map((country) => (
+                            <label
+                              key={country.id}
+                              className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={editReqAllowedCountries.has(country.id)}
+                                onChange={(event) =>
+                                  setEditReqAllowedCountries((prev) => {
+                                    const next = new Set(prev);
+                                    if (event.target.checked) next.add(country.id);
+                                    else next.delete(country.id);
+                                    return next;
+                                  })
+                                }
+                                className="w-4 h-4 accent-emerald-500"
+                              />
+                              <span>{country.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-white/50 text-sm">Нет стран</div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-white/50 text-xs">Компании</div>
+                        <select
+                          value={editReqAllowedCompaniesMode}
+                          onChange={(event) =>
+                            setEditReqAllowedCompaniesMode(
+                              event.target.value as 'allow' | 'deny',
+                            )
+                          }
+                          className="h-7 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        >
+                          <option value="allow" className="bg-[#0b111b] text-white">
+                            Белый список
+                          </option>
+                          <option value="deny" className="bg-[#0b111b] text-white">
+                            Черный список
+                          </option>
+                        </select>
+                      </div>
+                      {companies.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {companies.map((company) => (
+                            <label
+                              key={company.id}
+                              className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={editReqAllowedCompanies.has(company.id)}
+                                onChange={(event) =>
+                                  setEditReqAllowedCompanies((prev) => {
+                                    const next = new Set(prev);
+                                    if (event.target.checked) next.add(company.id);
+                                    else next.delete(company.id);
+                                    return next;
+                                  })
+                                }
+                                className="w-4 h-4 accent-emerald-500"
+                              />
+                              <span>{company.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-white/50 text-sm">Нет компаний</div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
