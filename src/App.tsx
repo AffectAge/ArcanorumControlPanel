@@ -50,6 +50,18 @@ const createId = () =>
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
+const radiationColor = (value: number) => {
+  const t = clamp01(value / 100);
+  const hue = 120 - 120 * t;
+  return `hsl(${hue} 70% 55%)`;
+};
+
+const pollutionColor = (value: number) => {
+  const t = clamp01(value / 100);
+  const hue = 190 - 140 * t;
+  return `hsl(${hue} 60% ${65 - t * 25}%)`;
+};
+
 const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
   const next: ProvinceRecord = { ...record };
   Object.values(next).forEach((province) => {
@@ -89,6 +101,12 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
           }
         });
       province.buildingsBuilt = converted;
+    }
+    if (province.radiation == null) {
+      province.radiation = 0;
+    }
+    if (province.pollution == null) {
+      province.pollution = 0;
     }
 
     if (!province.constructionProgress) {
@@ -191,6 +209,8 @@ const initialMapLayers: MapLayer[] = [
   { id: 'climate', name: 'Климат', visible: false },
   { id: 'religion', name: 'Религии', visible: false },
   { id: 'resources', name: 'Ресурсы', visible: false },
+  { id: 'radiation', name: 'Радиация', visible: false },
+  { id: 'pollution', name: 'Загрязнения', visible: false },
   { id: 'colonization', name: 'Колонизация', visible: false },
 ];
 
@@ -786,6 +806,8 @@ function App() {
             landscapeId: landscapes.find((l) => l.color === landscapeColor)?.id,
             climateId: climates.find((c) => c.color === climateColor)?.id,
             religionId: religions.find((r) => r.color === religionColor)?.id,
+            radiation: 0,
+            pollution: 0,
             resourceAmounts: {},
             colonizationCost: 100,
             colonizationProgress: {},
@@ -827,6 +849,14 @@ function App() {
           } else {
             existing.resourceAmounts = {};
           }
+          updated = true;
+        }
+        if (existing.radiation == null) {
+          existing.radiation = 0;
+          updated = true;
+        }
+        if (existing.pollution == null) {
+          existing.pollution = 0;
           updated = true;
         }
         if (updated) changed = true;
@@ -876,6 +906,14 @@ function App() {
           paint.religion ??= {};
           paint.religion[province.id] = religion.color;
         }
+      }
+      if (province.radiation != null) {
+        paint.radiation ??= {};
+        paint.radiation[province.id] = radiationColor(province.radiation);
+      }
+      if (province.pollution != null) {
+        paint.pollution ??= {};
+        paint.pollution[province.id] = pollutionColor(province.pollution);
       }
       if (selectedResourceId) {
         const amount = province.resourceAmounts?.[selectedResourceId] ?? 0;
@@ -1012,6 +1050,21 @@ function App() {
     if (countries.length > 5) {
       legends.political.push({ label: 'Другие страны', color: '#94a3b8' });
     }
+    const envSteps = [0, 20, 40, 60, 80, 100];
+    legends.radiation = envSteps.slice(0, -1).map((from, index) => {
+      const to = envSteps[index + 1];
+      return {
+        label: `${from}-${to}`,
+        color: radiationColor(from),
+      };
+    });
+    legends.pollution = envSteps.slice(0, -1).map((from, index) => {
+      const to = envSteps[index + 1];
+      return {
+        label: `${from}-${to}`,
+        color: pollutionColor(from),
+      };
+    });
     return legends;
   }, [climates, religions, landscapes, cultures, resources, selectedResourceId, countries]);
 
@@ -1098,6 +1151,28 @@ function App() {
         ...(prev[provinceId] as ProvinceData),
         id: provinceId,
         colonizationCost: cost,
+      },
+    }));
+  };
+
+  const setRadiation = (provinceId: string, value: number) => {
+    setProvinces((prev) => ({
+      ...prev,
+      [provinceId]: {
+        ...(prev[provinceId] as ProvinceData),
+        id: provinceId,
+        radiation: value,
+      },
+    }));
+  };
+
+  const setPollution = (provinceId: string, value: number) => {
+    setProvinces((prev) => ({
+      ...prev,
+      [provinceId]: {
+        ...(prev[provinceId] as ProvinceData),
+        id: provinceId,
+        pollution: value,
       },
     }));
   };
@@ -1613,6 +1688,24 @@ function App() {
           forbidden.length > 0 &&
           forbidden.some((id) => (amounts[id] ?? 0) > 0)
         ) {
+          return prev;
+        }
+      }
+      if (requirements?.radiation) {
+        const value = province.radiation ?? 0;
+        if (requirements.radiation.min != null && value < requirements.radiation.min) {
+          return prev;
+        }
+        if (requirements.radiation.max != null && value > requirements.radiation.max) {
+          return prev;
+        }
+      }
+      if (requirements?.pollution) {
+        const value = province.pollution ?? 0;
+        if (requirements.pollution.min != null && value < requirements.pollution.min) {
+          return prev;
+        }
+        if (requirements.pollution.max != null && value > requirements.pollution.max) {
           return prev;
         }
       }
@@ -2321,6 +2414,8 @@ function App() {
         onSetProvinceResourceAmount={setProvinceResourceAmount}
         onSetColonizationCost={setColonizationCost}
         onSetColonizationDisabled={setColonizationDisabled}
+        onSetRadiation={setRadiation}
+        onSetPollution={setPollution}
         onAddClimate={addClimate}
         onAddReligion={addReligion}
         onAddLandscape={addLandscape}

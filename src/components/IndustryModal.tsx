@@ -6,6 +6,9 @@ import type {
   ProvinceRecord,
   Company,
   Industry,
+  ProvinceData,
+  TraitCriteria,
+  RequirementNode,
 } from '../types';
 
 type IndustryModalProps = {
@@ -38,6 +41,293 @@ const getBuildingName = (
   id: string,
 ): string => buildings.find((item) => item.id === id)?.name ?? id;
 
+const normalizeTraitCriteria = (
+  criteria: TraitCriteria | undefined,
+  legacyId?: string,
+) => ({
+  anyOf: criteria?.anyOf ?? (legacyId ? [legacyId] : []),
+  noneOf: criteria?.noneOf ?? [],
+});
+
+const evaluateRequirementNode = (
+  node: RequirementNode,
+  province: ProvinceData,
+): boolean => {
+  if (node.type === 'trait') {
+    const key =
+      node.category === 'climate'
+        ? province.climateId
+        : node.category === 'landscape'
+          ? province.landscapeId
+          : node.category === 'culture'
+            ? province.cultureId
+            : province.religionId;
+    return Boolean(key && key === node.id);
+  }
+  if (node.op === 'and') {
+    return node.children.every((child) => evaluateRequirementNode(child, province));
+  }
+  if (node.op === 'or') {
+    return node.children.some((child) => evaluateRequirementNode(child, province));
+  }
+  if (node.op === 'not') {
+    if (node.children.length === 0) return true;
+    return !node.children.some((child) =>
+      evaluateRequirementNode(child, province),
+    );
+  }
+  if (node.op === 'xor') {
+    const matches = node.children.filter((child) =>
+      evaluateRequirementNode(child, province),
+    ).length;
+    return matches === 1;
+  }
+  if (node.op === 'nand') {
+    return !node.children.every((child) =>
+      evaluateRequirementNode(child, province),
+    );
+  }
+  if (node.op === 'nor') {
+    return !node.children.some((child) =>
+      evaluateRequirementNode(child, province),
+    );
+  }
+  if (node.op === 'implies') {
+    if (node.children.length < 2) return true;
+    const [a, b] = node.children;
+    return !evaluateRequirementNode(a, province) ||
+      evaluateRequirementNode(b, province);
+  }
+  if (node.op === 'eq') {
+    if (node.children.length < 2) return true;
+    const results = node.children.map((child) =>
+      evaluateRequirementNode(child, province),
+    );
+    return results.every((value) => value === results[0]);
+  }
+  return true;
+};
+
+const getOwnerCountryId = (
+  owner: { type: 'state'; countryId: string } | { type: 'company'; companyId: string },
+  companies: Company[],
+) =>
+  owner.type === 'state'
+    ? owner.countryId
+    : companies.find((c) => c.id === owner.companyId)?.countryId;
+
+const isBuildingActiveForProvince = (
+  building: BuildingDefinition | undefined,
+  province: ProvinceData | undefined,
+  provinces: ProvinceRecord,
+  owner: { type: 'state'; countryId: string } | { type: 'company'; companyId: string },
+  companies: Company[],
+): boolean => {
+  if (!building || !province) return true;
+  const requirements = building.requirements;
+  if (!requirements) return true;
+  if (requirements.logic) {
+    if (!evaluateRequirementNode(requirements.logic, province)) return false;
+  } else {
+    const climateReq = normalizeTraitCriteria(
+      requirements.climate,
+      requirements.climateId,
+    );
+    if (
+      climateReq.anyOf.length > 0 &&
+      (!province.climateId || !climateReq.anyOf.includes(province.climateId))
+    ) {
+      return false;
+    }
+    if (
+      climateReq.noneOf.length > 0 &&
+      province.climateId &&
+      climateReq.noneOf.includes(province.climateId)
+    ) {
+      return false;
+    }
+    const landscapeReq = normalizeTraitCriteria(
+      requirements.landscape,
+      requirements.landscapeId,
+    );
+    if (
+      landscapeReq.anyOf.length > 0 &&
+      (!province.landscapeId ||
+        !landscapeReq.anyOf.includes(province.landscapeId))
+    ) {
+      return false;
+    }
+    if (
+      landscapeReq.noneOf.length > 0 &&
+      province.landscapeId &&
+      landscapeReq.noneOf.includes(province.landscapeId)
+    ) {
+      return false;
+    }
+    const cultureReq = normalizeTraitCriteria(
+      requirements.culture,
+      requirements.cultureId,
+    );
+    if (
+      cultureReq.anyOf.length > 0 &&
+      (!province.cultureId || !cultureReq.anyOf.includes(province.cultureId))
+    ) {
+      return false;
+    }
+    if (
+      cultureReq.noneOf.length > 0 &&
+      province.cultureId &&
+      cultureReq.noneOf.includes(province.cultureId)
+    ) {
+      return false;
+    }
+    const religionReq = normalizeTraitCriteria(
+      requirements.religion,
+      requirements.religionId,
+    );
+    if (
+      religionReq.anyOf.length > 0 &&
+      (!province.religionId || !religionReq.anyOf.includes(province.religionId))
+    ) {
+      return false;
+    }
+    if (
+      religionReq.noneOf.length > 0 &&
+      province.religionId &&
+      religionReq.noneOf.includes(province.religionId)
+    ) {
+      return false;
+    }
+  }
+
+  if (requirements.resources) {
+    const amounts = province.resourceAmounts ?? {};
+    const legacyRequired = Object.entries(requirements.resources)
+      .filter(([, value]) => typeof value === 'number' && value > 0)
+      .map(([id]) => id);
+    const required = requirements.resources.anyOf ?? legacyRequired;
+    const forbidden = requirements.resources.noneOf ?? [];
+    if (
+      required.length > 0 &&
+      !required.every((id) => (amounts[id] ?? 0) > 0)
+    ) {
+      return false;
+    }
+    if (forbidden.length > 0 && forbidden.some((id) => (amounts[id] ?? 0) > 0)) {
+      return false;
+    }
+  }
+
+  if (requirements.radiation) {
+    const value = province.radiation ?? 0;
+    if (requirements.radiation.min != null && value < requirements.radiation.min) {
+      return false;
+    }
+    if (requirements.radiation.max != null && value > requirements.radiation.max) {
+      return false;
+    }
+  }
+
+  if (requirements.pollution) {
+    const value = province.pollution ?? 0;
+    if (requirements.pollution.min != null && value < requirements.pollution.min) {
+      return false;
+    }
+    if (requirements.pollution.max != null && value > requirements.pollution.max) {
+      return false;
+    }
+  }
+
+  if (requirements.buildings) {
+    const provinceCount = (depId: string) =>
+      province.buildingsBuilt?.filter((entry) => entry.buildingId === depId)
+        .length ?? 0;
+    const ownerCountryId = getOwnerCountryId(owner, companies);
+    const countryCount = (depId: string) =>
+      ownerCountryId
+        ? Object.values(provinces).reduce((sum, prov) => {
+            const list = prov.buildingsBuilt ?? [];
+            return (
+              sum +
+              list.filter((entry) => {
+                if (entry.buildingId !== depId) return false;
+                if (entry.owner.type === 'state') {
+                  return entry.owner.countryId === ownerCountryId;
+                }
+                const companyCountry = companies.find(
+                  (c) => c.id === entry.owner.companyId,
+                )?.countryId;
+                return companyCountry === ownerCountryId;
+              }).length
+            );
+          }, 0)
+        : 0;
+    const globalCount = (depId: string) =>
+      Object.values(provinces).reduce(
+        (sum, prov) =>
+          sum +
+          (prov.buildingsBuilt ?? []).filter(
+            (entry) => entry.buildingId === depId,
+          ).length,
+        0,
+      );
+
+    const ok = Object.entries(requirements.buildings).every(
+      ([depId, constraint]) => {
+        const province = (constraint as any).province ?? constraint;
+        const country = (constraint as any).country;
+        const global = (constraint as any).global;
+        const pCount = provinceCount(depId);
+        const cCount = countryCount(depId);
+        const gCount = globalCount(depId);
+        if (province?.min != null && pCount < province.min) return false;
+        if (province?.max != null && pCount > province.max) return false;
+        if (country?.min != null && cCount < country.min) return false;
+        if (country?.max != null && cCount > country.max) return false;
+        if (global?.min != null && gCount < global.min) return false;
+        if (global?.max != null && gCount > global.max) return false;
+        return true;
+      },
+    );
+    if (!ok) return false;
+  } else if (requirements.dependencies) {
+    const ok = requirements.dependencies.every(
+      (depId) =>
+        province.buildingsBuilt?.filter((entry) => entry.buildingId === depId)
+          .length ?? 0 > 0,
+    );
+    if (!ok) return false;
+  }
+
+  if (requirements.allowedCountries || requirements.allowedCompanies) {
+    if (owner.type === 'state') {
+      const mode = requirements.allowedCountriesMode ?? 'allow';
+      const list = requirements.allowedCountries ?? [];
+      if (list.length === 0) {
+        if (mode === 'allow') return false;
+      } else {
+        const included = list.includes(owner.countryId);
+        if ((mode === 'allow' && !included) || (mode === 'deny' && included)) {
+          return false;
+        }
+      }
+    } else {
+      const mode = requirements.allowedCompaniesMode ?? 'allow';
+      const list = requirements.allowedCompanies ?? [];
+      if (list.length === 0) {
+        if (mode === 'allow') return false;
+      } else {
+        const included = list.includes(owner.companyId);
+        if ((mode === 'allow' && !included) || (mode === 'deny' && included)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+};
+
 export default function IndustryModal({
   open,
   provinces,
@@ -65,6 +355,7 @@ export default function IndustryModal({
   const [filterCompanyCountryId, setFilterCompanyCountryId] = useState('');
   const [filterIndustryId, setFilterIndustryId] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'construction' | 'built'>('all');
+  const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
   const [sortBy, setSortBy] = useState<'building' | 'province' | 'company' | 'industry'>(
     'building',
   );
@@ -103,6 +394,13 @@ export default function IndustryModal({
         owner: entry.owner,
         countryId: province.ownerCountryId,
         progress: undefined as number | undefined,
+        isActive: isBuildingActiveForProvince(
+          buildings.find((b) => b.id === entry.buildingId),
+          province,
+          provinces,
+          entry.owner,
+          companies,
+        ),
       })),
     );
 
@@ -118,6 +416,13 @@ export default function IndustryModal({
             owner: entry.owner,
             countryId: province.ownerCountryId,
             progress: entry.progress,
+            isActive: isBuildingActiveForProvince(
+              buildings.find((b) => b.id === buildingId),
+              province,
+              provinces,
+              entry.owner,
+              companies,
+            ),
           })),
       ),
     );
@@ -141,10 +446,11 @@ export default function IndustryModal({
         owner: undefined,
         countryId: province.ownerCountryId,
         progress: undefined as number | undefined,
+        isActive: true,
       }));
 
     return [...builtCards, ...constructionCards, ...emptyCards];
-  }, [rows, filterProvinceId]);
+  }, [rows, filterProvinceId, buildings, provinces, companies]);
 
   const filteredCards = useMemo(() => {
     const filtered = cards.filter((card) => {
@@ -156,6 +462,7 @@ export default function IndustryModal({
           return false;
         }
         if (filterStatus !== 'all') return false;
+        if (filterActive !== 'all') return false;
         return true;
       }
       if (filterCompanyId) {
@@ -172,6 +479,8 @@ export default function IndustryModal({
         if (!building || building.industryId !== filterIndustryId) return false;
       }
       if (filterStatus !== 'all' && card.kind !== filterStatus) return false;
+      if (filterActive === 'active' && !card.isActive) return false;
+      if (filterActive === 'inactive' && card.isActive) return false;
       return true;
     });
 
@@ -222,6 +531,7 @@ export default function IndustryModal({
     filterCompanyCountryId,
     filterIndustryId,
     filterStatus,
+    filterActive,
     sortBy,
     companies,
     buildings,
@@ -402,6 +712,26 @@ export default function IndustryModal({
                 </option>
               </select>
             </label>
+            <label className="flex flex-col gap-2 text-white/70 text-xs">
+              Активность
+              <select
+                value={filterActive}
+                onChange={(event) =>
+                  setFilterActive(event.target.value as 'all' | 'active' | 'inactive')
+                }
+                className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+              >
+                <option value="all" className="bg-[#0b111b] text-white">
+                  Все
+                </option>
+                <option value="active" className="bg-[#0b111b] text-white">
+                  Только активные
+                </option>
+                <option value="inactive" className="bg-[#0b111b] text-white">
+                  Только неактивные
+                </option>
+              </select>
+            </label>
           </div>
 
           <div className="flex items-center justify-between gap-3 text-white/60 text-xs">
@@ -418,6 +748,7 @@ export default function IndustryModal({
                   setFilterCompanyCountryId('');
                   setFilterIndustryId('');
                   setFilterStatus('all');
+                  setFilterActive('all');
                 }}
                 className="h-8 px-3 rounded-lg border border-white/10 bg-black/40 text-white/60 text-xs hover:border-emerald-400/40 hover:text-emerald-300"
               >
@@ -490,6 +821,14 @@ export default function IndustryModal({
                         const isEditing = ownerEditor?.key === card.key;
                         const building = buildings.find((b) => b.id === card.buildingId);
                         const country = countries.find((c) => c.id === card.countryId);
+                        const activeProvince = provinces[card.provinceId];
+                        const isActive = isBuildingActiveForProvince(
+                          building,
+                          activeProvince,
+                          provinces,
+                          card.owner,
+                          companies,
+                        );
                         const baseCost = Math.max(1, building?.cost ?? 1);
                         const demolishCost = Math.ceil(
                           (baseCost * (demolitionCostPercent ?? 0)) / 100,
@@ -523,9 +862,11 @@ export default function IndustryModal({
                           <div
                             key={card.key}
                             className={`rounded-2xl border bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col gap-4 shadow-lg shadow-black/30 ${
-                              card.kind === 'construction'
-                                ? 'border-amber-400/50'
-                                : 'border-white/10'
+                              !isActive
+                                ? 'border-red-400/60'
+                                : card.kind === 'construction'
+                                  ? 'border-amber-400/50'
+                                  : 'border-white/10'
                             }`}
                           >
                             <div className="flex items-start justify-between gap-3">
@@ -542,8 +883,13 @@ export default function IndustryModal({
                                   </div>
                                 )}
                                 <div>
-                                  <div className="text-white/80 text-sm font-semibold">
-                                    {building?.name ?? card.buildingId}
+                                  <div className="text-white/80 text-sm font-semibold flex items-center gap-2">
+                                    <span>{building?.name ?? card.buildingId}</span>
+                                    {!isActive && (
+                                      <span className="px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
+									  Неактивное
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-white/40 text-xs">
                                     Стоимость: {Math.max(1, building?.cost ?? 1)}
@@ -849,13 +1195,23 @@ export default function IndustryModal({
                       ? companies.find((c) => c.id === card.owner.companyId)?.color
                       : undefined;
                   const isEditing = ownerEditor?.key === card.key;
+                  const activeProvince = provinces[card.provinceId];
+                  const isActive = isBuildingActiveForProvince(
+                    building,
+                    activeProvince,
+                    provinces,
+                    card.owner,
+                    companies,
+                  );
                   return (
                     <div
                       key={card.key}
                       className={`rounded-2xl border bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col gap-4 shadow-lg shadow-black/30 ${
-                        card.kind === 'construction'
-                          ? 'border-amber-400/50'
-                          : 'border-white/10'
+                        !isActive
+                          ? 'border-red-400/60'
+                          : card.kind === 'construction'
+                            ? 'border-amber-400/50'
+                            : 'border-white/10'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -872,8 +1228,13 @@ export default function IndustryModal({
                           </div>
                         )}
                         <div>
-                          <div className="text-white/80 text-sm font-semibold">
-                            {building?.name ?? card.buildingId}
+                          <div className="text-white/80 text-sm font-semibold flex items-center gap-2">
+                            <span>{building?.name ?? card.buildingId}</span>
+                            {!isActive && (
+                              <span className="px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
+                                Неактивное
+                              </span>
+                            )}
                           </div>
                           <div className="text-white/40 text-xs">
                             Стоимость: {Math.max(1, building?.cost ?? 1)}

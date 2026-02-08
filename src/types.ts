@@ -51,6 +51,8 @@ export type ProvinceData = {
   religionId?: string;
   cultureId?: string;
   landscapeId?: string;
+  radiation?: number;
+  pollution?: number;
   resourceAmounts?: Record<string, number>;
   colonizationCost?: number;
   colonizationProgress?: Record<string, number>;
@@ -95,6 +97,8 @@ export type BuildingDefinition = {
     allowedCompanies?: string[];
     allowedCountriesMode?: 'allow' | 'deny';
     allowedCompaniesMode?: 'allow' | 'deny';
+    radiation?: { min?: number; max?: number };
+    pollution?: { min?: number; max?: number };
     logic?: RequirementNode;
     climate?: TraitCriteria;
     landscape?: TraitCriteria;

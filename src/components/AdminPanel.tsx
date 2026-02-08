@@ -62,6 +62,8 @@ type AdminPanelProps = {
   ) => void;
   onSetColonizationCost: (provinceId: string, cost: number) => void;
   onSetColonizationDisabled: (provinceId: string, disabled: boolean) => void;
+  onSetRadiation: (provinceId: string, value: number) => void;
+  onSetPollution: (provinceId: string, value: number) => void;
   onAddClimate: (name: string, color: string) => void;
   onAddReligion: (name: string, color: string, iconDataUrl?: string) => void;
   onAddLandscape: (name: string, color: string) => void;
@@ -133,6 +135,8 @@ export default function AdminPanel({
   onSetProvinceResourceAmount,
   onSetColonizationCost,
   onSetColonizationDisabled,
+  onSetRadiation,
+  onSetPollution,
   onAddClimate,
   onAddReligion,
   onAddLandscape,
@@ -214,6 +218,10 @@ export default function AdminPanel({
   const [editReqAllowedCompaniesMode, setEditReqAllowedCompaniesMode] = useState<
     'allow' | 'deny'
   >('allow');
+  const [editReqRadiationMin, setEditReqRadiationMin] = useState<number | ''>(0);
+  const [editReqRadiationMax, setEditReqRadiationMax] = useState<number | ''>(0);
+  const [editReqPollutionMin, setEditReqPollutionMin] = useState<number | ''>(0);
+  const [editReqPollutionMax, setEditReqPollutionMax] = useState<number | ''>(0);
   const [editReqLogic, setEditReqLogic] = useState<RequirementNode>({
     type: 'group',
     op: 'and',
@@ -387,6 +395,10 @@ export default function AdminPanel({
     setEditReqAllowedCompanies(new Set(requirements?.allowedCompanies ?? []));
     setEditReqAllowedCountriesMode(requirements?.allowedCountriesMode ?? 'allow');
     setEditReqAllowedCompaniesMode(requirements?.allowedCompaniesMode ?? 'allow');
+    setEditReqRadiationMin(requirements?.radiation?.min ?? 0);
+    setEditReqRadiationMax(requirements?.radiation?.max ?? 0);
+    setEditReqPollutionMin(requirements?.pollution?.min ?? 0);
+    setEditReqPollutionMax(requirements?.pollution?.max ?? 0);
     const legacyResourceAny = requirements?.resources
       ? Object.entries(requirements.resources)
           .filter(([, value]) => typeof value === 'number' && value > 0)
@@ -467,6 +479,34 @@ export default function AdminPanel({
           : undefined,
       allowedCountriesMode: editReqAllowedCountriesMode,
       allowedCompaniesMode: editReqAllowedCompaniesMode,
+      radiation:
+        (editReqRadiationMin !== '' && Number(editReqRadiationMin) > 0) ||
+        (editReqRadiationMax !== '' && Number(editReqRadiationMax) > 0)
+          ? {
+              min:
+                editReqRadiationMin === '' || Number(editReqRadiationMin) <= 0
+                  ? undefined
+                  : Math.max(0, Number(editReqRadiationMin)),
+              max:
+                editReqRadiationMax === '' || Number(editReqRadiationMax) <= 0
+                  ? undefined
+                  : Math.max(0, Number(editReqRadiationMax)),
+            }
+          : undefined,
+      pollution:
+        (editReqPollutionMin !== '' && Number(editReqPollutionMin) > 0) ||
+        (editReqPollutionMax !== '' && Number(editReqPollutionMax) > 0)
+          ? {
+              min:
+                editReqPollutionMin === '' || Number(editReqPollutionMin) <= 0
+                  ? undefined
+                  : Math.max(0, Number(editReqPollutionMin)),
+              max:
+                editReqPollutionMax === '' || Number(editReqPollutionMax) <= 0
+                  ? undefined
+                  : Math.max(0, Number(editReqPollutionMax)),
+            }
+          : undefined,
       buildings:
         Object.keys(editReqBuildingCriteria).length > 0
           ? Object.fromEntries(
@@ -1205,6 +1245,40 @@ export default function AdminPanel({
                       className="w-4 h-4 accent-emerald-500"
                     />
                     Запретить колонизацию
+                  </label>
+
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Радиация
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={activeProvince.radiation ?? 0}
+                      onChange={(event) =>
+                        onSetRadiation(
+                          activeProvince.id,
+                          Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Загрязнение
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={activeProvince.pollution ?? 0}
+                      onChange={(event) =>
+                        onSetPollution(
+                          activeProvince.id,
+                          Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    />
                   </label>
 
                   <div className="md:col-span-2">
@@ -2485,6 +2559,86 @@ export default function AdminPanel({
                       ) : (
                         <div className="text-white/50 text-sm">Нет компаний</div>
                       )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-white/70 text-sm">Радиация / Загрязнение</div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/60 text-xs">Радиация</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                          Мин
+                          <input
+                            type="number"
+                            min={0}
+                            value={editReqRadiationMin}
+                            onChange={(event) =>
+                              setEditReqRadiationMin(
+                                event.target.value === ''
+                                  ? ''
+                                  : Math.max(0, Number(event.target.value) || 0),
+                              )
+                            }
+                            className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                          Макс
+                          <input
+                            type="number"
+                            min={0}
+                            value={editReqRadiationMax}
+                            onChange={(event) =>
+                              setEditReqRadiationMax(
+                                event.target.value === ''
+                                  ? ''
+                                  : Math.max(0, Number(event.target.value) || 0),
+                              )
+                            }
+                            className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/60 text-xs">Загрязнение</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                          Мин
+                          <input
+                            type="number"
+                            min={0}
+                            value={editReqPollutionMin}
+                            onChange={(event) =>
+                              setEditReqPollutionMin(
+                                event.target.value === ''
+                                  ? ''
+                                  : Math.max(0, Number(event.target.value) || 0),
+                              )
+                            }
+                            className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-[10px] text-white/50">
+                          Макс
+                          <input
+                            type="number"
+                            min={0}
+                            value={editReqPollutionMax}
+                            onChange={(event) =>
+                              setEditReqPollutionMax(
+                                event.target.value === ''
+                                  ? ''
+                                  : Math.max(0, Number(event.target.value) || 0),
+                              )
+                            }
+                            className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                          />
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>

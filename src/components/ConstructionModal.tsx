@@ -50,6 +50,7 @@ export default function ConstructionModal({
   const [ownerType, setOwnerType] = useState<'state' | 'company'>('state');
   const [companyId, setCompanyId] = useState('');
   const [stateCountryId, setStateCountryId] = useState('');
+  const [hoveredBuildingId, setHoveredBuildingId] = useState<string | null>(null);
   const availableCompanies = useMemo(
     () => companies.filter((company) => company.countryId === activeCountryId),
     [companies, activeCountryId],
@@ -155,6 +156,9 @@ export default function ConstructionModal({
   );
   const perTask =
     activeTasks > 0 ? Math.max(0, activeCountryPoints) / activeTasks : 0;
+  const hoveredBuilding = hoveredBuildingId
+    ? buildings.find((b) => b.id === hoveredBuildingId)
+    : undefined;
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -249,55 +253,83 @@ export default function ConstructionModal({
                   ))}
                 </select>
                 <div className="flex items-center gap-2 max-w-full flex-wrap">
-                  {countries.map((country) => (
-                    <button
-                      key={country.id}
-                      onClick={() => setStateCountryId(country.id)}
-                      className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-                        resolvedStateCountryId === country.id
-                          ? 'border-emerald-400/60 bg-emerald-500/20'
-                          : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
-                      }`}
-                      title={country.name}
-                    >
-                      {country.flagDataUrl ? (
-                        <img
-                          src={country.flagDataUrl}
-                          alt=""
-                          className="w-6 h-6 rounded object-contain"
-                        />
-                      ) : (
-                        <span className="text-white/50 text-[10px]">Flag</span>
-                      )}
-                    </button>
-                  ))}
+                  {countries.map((country) => {
+                    const available =
+                      hoveredBuilding &&
+                      isOwnerAllowed(hoveredBuilding, {
+                        type: 'state',
+                        countryId: country.id,
+                      });
+                    return (
+                      <button
+                        key={country.id}
+                        onClick={() => setStateCountryId(country.id)}
+                        className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                          resolvedStateCountryId === country.id
+                            ? 'border-emerald-400/60 bg-emerald-500/20'
+                            : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
+                        } ${
+                          hoveredBuildingId
+                            ? available
+                              ? 'ring-1 ring-emerald-400/60'
+                              : 'opacity-40 ring-1 ring-red-400/40'
+                            : ''
+                        }`}
+                        title={country.name}
+                      >
+                        {country.flagDataUrl ? (
+                          <img
+                            src={country.flagDataUrl}
+                            alt=""
+                            className="w-6 h-6 rounded object-contain"
+                          />
+                        ) : (
+                          <span className="text-white/50 text-[10px]">Flag</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
             {ownerType === 'company' && (
               <div className="flex items-center gap-2 max-w-full flex-wrap">
-                {availableCompanies.map((company) => (
-                  <button
-                    key={company.id}
-                    onClick={() => setCompanyId(company.id)}
-                    className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-                      companyId === company.id
-                        ? 'border-emerald-400/60 bg-emerald-500/20'
-                        : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
-                    }`}
-                    title={company.name}
-                  >
-                    {company.iconDataUrl ? (
-                      <img
-                        src={company.iconDataUrl}
-                        alt=""
-                        className="w-6 h-6 rounded object-cover"
-                      />
-                    ) : (
-                      <span className="text-white/50 text-[10px]">Logo</span>
-                    )}
-                  </button>
-                ))}
+                {availableCompanies.map((company) => {
+                  const available =
+                    hoveredBuilding &&
+                    isOwnerAllowed(hoveredBuilding, {
+                      type: 'company',
+                      companyId: company.id,
+                    });
+                  return (
+                    <button
+                      key={company.id}
+                      onClick={() => setCompanyId(company.id)}
+                      className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                        companyId === company.id
+                          ? 'border-emerald-400/60 bg-emerald-500/20'
+                          : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
+                      } ${
+                        hoveredBuildingId
+                          ? available
+                            ? 'ring-1 ring-emerald-400/60'
+                            : 'opacity-40 ring-1 ring-red-400/40'
+                          : ''
+                      }`}
+                      title={company.name}
+                    >
+                      {company.iconDataUrl ? (
+                        <img
+                          src={company.iconDataUrl}
+                          alt=""
+                          className="w-6 h-6 rounded object-cover"
+                        />
+                      ) : (
+                        <span className="text-white/50 text-[10px]">Logo</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -523,6 +555,44 @@ export default function ConstructionModal({
                   }
                 }
               }
+              if (requirements?.radiation) {
+                const value = province.radiation ?? 0;
+                if (
+                  requirements.radiation.min != null &&
+                  value < requirements.radiation.min
+                ) {
+                  issues.other.push(
+                    `Радиация ниже ${requirements.radiation.min} (есть ${value})`,
+                  );
+                }
+                if (
+                  requirements.radiation.max != null &&
+                  value > requirements.radiation.max
+                ) {
+                  issues.other.push(
+                    `Радиация выше ${requirements.radiation.max} (есть ${value})`,
+                  );
+                }
+              }
+              if (requirements?.pollution) {
+                const value = province.pollution ?? 0;
+                if (
+                  requirements.pollution.min != null &&
+                  value < requirements.pollution.min
+                ) {
+                  issues.other.push(
+                    `Загрязнение ниже ${requirements.pollution.min} (есть ${value})`,
+                  );
+                }
+                if (
+                  requirements.pollution.max != null &&
+                  value > requirements.pollution.max
+                ) {
+                  issues.other.push(
+                    `Загрязнение выше ${requirements.pollution.max} (есть ${value})`,
+                  );
+                }
+              }
               const ownerAllowed = isOwnerAllowed(building, owner);
               if (!ownerAllowed) {
                 issues.other.push('Владелец не может строить это здание');
@@ -614,14 +684,17 @@ export default function ConstructionModal({
                 issues.resources.length > 0 ||
                 issues.buildings.length > 0 ||
                 issues.other.length > 0;
+              const isInactive = hasIssues || !ownerAllowed;
               const canStart = isOwner;
               const canCancel = isOwner && hasProgress;
 
               return (
                 <div
                   key={building.id}
+                  onMouseEnter={() => setHoveredBuildingId(building.id)}
+                  onMouseLeave={() => setHoveredBuildingId(null)}
                   className={`grid grid-cols-12 items-center gap-2 px-3 py-3 rounded-xl bg-white/5 border ${
-                    ownerAllowed ? 'border-white/10' : 'border-red-400/50'
+                    isInactive ? 'border-red-400/60' : 'border-white/10'
                   }`}
                 >
                   <div className="col-span-5 flex items-center gap-3">
@@ -637,9 +710,9 @@ export default function ConstructionModal({
                     <div>
                       <div className="text-white/80 text-sm flex items-center gap-2">
                         <span>{building.name}</span>
-                        {!ownerAllowed && (
+                        {isInactive && (
                           <span className="px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
-                            Недоступно
+                            Неактивное
                           </span>
                         )}
                       </div>
@@ -701,7 +774,7 @@ export default function ConstructionModal({
                         {issues.other.length > 0 && (
                           <div>
                             <div className="text-red-200/90 font-semibold">
-                              Лимиты
+                              Прочее
                             </div>
                             <div>
                               {Array.from(new Set(issues.other)).join(', ')}
