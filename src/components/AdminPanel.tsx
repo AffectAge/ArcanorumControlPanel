@@ -71,8 +71,13 @@ type AdminPanelProps = {
     iconDataUrl?: string,
     industryId?: string,
   ) => void;
-  onAddIndustry: (name: string, iconDataUrl?: string) => void;
-  onAddCompany: (name: string, countryId: string, iconDataUrl?: string) => void;
+  onAddIndustry: (name: string, iconDataUrl?: string, color?: string) => void;
+  onAddCompany: (
+    name: string,
+    countryId: string,
+    iconDataUrl?: string,
+    color?: string,
+  ) => void;
   onUpdateCompanyIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateReligionIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateCultureIcon: (id: string, iconDataUrl?: string) => void;
@@ -80,6 +85,13 @@ type AdminPanelProps = {
   onUpdateBuildingIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateIndustryIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateBuildingIndustry: (id: string, industryId?: string) => void;
+  onUpdateIndustryColor: (id: string, color: string) => void;
+  onUpdateCompanyColor: (id: string, color: string) => void;
+  onUpdateClimateColor: (id: string, color: string) => void;
+  onUpdateReligionColor: (id: string, color: string) => void;
+  onUpdateLandscapeColor: (id: string, color: string) => void;
+  onUpdateCultureColor: (id: string, color: string) => void;
+  onUpdateResourceColor: (id: string, color: string) => void;
   onDeleteClimate: (id: string) => void;
   onDeleteReligion: (id: string) => void;
   onDeleteLandscape: (id: string) => void;
@@ -129,6 +141,13 @@ export default function AdminPanel({
   onUpdateBuildingIcon,
   onUpdateIndustryIcon,
   onUpdateBuildingIndustry,
+  onUpdateIndustryColor,
+  onUpdateCompanyColor,
+  onUpdateClimateColor,
+  onUpdateReligionColor,
+  onUpdateLandscapeColor,
+  onUpdateCultureColor,
+  onUpdateResourceColor,
   onDeleteClimate,
   onDeleteReligion,
   onDeleteLandscape,
@@ -157,9 +176,11 @@ export default function AdminPanel({
   const [buildingIndustryId, setBuildingIndustryId] = useState<string>('');
   const [industryName, setIndustryName] = useState('');
   const [industryIcon, setIndustryIcon] = useState<string | undefined>(undefined);
+  const [industryColor, setIndustryColor] = useState('#f59e0b');
   const [companyName, setCompanyName] = useState('');
   const [companyCountryId, setCompanyCountryId] = useState<string>('');
   const [companyIcon, setCompanyIcon] = useState<string | undefined>(undefined);
+  const [companyColor, setCompanyColor] = useState('#a855f7');
   const [resourceColor, setResourceColor] = useState('#22c55e');
   const [resourceIcon, setResourceIcon] = useState<string | undefined>(undefined);
 
@@ -231,17 +252,19 @@ export default function AdminPanel({
   const handleAddIndustry = () => {
     const name = industryName.trim();
     if (!name) return;
-    onAddIndustry(name, industryIcon);
+    onAddIndustry(name, industryIcon, industryColor);
     setIndustryName('');
     setIndustryIcon(undefined);
+    setIndustryColor('#f59e0b');
   };
 
   const handleAddCompany = () => {
     const name = companyName.trim();
     if (!name || !companyCountryId) return;
-    onAddCompany(name, companyCountryId, companyIcon);
+    onAddCompany(name, companyCountryId, companyIcon, companyColor);
     setCompanyName('');
     setCompanyIcon(undefined);
+    setCompanyColor('#a855f7');
   };
 
 
@@ -723,6 +746,14 @@ export default function AdminPanel({
                       />
                       <span className="text-white/80 text-sm">{climate.name}</span>
                     </div>
+                    <input
+                      type="color"
+                      value={climate.color}
+                      onChange={(event) =>
+                        onUpdateClimateColor(climate.id, event.target.value)
+                      }
+                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                    />
                     <button
                       onClick={() => onDeleteClimate(climate.id)}
                       className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
@@ -819,31 +850,39 @@ export default function AdminPanel({
                       )}
                       <span className="text-white/80 text-sm">{religion.name}</span>
                     </div>
-                      <div className="flex items-center gap-2">
-                        <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              handleIconUpload(
-                                event.target.files?.[0],
-                                (value) => onUpdateReligionIcon(religion.id, value),
-                              )
-                            }
-                          />
-                          <ImageIcon className="w-3.5 h-3.5" />
-                          Изменить логотип
-                        </label>
-                        {religion.iconDataUrl && (
-                          <button
-                            onClick={() => onUpdateReligionIcon(religion.id, undefined)}
-                            className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
-                          >
-                            Удалить логотип
-                          </button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={religion.color}
+                        onChange={(event) =>
+                          onUpdateReligionColor(religion.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) =>
+                            handleIconUpload(
+                              event.target.files?.[0],
+                              (value) => onUpdateReligionIcon(religion.id, value),
+                            )
+                          }
+                        />
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        Изменить логотип
+                      </label>
+                      {religion.iconDataUrl && (
+                        <button
+                          onClick={() => onUpdateReligionIcon(religion.id, undefined)}
+                          className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                        >
+                          Удалить логотип
+                        </button>
+                      )}
+                    </div>
                     <button
                       onClick={() => onDeleteReligion(religion.id)}
                       className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
@@ -905,6 +944,14 @@ export default function AdminPanel({
                       />
                       <span className="text-white/80 text-sm">{landscape.name}</span>
                     </div>
+                    <input
+                      type="color"
+                      value={landscape.color}
+                      onChange={(event) =>
+                        onUpdateLandscapeColor(landscape.id, event.target.value)
+                      }
+                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                    />
                     <button
                       onClick={() => onDeleteLandscape(landscape.id)}
                       className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
@@ -1001,31 +1048,39 @@ export default function AdminPanel({
                       )}
                       <span className="text-white/80 text-sm">{culture.name}</span>
                     </div>
-                      <div className="flex items-center gap-2">
-                        <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              handleIconUpload(
-                                event.target.files?.[0],
-                                (value) => onUpdateCultureIcon(culture.id, value),
-                              )
-                            }
-                          />
-                          <ImageIcon className="w-3.5 h-3.5" />
-                          Изменить логотип
-                        </label>
-                        {culture.iconDataUrl && (
-                          <button
-                            onClick={() => onUpdateCultureIcon(culture.id, undefined)}
-                            className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
-                          >
-                            Удалить логотип
-                          </button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={culture.color}
+                        onChange={(event) =>
+                          onUpdateCultureColor(culture.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) =>
+                            handleIconUpload(
+                              event.target.files?.[0],
+                              (value) => onUpdateCultureIcon(culture.id, value),
+                            )
+                          }
+                        />
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        Изменить логотип
+                      </label>
+                      {culture.iconDataUrl && (
+                        <button
+                          onClick={() => onUpdateCultureIcon(culture.id, undefined)}
+                          className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                        >
+                          Удалить логотип
+                        </button>
+                      )}
+                    </div>
                     <button
                       onClick={() => onDeleteCulture(culture.id)}
                       className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
@@ -1123,31 +1178,39 @@ export default function AdminPanel({
                       )}
                       <span className="text-white/80 text-sm">{resource.name}</span>
                     </div>
-                      <div className="flex items-center gap-2">
-                        <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              handleIconUpload(
-                                event.target.files?.[0],
-                                (value) => onUpdateResourceIcon(resource.id, value),
-                              )
-                            }
-                          />
-                          <ImageIcon className="w-3.5 h-3.5" />
-                          Изменить логотип
-                        </label>
-                        {resource.iconDataUrl && (
-                          <button
-                            onClick={() => onUpdateResourceIcon(resource.id, undefined)}
-                            className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
-                          >
-                            Удалить логотип
-                          </button>
-                        )}
-                      </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={resource.color}
+                        onChange={(event) =>
+                          onUpdateResourceColor(resource.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) =>
+                            handleIconUpload(
+                              event.target.files?.[0],
+                              (value) => onUpdateResourceIcon(resource.id, value),
+                            )
+                          }
+                        />
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        Изменить логотип
+                      </label>
+                      {resource.iconDataUrl && (
+                        <button
+                          onClick={() => onUpdateResourceIcon(resource.id, undefined)}
+                          className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-red-400/40"
+                        >
+                          Удалить логотип
+                        </button>
+                      )}
+                    </div>
                     <button
                       onClick={() => onDeleteResource(resource.id)}
                       className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
@@ -1364,6 +1427,15 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цвет
+                  <input
+                    type="color"
+                    value={industryColor}
+                    onChange={(event) => setIndustryColor(event.target.value)}
+                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Логотип
                   <div className="flex items-center gap-2">
                     <input
@@ -1414,6 +1486,11 @@ export default function AdminPanel({
                             alt=""
                             className="w-6 h-6 rounded-md object-cover border border-white/10"
                           />
+                        ) : industry.color ? (
+                          <span
+                            className="w-4 h-4 rounded-full border border-white/10"
+                            style={{ backgroundColor: industry.color }}
+                          />
                         ) : (
                           <Factory className="w-4 h-4 text-white/60" />
                         )}
@@ -1422,6 +1499,14 @@ export default function AdminPanel({
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={industry.color ?? '#f59e0b'}
+                          onChange={(event) =>
+                            onUpdateIndustryColor(industry.id, event.target.value)
+                          }
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                        />
                         <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
                           <input
                             type="file"
@@ -1500,6 +1585,15 @@ export default function AdminPanel({
                   </select>
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цвет
+                  <input
+                    type="color"
+                    value={companyColor}
+                    onChange={(event) => setCompanyColor(event.target.value)}
+                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Логотип
                   <div className="flex items-center gap-2">
                     <input
@@ -1548,15 +1642,20 @@ export default function AdminPanel({
                         className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
                       >
                         <div className="flex items-center gap-3">
-                          {company.iconDataUrl ? (
-                            <img
-                              src={company.iconDataUrl}
-                              alt=""
-                              className="w-6 h-6 rounded-md object-cover border border-white/10"
-                            />
-                          ) : (
-                            <Briefcase className="w-4 h-4 text-white/60" />
-                          )}
+                        {company.iconDataUrl ? (
+                          <img
+                            src={company.iconDataUrl}
+                            alt=""
+                            className="w-6 h-6 rounded-md object-cover border border-white/10"
+                          />
+                        ) : company.color ? (
+                          <span
+                            className="w-4 h-4 rounded-full border border-white/10"
+                            style={{ backgroundColor: company.color }}
+                          />
+                        ) : (
+                          <Briefcase className="w-4 h-4 text-white/60" />
+                        )}
                           <div>
                             <div className="text-white/80 text-sm">
                               {company.name}
@@ -1566,22 +1665,30 @@ export default function AdminPanel({
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(event) =>
-                                handleIconUpload(
-                                  event.target.files?.[0],
-                                  (value) => onUpdateCompanyIcon(company.id, value),
-                                )
-                              }
-                            />
-                            <ImageIcon className="w-3.5 h-3.5" />
-                            Изменить логотип
-                          </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={company.color ?? '#a855f7'}
+                          onChange={(event) =>
+                            onUpdateCompanyColor(company.id, event.target.value)
+                          }
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                        />
+                        <label className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/70 text-[11px] flex items-center gap-1 cursor-pointer hover:border-emerald-400/40">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              handleIconUpload(
+                                event.target.files?.[0],
+                                (value) => onUpdateCompanyIcon(company.id, value),
+                              )
+                            }
+                          />
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          Изменить логотип
+                        </label>
                           {company.iconDataUrl && (
                             <button
                               onClick={() => onUpdateCompanyIcon(company.id, undefined)}

@@ -87,6 +87,7 @@ export type Industry = {
   id: string;
   name: string;
   iconDataUrl?: string;
+  color?: string;
 };
 
 export type Company = {
@@ -94,6 +95,7 @@ export type Company = {
   name: string;
   countryId: string;
   iconDataUrl?: string;
+  color?: string;
 };
 
 export type BuildingOwner =

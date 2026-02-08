@@ -1194,8 +1194,11 @@ function App() {
     ]);
   };
 
-  const addIndustry = (name: string, iconDataUrl?: string) => {
-    setIndustries((prev) => [...prev, { id: createId(), name, iconDataUrl }]);
+  const addIndustry = (name: string, iconDataUrl?: string, color?: string) => {
+    setIndustries((prev) => [
+      ...prev,
+      { id: createId(), name, iconDataUrl, color },
+    ]);
   };
 
   const updateIndustryIcon = (id: string, iconDataUrl?: string) => {
@@ -1203,6 +1206,12 @@ function App() {
       prev.map((industry) =>
         industry.id === id ? { ...industry, iconDataUrl } : industry,
       ),
+    );
+  };
+
+  const updateIndustryColor = (id: string, color?: string) => {
+    setIndustries((prev) =>
+      prev.map((industry) => (industry.id === id ? { ...industry, color } : industry)),
     );
   };
 
@@ -1215,10 +1224,15 @@ function App() {
     );
   };
 
-  const addCompany = (name: string, countryId: string, iconDataUrl?: string) => {
+  const addCompany = (
+    name: string,
+    countryId: string,
+    iconDataUrl?: string,
+    color?: string,
+  ) => {
     setCompanies((prev) => [
       ...prev,
-      { id: createId(), name, countryId, iconDataUrl },
+      { id: createId(), name, countryId, iconDataUrl, color },
     ]);
   };
 
@@ -1230,6 +1244,21 @@ function App() {
     );
   };
 
+  const updateCompanyColor = (id: string, color?: string) => {
+    setCompanies((prev) =>
+      prev.map((company) => (company.id === id ? { ...company, color } : company)),
+    );
+  };
+
+  const updateTraitColor = (
+    listSetter: React.Dispatch<React.SetStateAction<Trait[]>>,
+    id: string,
+    color: string,
+  ) => {
+    listSetter((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, color } : item)),
+    );
+  };
   const deleteCompany = (id: string) => {
     setCompanies((prev) => prev.filter((company) => company.id !== id));
     setProvinces((prev) => {
@@ -1953,13 +1982,30 @@ function App() {
         onAddBuilding={addBuilding}
         onAddIndustry={addIndustry}
         onUpdateIndustryIcon={updateIndustryIcon}
+        onUpdateIndustryColor={updateIndustryColor}
         onAddCompany={addCompany}
         onUpdateCompanyIcon={updateCompanyIcon}
+        onUpdateCompanyColor={updateCompanyColor}
         onUpdateReligionIcon={updateReligionIcon}
         onUpdateCultureIcon={updateCultureIcon}
         onUpdateResourceIcon={updateResourceIcon}
         onUpdateBuildingIcon={updateBuildingIcon}
         onUpdateBuildingIndustry={updateBuildingIndustry}
+        onUpdateClimateColor={(id, color) =>
+          updateTraitColor(setClimates, id, color)
+        }
+        onUpdateReligionColor={(id, color) =>
+          updateTraitColor(setReligions, id, color)
+        }
+        onUpdateLandscapeColor={(id, color) =>
+          updateTraitColor(setLandscapes, id, color)
+        }
+        onUpdateCultureColor={(id, color) =>
+          updateTraitColor(setCultures, id, color)
+        }
+        onUpdateResourceColor={(id, color) =>
+          updateTraitColor(setResources, id, color)
+        }
         onDeleteClimate={deleteClimate}
         onDeleteReligion={deleteReligion}
         onDeleteLandscape={deleteLandscape}
