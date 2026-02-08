@@ -13,6 +13,7 @@ import SettingsModal from './components/SettingsModal';
 import ProvinceContextMenu from './components/ProvinceContextMenu';
 import EventLogPanel from './components/EventLogPanel';
 import IndustryModal from './components/IndustryModal';
+import DiplomacyModal from './components/DiplomacyModal';
 import {
   EventLogContext,
   createDefaultLog,
@@ -243,6 +244,7 @@ function App() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [industryOpen, setIndustryOpen] = useState(false);
+  const [diplomacyOpen, setDiplomacyOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>([
     { id: createId(), name: 'Умеренный', color: '#38bdf8' },
     { id: createId(), name: 'Засушливый', color: '#f59e0b' },
@@ -2245,6 +2247,7 @@ function App() {
       <BottomDock
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenIndustry={() => setIndustryOpen(true)}
+        onOpenDiplomacy={() => setDiplomacyOpen(true)}
       />
       <EventLogPanel activeCountryId={activeCountryId} countries={countries} />
 
@@ -2512,6 +2515,18 @@ function App() {
         }}
         onClose={() => setIndustryOpen(false)}
       />
+      <DiplomacyModal
+        open={diplomacyOpen}
+        countries={countries}
+        industries={industries}
+        provinces={provinces}
+        buildings={buildings}
+        companies={companies}
+        agreements={diplomacyAgreements}
+        onClose={() => setDiplomacyOpen(false)}
+        onAddAgreement={addDiplomacyAgreement}
+        onDeleteAgreement={deleteDiplomacyAgreement}
+      />
 
       <AdminPanel
         open={adminOpen}
@@ -2526,7 +2541,6 @@ function App() {
         buildings={buildings}
         industries={industries}
         companies={companies}
-        diplomacyAgreements={diplomacyAgreements}
         onClose={() => setAdminOpen(false)}
         onAssignOwner={assignOwner}
         onAssignClimate={assignClimate}
@@ -2579,8 +2593,6 @@ function App() {
         onDeleteBuilding={deleteBuilding}
         onDeleteIndustry={deleteIndustry}
         onDeleteCompany={deleteCompany}
-        onAddDiplomacyAgreement={addDiplomacyAgreement}
-        onDeleteDiplomacyAgreement={deleteDiplomacyAgreement}
       />
     </div>
     </EventLogContext.Provider>

@@ -1,0 +1,471 @@
+﻿import { useEffect, useMemo, useState } from 'react';
+import { X, Plus, Trash2, Handshake } from 'lucide-react';
+import type {
+  Country,
+  Industry,
+  DiplomacyAgreement,
+  ProvinceRecord,
+  BuildingDefinition,
+  Company,
+} from '../types';
+
+type DiplomacyModalProps = {
+  open: boolean;
+  countries: Country[];
+  industries: Industry[];
+  provinces: ProvinceRecord;
+  buildings: BuildingDefinition[];
+  companies: Company[];
+  agreements: DiplomacyAgreement[];
+  onClose: () => void;
+  onAddAgreement: (agreement: Omit<DiplomacyAgreement, 'id'>, reciprocal: boolean) => void;
+  onDeleteAgreement: (id: string) => void;
+};
+
+export default function DiplomacyModal({
+  open,
+  countries,
+  industries,
+  provinces,
+  buildings,
+  companies,
+  agreements,
+  onClose,
+  onAddAgreement,
+  onDeleteAgreement,
+}: DiplomacyModalProps) {
+  const treatyTypes = [
+    {
+      id: 'build-rights',
+      name: 'Право строительства',
+      description: 'Компании и государства',
+    },
+  ];
+  const [activeTreatyType, setActiveTreatyType] = useState(treatyTypes[0].id);
+  const [kind, setKind] = useState<'company' | 'state'>('company');
+  const [hostId, setHostId] = useState('');
+  const [guestId, setGuestId] = useState('');
+  const [reciprocal, setReciprocal] = useState(false);
+  const [selectedIndustries, setSelectedIndustries] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [limitProvince, setLimitProvince] = useState<number | ''>(0);
+  const [limitCountry, setLimitCountry] = useState<number | ''>(0);
+  const [limitGlobal, setLimitGlobal] = useState<number | ''>(0);
+  const buildingIndustryMap = useMemo(() => {
+    const map = new Map<string, string | undefined>();
+    buildings.forEach((building) => map.set(building.id, building.industryId));
+    return map;
+  }, [buildings]);
+
+  const companyCountryMap = useMemo(() => {
+    const map = new Map<string, string>();
+    companies.forEach((company) => map.set(company.id, company.countryId));
+    return map;
+  }, [companies]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (countries.length === 0) return;
+    if (!hostId) setHostId(countries[0].id);
+    if (!guestId) setGuestId(countries[1]?.id ?? countries[0].id);
+  }, [open, countries, hostId, guestId]);
+
+  if (!open) return null;
+
+  const getAgreementUsage = (agreement: DiplomacyAgreement) => {
+    let globalCount = 0;
+    let hostCount = 0;
+    const perProvince: Record<string, number> = {};
+
+    const matchesAgreement = (
+      owner: { type: 'state'; countryId: string } | { type: 'company'; companyId: string },
+      buildingId: string,
+      provinceOwnerId?: string,
+    ) => {
+      if (!provinceOwnerId || provinceOwnerId !== agreement.hostCountryId) return false;
+      if (agreement.kind === 'state' && owner.type !== 'state') return false;
+      if (agreement.kind === 'company' && owner.type !== 'company') return false;
+      const guestId =
+        owner.type === 'state'
+          ? owner.countryId
+          : companyCountryMap.get(owner.companyId);
+      if (!guestId || guestId !== agreement.guestCountryId) return false;
+      if (agreement.industries && agreement.industries.length > 0) {
+        const industryId = buildingIndustryMap.get(buildingId);
+        if (!industryId || !agreement.industries.includes(industryId)) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    Object.values(provinces).forEach((province) => {
+      const provinceOwnerId = province.ownerCountryId;
+      if (!provinceOwnerId || provinceOwnerId !== agreement.hostCountryId) return;
+
+      const built = province.buildingsBuilt ?? [];
+      built.forEach((entry) => {
+        if (matchesAgreement(entry.owner, entry.buildingId, provinceOwnerId)) {
+          globalCount += 1;
+          hostCount += 1;
+          perProvince[province.id] = (perProvince[province.id] ?? 0) + 1;
+        }
+      });
+
+      const construction = province.constructionProgress ?? {};
+      Object.entries(construction).forEach(([buildingId, entries]) => {
+        entries.forEach((entry) => {
+          if (matchesAgreement(entry.owner, buildingId, provinceOwnerId)) {
+            globalCount += 1;
+            hostCount += 1;
+            perProvince[province.id] = (perProvince[province.id] ?? 0) + 1;
+          }
+        });
+      });
+    });
+
+    const maxPerProvince = Object.values(perProvince).reduce(
+      (acc, value) => Math.max(acc, value),
+      0,
+    );
+
+    return {
+      perProvince: maxPerProvince,
+      perCountry: hostCount,
+      global: globalCount,
+    };
+  };
+
+  const handleAdd = () => {
+    if (!hostId || !guestId) return;
+    if (hostId === guestId) return;
+    onAddAgreement(
+      {
+        kind,
+        hostCountryId: hostId,
+        guestCountryId: guestId,
+        industries:
+          selectedIndustries.size > 0 ? Array.from(selectedIndustries) : undefined,
+        limits: {
+          perProvince:
+            limitProvince === '' || Number(limitProvince) <= 0
+              ? undefined
+              : Math.max(0, Number(limitProvince)),
+          perCountry:
+            limitCountry === '' || Number(limitCountry) <= 0
+              ? undefined
+              : Math.max(0, Number(limitCountry)),
+          global:
+            limitGlobal === '' || Number(limitGlobal) <= 0
+              ? undefined
+              : Math.max(0, Number(limitGlobal)),
+        },
+      },
+      reciprocal,
+    );
+    setSelectedIndustries(new Set());
+    setLimitProvince(0);
+    setLimitCountry(0);
+    setLimitGlobal(0);
+    setReciprocal(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm animate-fadeIn">
+      <div className="absolute inset-4 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl border border-white/10 bg-black/40 flex items-center justify-center">
+              <Handshake className="w-5 h-5 text-white/70" />
+            </div>
+            <div>
+              <div className="text-white text-lg font-semibold">Дипломатия</div>
+              <div className="text-white/60 text-sm">
+                Соглашения о праве строительства
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/70 flex items-center justify-center hover:border-emerald-400/40"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+          <div className="w-64 border-r border-white/10 p-4 space-y-3">
+            <div className="text-white/70 text-xs uppercase tracking-wide">
+              Типы договоров
+            </div>
+            <div className="space-y-2">
+              {treatyTypes.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTreatyType(item.id)}
+                  className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                    activeTreatyType === item.id
+                      ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                      : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+                  }`}
+                >
+                  <div className="text-white/80">{item.name}</div>
+                  <div className="text-white/40 text-[11px]">{item.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 p-6 overflow-y-auto legend-scroll">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 mb-6">
+              <div className="text-white/80 text-sm font-semibold mb-2">
+                Как работают договоры
+              </div>
+              <div className="text-white/60 text-xs leading-relaxed">
+                Договор даёт право строить в провинциях страны-хозяина. Тип
+                определяет, кто строит: компании или государство. Ограничения
+                считают построенные здания и активные стройки.
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <div className="text-white/80 text-sm font-semibold">Новое соглашение</div>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Тип
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setKind('company')}
+                        className={`h-8 px-3 rounded-lg border text-xs ${
+                          kind === 'company'
+                            ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200'
+                            : 'bg-black/30 border-white/10 text-white/60'
+                        }`}
+                      >
+                        Компании
+                      </button>
+                      <button
+                        onClick={() => setKind('state')}
+                        className={`h-8 px-3 rounded-lg border text-xs ${
+                          kind === 'state'
+                            ? 'bg-emerald-500/20 border-emerald-400/40 text-emerald-200'
+                            : 'bg-black/30 border-white/10 text-white/60'
+                        }`}
+                      >
+                        Государство
+                      </button>
+                    </div>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Страна-хозяин
+                    <select
+                      value={hostId}
+                      onChange={(event) => setHostId(event.target.value)}
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                    >
+                      {countries.map((country) => (
+                        <option
+                          key={country.id}
+                          value={country.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {country.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Страна-гость
+                    <select
+                      value={guestId}
+                      onChange={(event) => setGuestId(event.target.value)}
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                    >
+                      {countries.map((country) => (
+                        <option
+                          key={country.id}
+                          value={country.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {country.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <label className="flex items-center gap-2 text-white/70 text-sm">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-emerald-500"
+                    checked={reciprocal}
+                    onChange={(event) => setReciprocal(event.target.checked)}
+                  />
+                  Взаимное соглашение
+                </label>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-white/60 text-xs">Отрасли (пусто = все)</div>
+                <div className="max-h-40 overflow-y-auto legend-scroll space-y-2 pr-1">
+                  {industries.length > 0 ? (
+                    industries.map((industry) => (
+                      <label
+                        key={industry.id}
+                        className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIndustries.has(industry.id)}
+                          onChange={(event) =>
+                            setSelectedIndustries((prev) => {
+                              const next = new Set(prev);
+                              if (event.target.checked) {
+                                next.add(industry.id);
+                              } else {
+                                next.delete(industry.id);
+                              }
+                              return next;
+                            })
+                          }
+                          className="w-4 h-4 accent-emerald-500"
+                        />
+                        <span>{industry.name}</span>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="text-white/40 text-xs">Нет отраслей</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-white/60 text-xs">Лимиты (0 = без лимита)</div>
+                <div className="grid grid-cols-1 gap-2">
+                  <label className="flex flex-col gap-1 text-[11px] text-white/50">
+                    Провинция
+                    <input
+                      type="number"
+                      min={0}
+                      value={limitProvince}
+                      onChange={(event) =>
+                        setLimitProvince(
+                          event.target.value === ''
+                            ? ''
+                            : Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[11px] text-white/50">
+                    Государство
+                    <input
+                      type="number"
+                      min={0}
+                      value={limitCountry}
+                      onChange={(event) =>
+                        setLimitCountry(
+                          event.target.value === ''
+                            ? ''
+                            : Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[11px] text-white/50">
+                    Мир
+                    <input
+                      type="number"
+                      min={0}
+                      value={limitGlobal}
+                      onChange={(event) =>
+                        setLimitGlobal(
+                          event.target.value === ''
+                            ? ''
+                            : Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <button
+                onClick={handleAdd}
+                className="h-9 px-3 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Добавить
+              </button>
+            </div>
+
+              <div className="space-y-3">
+                {agreements.length > 0 ? (
+                  agreements.map((agreement) => {
+                    const host = countries.find((c) => c.id === agreement.hostCountryId);
+                    const guest = countries.find((c) => c.id === agreement.guestCountryId);
+                    const industryNames = agreement.industries?.length
+                      ? agreement.industries
+                          .map(
+                            (id) => industries.find((item) => item.id === id)?.name ?? id,
+                          )
+                          .join(', ')
+                      : 'Все отрасли';
+                    const perProvince = agreement.limits?.perProvince ?? 0;
+                    const perCountry = agreement.limits?.perCountry ?? 0;
+                    const global = agreement.limits?.global ?? 0;
+                    const limitLabel = (value: number) =>
+                      value && value > 0 ? value : '∞';
+                    const usage = getAgreementUsage(agreement);
+                    return (
+                      <div
+                        key={agreement.id}
+                        className="rounded-xl border border-white/10 bg-black/30 p-4 flex items-start justify-between gap-3"
+                      >
+                        <div className="space-y-2">
+                          <div className="text-white/80 text-sm font-semibold">
+                            {host?.name ?? agreement.hostCountryId} →{' '}
+                            {guest?.name ?? agreement.guestCountryId}
+                          </div>
+                          <div className="text-white/50 text-xs">
+                            Тип: {agreement.kind === 'company' ? 'Компании' : 'Государство'}
+                          </div>
+                          <div className="text-white/50 text-xs">
+                            Отрасли: {industryNames}
+                          </div>
+                          <div className="text-white/50 text-xs">
+                            Лимиты: Пров. {limitLabel(perProvince)} / Гос.{' '}
+                            {limitLabel(perCountry)} / Мир {limitLabel(global)}
+                          </div>
+                          <div className="text-white/60 text-xs">
+                            Использовано: Пров. {usage.perProvince} / Гос.{' '}
+                            {usage.perCountry} / Мир {usage.global}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onDeleteAgreement(agreement.id)}
+                          className="w-9 h-9 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                        >
+                          <Trash2 className="w-4 h-4 text-white/60" />
+                        </button>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-white/50 text-sm">Соглашений нет</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

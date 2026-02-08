@@ -9,6 +9,7 @@ import {
   Landmark,
   ShoppingCart,
   Wrench,
+  Handshake,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -22,15 +23,21 @@ const dockItems = [
   { id: 'culture', icon: Palette, label: 'Culture' },
   { id: 'government', icon: Landmark, label: 'Government' },
   { id: 'trade', icon: ShoppingCart, label: 'Trade' },
+  { id: 'diplomacy', icon: Handshake, label: 'Diplomacy' },
   { id: 'settings', icon: Wrench, label: 'Settings' },
 ];
 
 type BottomDockProps = {
   onOpenSettings: () => void;
   onOpenIndustry: () => void;
+  onOpenDiplomacy: () => void;
 };
 
-export default function BottomDock({ onOpenSettings, onOpenIndustry }: BottomDockProps) {
+export default function BottomDock({
+  onOpenSettings,
+  onOpenIndustry,
+  onOpenDiplomacy,
+}: BottomDockProps) {
   const [activeItem, setActiveItem] = useState('research');
 
   return (
@@ -42,6 +49,7 @@ export default function BottomDock({ onOpenSettings, onOpenIndustry }: BottomDoc
             setActiveItem(item.id);
             if (item.id === 'settings') onOpenSettings();
             if (item.id === 'industry') onOpenIndustry();
+            if (item.id === 'diplomacy') onOpenDiplomacy();
           }}
           className={`
             w-11 h-11 rounded-xl border transition-all duration-200 flex items-center justify-center group relative

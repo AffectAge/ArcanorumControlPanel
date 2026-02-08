@@ -45,8 +45,6 @@ export default function ConstructionModal({
   onStart,
   onCancel,
 }: ConstructionModalProps) {
-  if (!open || !provinceId || !province) return null;
-
   const [ownerType, setOwnerType] = useState<'state' | 'company'>('state');
   const [companyId, setCompanyId] = useState('');
   const [stateCountryId, setStateCountryId] = useState('');
@@ -125,6 +123,14 @@ export default function ConstructionModal({
     }
     return true;
   };
+
+  if (!open || !provinceId || !province) return null;
+
+  const getOwnerCountryId = (target: BuildingOwner) =>
+    target.type === 'state'
+      ? target.countryId
+      : companies.find((c) => c.id === target.companyId)?.countryId;
+
   const resolvedStateCountryId =
     stateCountryId || activeCountryId || countries[0]?.id || 'state';
   const owner: BuildingOwner =
@@ -147,10 +153,6 @@ export default function ConstructionModal({
   const progressMap = province.constructionProgress ?? {};
   const builtList = province.buildingsBuilt ?? [];
   const provincesList = provinces ? Object.values(provinces) : [province];
-  const getOwnerCountryId = (target: BuildingOwner) =>
-    target.type === 'state'
-      ? target.countryId
-      : companies.find((c) => c.id === target.companyId)?.countryId;
   const hasDiplomaticAccess = (
     building: BuildingDefinition,
     target: BuildingOwner,
