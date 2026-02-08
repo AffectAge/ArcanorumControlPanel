@@ -109,6 +109,24 @@ export default function SettingsModal({
               className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
             />
           </label>
+          <label className="flex flex-col gap-2 text-white/70 text-sm">
+            Авто-отклонение дипломатических предложений (ходов)
+            <input
+              type="number"
+              min={1}
+              value={settings.diplomacyProposalExpireTurns ?? 3}
+              onChange={(event) =>
+                onChange({
+                  ...settings,
+                  diplomacyProposalExpireTurns: Math.max(
+                    1,
+                    Number(event.target.value) || 1,
+                  ),
+                })
+              }
+              className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+            />
+          </label>
 
           <div className="text-white/40 text-xs">
             Подсказка: очки колонизации и прогресс начисляются в конце глобального хода.

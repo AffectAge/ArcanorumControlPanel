@@ -275,6 +275,10 @@ function App() {
     DiplomacyProposal[]
   >([]);
   const [diplomacyInboxOpen, setDiplomacyInboxOpen] = useState(false);
+  const [diplomacySentNotice, setDiplomacySentNotice] = useState<{
+    open: boolean;
+    toCountryName: string;
+  }>({ open: false, toCountryName: '' });
   const pendingDiplomacyProposals = useMemo(
     () =>
       diplomacyProposals.filter(
@@ -590,6 +594,76 @@ function App() {
           ),
         );
       }
+      const expiry = Math.max(
+        1,
+        gameSettings.diplomacyProposalExpireTurns ?? 3,
+      );
+      const nextTurn = turn + 1;
+      setDiplomacyProposals((prev) => {
+        if (prev.length === 0) return prev;
+        const expired = prev.filter(
+          (proposal) => nextTurn - proposal.createdTurn >= expiry,
+        );
+        if (expired.length > 0) {
+          expired.forEach((proposal) => {
+            const fromName =
+              countries.find((country) => country.id === proposal.fromCountryId)
+                ?.name ?? proposal.fromCountryId;
+            const toName =
+              countries.find((country) => country.id === proposal.toCountryId)
+                ?.name ?? proposal.toCountryId;
+            addEvent({
+              category: 'diplomacy',
+              message: `${toName} отклонила предложение договора от ${fromName} (истек срок).`,
+              countryId: proposal.toCountryId,
+              priority: 'low',
+            });
+          });
+        }
+        return prev.filter(
+          (proposal) => nextTurn - proposal.createdTurn < expiry,
+        );
+      });
+      setDiplomacyAgreements((prev) => {
+        const [active, expired] = prev.reduce<
+          [DiplomacyAgreement[], DiplomacyAgreement[]]
+        >(
+          (acc, agreement) => {
+            if (!agreement.durationTurns || agreement.durationTurns <= 0) {
+              acc[0].push(agreement);
+              return acc;
+            }
+            if (!agreement.startTurn) {
+              acc[0].push(agreement);
+              return acc;
+            }
+            if (nextTurn - agreement.startTurn < agreement.durationTurns) {
+              acc[0].push(agreement);
+            } else {
+              acc[1].push(agreement);
+            }
+            return acc;
+          },
+          [[], []],
+        );
+        if (expired.length > 0) {
+          expired.forEach((agreement) => {
+            const hostName =
+              countries.find((c) => c.id === agreement.hostCountryId)?.name ??
+              agreement.hostCountryId;
+            const guestName =
+              countries.find((c) => c.id === agreement.guestCountryId)?.name ??
+              agreement.guestCountryId;
+            addEvent({
+              category: 'diplomacy',
+              message: `Договор ${hostName} → ${guestName} истёк.`,
+              countryId: agreement.hostCountryId,
+              priority: 'low',
+            });
+          });
+        }
+        return active;
+      });
     }
   };
 
@@ -700,6 +774,7 @@ function App() {
         constructionPointsPerTurn: 10,
         demolitionCostPercent: 20,
         eventLogRetainTurns: 3,
+        diplomacyProposalExpireTurns: 3,
       },
     );
     setEventLog(normalizeEventLog(save.data.eventLog));
@@ -809,6 +884,7 @@ function App() {
       constructionPointsPerTurn: 10,
       demolitionCostPercent: 20,
       eventLogRetainTurns: 3,
+      diplomacyProposalExpireTurns: 3,
     });
     setEventLog(createDefaultLog());
     setHotseatOpen(false);
@@ -1406,13 +1482,17 @@ function App() {
     reciprocal: boolean,
   ) => {
     setDiplomacyAgreements((prev) => {
-      const next = [...prev, { ...payload, id: createId() }];
+      const next = [
+        ...prev,
+        { ...payload, id: createId(), startTurn: turn },
+      ];
       if (reciprocal && payload.hostCountryId !== payload.guestCountryId) {
         next.push({
           ...payload,
           id: createId(),
           hostCountryId: payload.guestCountryId,
           guestCountryId: payload.hostCountryId,
+          startTurn: turn,
         });
       }
       return next;
@@ -1430,6 +1510,19 @@ function App() {
         createdTurn: turn,
       },
     ]);
+    const fromName =
+      countries.find((country) => country.id === payload.fromCountryId)?.name ??
+      payload.fromCountryId;
+    const toName =
+      countries.find((country) => country.id === payload.toCountryId)?.name ??
+      payload.toCountryId;
+    addEvent({
+      category: 'diplomacy',
+      message: `${fromName} отправила предложение договора стране ${toName}.`,
+      countryId: payload.fromCountryId,
+      priority: 'low',
+    });
+    setDiplomacySentNotice({ open: true, toCountryName: toName });
   };
 
   const acceptDiplomacyProposal = (proposalId: string) => {
@@ -1439,16 +1532,57 @@ function App() {
     setDiplomacyProposals((prev) =>
       prev.filter((entry) => entry.id !== proposalId),
     );
+    const fromName =
+      countries.find((country) => country.id === proposal.fromCountryId)?.name ??
+      proposal.fromCountryId;
+    const toName =
+      countries.find((country) => country.id === proposal.toCountryId)?.name ??
+      proposal.toCountryId;
+    addEvent({
+      category: 'diplomacy',
+      message: `${toName} приняла предложение договора от ${fromName}.`,
+      countryId: proposal.toCountryId,
+      priority: 'low',
+    });
   };
 
   const declineDiplomacyProposal = (proposalId: string) => {
     setDiplomacyProposals((prev) =>
       prev.filter((entry) => entry.id !== proposalId),
     );
+    const proposal = diplomacyProposals.find((entry) => entry.id === proposalId);
+    if (!proposal) return;
+    const fromName =
+      countries.find((country) => country.id === proposal.fromCountryId)?.name ??
+      proposal.fromCountryId;
+    const toName =
+      countries.find((country) => country.id === proposal.toCountryId)?.name ??
+      proposal.toCountryId;
+    addEvent({
+      category: 'diplomacy',
+      message: `${toName} отклонила предложение договора от ${fromName}.`,
+      countryId: proposal.toCountryId,
+      priority: 'low',
+    });
   };
 
   const deleteDiplomacyAgreement = (id: string) => {
+    const agreement = diplomacyAgreements.find((entry) => entry.id === id);
     setDiplomacyAgreements((prev) => prev.filter((entry) => entry.id !== id));
+    if (agreement) {
+      const hostName =
+        countries.find((c) => c.id === agreement.hostCountryId)?.name ??
+        agreement.hostCountryId;
+      const guestName =
+        countries.find((c) => c.id === agreement.guestCountryId)?.name ??
+        agreement.guestCountryId;
+      addEvent({
+        category: 'diplomacy',
+        message: `Договор ${hostName} → ${guestName} отменён.`,
+        countryId: agreement.hostCountryId,
+        priority: 'low',
+      });
+    }
   };
 
   const updateBuildingIcon = (id: string, iconDataUrl?: string) => {
@@ -1519,6 +1653,11 @@ function App() {
         target.type === 'state'
           ? target.countryId
           : companies.find((c) => c.id === target.companyId)?.countryId;
+      const isAgreementActive = (agreement: DiplomacyAgreement) => {
+        if (!agreement.durationTurns || agreement.durationTurns <= 0) return true;
+        if (!agreement.startTurn) return true;
+        return turn - agreement.startTurn < agreement.durationTurns;
+      };
       const hasDiplomacyAccess = () => {
         const hostId = province.ownerCountryId;
         const ownerCountryId = getOwnerCountryId(owner);
@@ -1527,7 +1666,8 @@ function App() {
         const matches = diplomacyAgreements.filter(
           (agreement) =>
             agreement.hostCountryId === hostId &&
-            agreement.guestCountryId === ownerCountryId,
+            agreement.guestCountryId === ownerCountryId &&
+            isAgreementActive(agreement),
         );
         if (matches.length === 0) return false;
 
@@ -1538,6 +1678,18 @@ function App() {
           const industryId =
             buildings.find((item) => item.id === id)?.industryId ?? undefined;
           return Boolean(industryId && agreement.industries.includes(industryId));
+        };
+        const buildingAllowed = (agreement: DiplomacyAgreement, id: string) => {
+          if (!agreement.buildingIds || agreement.buildingIds.length === 0) {
+            return true;
+          }
+          return agreement.buildingIds.includes(id);
+        };
+        const provinceAllowed = (agreement: DiplomacyAgreement, provId: string) => {
+          if (!agreement.provinceIds || agreement.provinceIds.length === 0) {
+            return true;
+          }
+          return agreement.provinceIds.includes(provId);
         };
         const ownerAllowed = (agreement: DiplomacyAgreement) => {
           const allowsState = agreement.allowState ?? agreement.kind === 'state';
@@ -1553,6 +1705,8 @@ function App() {
         const agreementMatch = (
           target: BuildingOwner,
           agreementsToUse: DiplomacyAgreement[],
+          buildingId: string,
+          provinceId: string,
         ) =>
           agreementsToUse.find((agreement) => {
             const allowsState = agreement.allowState ?? agreement.kind === 'state';
@@ -1566,6 +1720,8 @@ function App() {
                 if (!agreement.companyIds.includes(target.companyId)) return false;
               }
             }
+            if (!provinceAllowed(agreement, provinceId)) return false;
+            if (!buildingAllowed(agreement, buildingId)) return false;
             return true;
           });
 
@@ -1575,19 +1731,31 @@ function App() {
         ) =>
           provinceList.reduce((sum, prov) => {
             const built = (prov.buildingsBuilt ?? []).filter((entry) => {
-              const match = agreementMatch(entry.owner, agreements);
+              const match = agreementMatch(
+                entry.owner,
+                agreements,
+                entry.buildingId,
+                prov.id,
+              );
               if (!match) return false;
               const entryCountryId = getOwnerCountryId(entry.owner);
               if (entryCountryId !== ownerCountryId) return false;
+              if (!provinceAllowed(match, prov.id)) return false;
               return industryAllowed(match, entry.buildingId);
             }).length;
             const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
               (sumProgress, [entryBuildingId, entries]) => {
                 const filtered = entries.filter((entry) => {
-                  const match = agreementMatch(entry.owner, agreements);
+                  const match = agreementMatch(
+                    entry.owner,
+                    agreements,
+                    entryBuildingId,
+                    prov.id,
+                  );
                   if (!match) return false;
                   const entryCountryId = getOwnerCountryId(entry.owner);
                   if (entryCountryId !== ownerCountryId) return false;
+                  if (!provinceAllowed(match, prov.id)) return false;
                   return industryAllowed(match, entryBuildingId);
                 });
                 return sumProgress + filtered.length;
@@ -1599,6 +1767,8 @@ function App() {
 
         return matches.some((agreement) => {
           if (!ownerAllowed(agreement)) return false;
+          if (!provinceAllowed(agreement, provinceId)) return false;
+          if (!buildingAllowed(agreement, buildingId)) return false;
           if (!industryAllowed(agreement, buildingId)) return false;
           const limits = agreement.limits ?? {};
           const perProvince = limits.perProvince ?? 0;
@@ -2261,6 +2431,27 @@ function App() {
       )}
       <LeftToolbar />
 
+      {diplomacySentNotice.open && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="w-[360px] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/10 text-white text-base font-semibold">
+              Предложение отправлено
+            </div>
+            <div className="px-5 py-4 text-white/70 text-sm">
+              Предложение направлено стране {diplomacySentNotice.toCountryName}.
+            </div>
+            <div className="px-5 py-4 border-t border-white/10 flex justify-end">
+              <button
+                onClick={() => setDiplomacySentNotice({ open: false, toCountryName: '' })}
+                className="h-9 px-4 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm"
+              >
+                Ок
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {infoPanelOpen && (
         <InfoPanel
           province={selectedProvinceId ?? '-'}
@@ -2411,6 +2602,7 @@ function App() {
         companies={companies}
         countries={countries}
         diplomacyAgreements={diplomacyAgreements}
+        turn={turn}
         activeCountryId={activeCountryId}
         activeCountryPoints={
           countries.find((country) => country.id === activeCountryId)
@@ -2445,6 +2637,7 @@ function App() {
         countries={countries}
         companies={companies}
         diplomacyAgreements={diplomacyAgreements}
+        turn={turn}
         activeCountryId={activeCountryId}
         activeCountryPoints={
           countries.find((country) => country.id === activeCountryId)
@@ -2601,6 +2794,8 @@ function App() {
         buildings={buildings}
         companies={companies}
         agreements={diplomacyAgreements}
+        turn={turn}
+        activeCountryId={activeCountryId}
         onClose={() => setDiplomacyOpen(false)}
         onCreateProposal={addDiplomacyProposal}
         onDeleteAgreement={deleteDiplomacyAgreement}
@@ -2610,6 +2805,7 @@ function App() {
         proposals={pendingDiplomacyProposals}
         countries={countries}
         industries={industries}
+        buildings={buildings}
         companies={companies}
         onAccept={(id) => {
           acceptDiplomacyProposal(id);

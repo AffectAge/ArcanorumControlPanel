@@ -77,6 +77,7 @@ export type GameSettings = {
   eventLogRetainTurns?: number;
   constructionPointsPerTurn?: number;
   demolitionCostPercent?: number;
+  diplomacyProposalExpireTurns?: number;
 };
 
 export type BuildingDefinition = {
@@ -157,12 +158,16 @@ export type DiplomacyAgreement = {
   allowState?: boolean;
   allowCompanies?: boolean;
   companyIds?: string[];
+  buildingIds?: string[];
+  provinceIds?: string[];
   industries?: string[];
   limits?: {
     perProvince?: number;
     perCountry?: number;
     global?: number;
   };
+  startTurn?: number;
+  durationTurns?: number;
 };
 
 export type DiplomacyProposal = {

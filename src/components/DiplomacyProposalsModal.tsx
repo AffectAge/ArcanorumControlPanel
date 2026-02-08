@@ -1,11 +1,12 @@
 ﻿import { Handshake, X, Check, XCircle } from 'lucide-react';
-import type { Country, DiplomacyProposal, Industry, Company } from '../types';
+import type { Country, DiplomacyProposal, Industry, Company, BuildingDefinition } from '../types';
 
 type DiplomacyProposalsModalProps = {
   open: boolean;
   proposals: DiplomacyProposal[];
   countries: Country[];
   industries: Industry[];
+  buildings: BuildingDefinition[];
   companies: Company[];
   onAccept: (id: string) => void;
   onDecline: (id: string) => void;
@@ -20,6 +21,7 @@ export default function DiplomacyProposalsModal({
   proposals,
   countries,
   industries,
+  buildings,
   companies,
   onAccept,
   onDecline,
@@ -66,6 +68,20 @@ export default function DiplomacyProposalsModal({
                 const perCountry = agreement.limits?.perCountry ?? 0;
                 const global = agreement.limits?.global ?? 0;
                 const limitLabel = (value: number) => (value && value > 0 ? value : '∞');
+                const durationLabel =
+                  agreement.durationTurns && agreement.durationTurns > 0
+                    ? `${agreement.durationTurns} ход.`
+                    : 'Бессрочно';
+                const allowedBuildingsLabel =
+                  agreement.buildingIds && agreement.buildingIds.length > 0
+                    ? agreement.buildingIds
+                        .map((id) => buildings.find((b) => b.id === id)?.name ?? id)
+                        .join(', ')
+                    : 'Все здания';
+                const allowedProvincesLabel =
+                  agreement.provinceIds && agreement.provinceIds.length > 0
+                    ? agreement.provinceIds.join(', ')
+                    : 'Все провинции';
                 const allowState = agreement.allowState ?? agreement.kind === 'state';
                 const allowCompanies =
                   agreement.allowCompanies ?? agreement.kind === 'company';
@@ -95,11 +111,14 @@ export default function DiplomacyProposalsModal({
                     {allowCompanies && (
                       <div className="text-white/50 text-xs">Компании: {companyLabel}</div>
                     )}
+                    <div className="text-white/50 text-xs">Здания: {allowedBuildingsLabel}</div>
+                    <div className="text-white/50 text-xs">Провинции: {allowedProvincesLabel}</div>
                     <div className="text-white/50 text-xs">Отрасли: {industryNames}</div>
                     <div className="text-white/50 text-xs">
                       Лимиты: Пров. {limitLabel(perProvince)} / Гос. {limitLabel(perCountry)} / Мир{' '}
                       {limitLabel(global)}
                     </div>
+                    <div className="text-white/50 text-xs">Срок: {durationLabel}</div>
                     {proposal.reciprocal && (
                       <div className="text-emerald-300/80 text-xs">Взаимное соглашение</div>
                     )}

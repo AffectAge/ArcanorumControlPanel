@@ -18,6 +18,8 @@ type DiplomacyModalProps = {
   buildings: BuildingDefinition[];
   companies: Company[];
   agreements: DiplomacyAgreement[];
+  turn: number;
+  activeCountryId?: string;
   onClose: () => void;
   onCreateProposal: (
     proposal: Omit<DiplomacyProposal, 'id' | 'createdTurn'>,
@@ -33,6 +35,8 @@ export default function DiplomacyModal({
   buildings,
   companies,
   agreements,
+  turn,
+  activeCountryId,
   onClose,
   onCreateProposal,
   onDeleteAgreement,
@@ -52,7 +56,7 @@ export default function DiplomacyModal({
     () => new Set(),
   );
   const [hostId, setHostId] = useState('');
-  const [guestId, setGuestId] = useState('');
+  const guestId = activeCountryId ?? '';
   const [reciprocal, setReciprocal] = useState(false);
   const [selectedIndustries, setSelectedIndustries] = useState<Set<string>>(
     () => new Set(),
@@ -60,6 +64,15 @@ export default function DiplomacyModal({
   const [limitProvince, setLimitProvince] = useState<number | ''>(0);
   const [limitCountry, setLimitCountry] = useState<number | ''>(0);
   const [limitGlobal, setLimitGlobal] = useState<number | ''>(0);
+  const [durationTurns, setDurationTurns] = useState<number | ''>(0);
+  const [allBuildings, setAllBuildings] = useState(true);
+  const [selectedBuildingIds, setSelectedBuildingIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [allProvinces, setAllProvinces] = useState(true);
+  const [selectedProvinceIds, setSelectedProvinceIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const buildingIndustryMap = useMemo(() => {
     const map = new Map<string, string | undefined>();
     buildings.forEach((building) => map.set(building.id, building.industryId));
@@ -75,13 +88,23 @@ export default function DiplomacyModal({
     () => companies.filter((company) => company.countryId === guestId),
     [companies, guestId],
   );
+  const hostProvinces = useMemo(
+    () =>
+      Object.values(provinces).filter(
+        (province) => province.ownerCountryId === hostId,
+      ),
+    [provinces, hostId],
+  );
+  const hostProvinceIds = useMemo(
+    () => hostProvinces.map((province) => province.id),
+    [hostProvinces],
+  );
 
   useEffect(() => {
     if (!open) return;
     if (countries.length === 0) return;
     if (!hostId) setHostId(countries[0].id);
-    if (!guestId) setGuestId(countries[1]?.id ?? countries[0].id);
-  }, [open, countries, hostId, guestId]);
+  }, [open, countries, hostId]);
 
   useEffect(() => {
     if (!open) return;
@@ -101,6 +124,36 @@ export default function DiplomacyModal({
       return next;
     });
   }, [open, allCompanies, guestId, companies]);
+  useEffect(() => {
+    if (!open) return;
+    if (allBuildings) {
+      setSelectedBuildingIds(new Set());
+      return;
+    }
+    setSelectedBuildingIds((prev) => {
+      const allowed = new Set(buildings.map((b) => b.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (allowed.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [open, allBuildings, buildings]);
+  useEffect(() => {
+    if (!open) return;
+    if (allProvinces) {
+      setSelectedProvinceIds(new Set());
+      return;
+    }
+    setSelectedProvinceIds((prev) => {
+      const allowed = new Set(hostProvinceIds);
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (allowed.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [open, allProvinces, hostProvinceIds]);
 
   if (!open) return null;
 
@@ -113,8 +166,12 @@ export default function DiplomacyModal({
       owner: { type: 'state'; countryId: string } | { type: 'company'; companyId: string },
       buildingId: string,
       provinceOwnerId?: string,
+      provinceId?: string,
     ) => {
       if (!provinceOwnerId || provinceOwnerId !== agreement.hostCountryId) return false;
+      if (agreement.provinceIds && agreement.provinceIds.length > 0) {
+        if (!provinceId || !agreement.provinceIds.includes(provinceId)) return false;
+      }
       const allowsState = agreement.allowState ?? agreement.kind === 'state';
       const allowsCompanies =
         agreement.allowCompanies ?? agreement.kind === 'company';
@@ -133,6 +190,9 @@ export default function DiplomacyModal({
       ) {
         return false;
       }
+      if (agreement.buildingIds && agreement.buildingIds.length > 0) {
+        if (!agreement.buildingIds.includes(buildingId)) return false;
+      }
       if (agreement.industries && agreement.industries.length > 0) {
         const industryId = buildingIndustryMap.get(buildingId);
         if (!industryId || !agreement.industries.includes(industryId)) {
@@ -148,7 +208,14 @@ export default function DiplomacyModal({
 
       const built = province.buildingsBuilt ?? [];
       built.forEach((entry) => {
-        if (matchesAgreement(entry.owner, entry.buildingId, provinceOwnerId)) {
+        if (
+          matchesAgreement(
+            entry.owner,
+            entry.buildingId,
+            provinceOwnerId,
+            province.id,
+          )
+        ) {
           globalCount += 1;
           hostCount += 1;
           perProvince[province.id] = (perProvince[province.id] ?? 0) + 1;
@@ -158,7 +225,9 @@ export default function DiplomacyModal({
       const construction = province.constructionProgress ?? {};
       Object.entries(construction).forEach(([buildingId, entries]) => {
         entries.forEach((entry) => {
-          if (matchesAgreement(entry.owner, buildingId, provinceOwnerId)) {
+          if (
+            matchesAgreement(entry.owner, buildingId, provinceOwnerId, province.id)
+          ) {
             globalCount += 1;
             hostCount += 1;
             perProvince[province.id] = (perProvince[province.id] ?? 0) + 1;
@@ -196,6 +265,14 @@ export default function DiplomacyModal({
           allowCompanies && !allCompanies
             ? Array.from(selectedCompanyIds)
             : undefined,
+        buildingIds:
+          !allBuildings && selectedBuildingIds.size > 0
+            ? Array.from(selectedBuildingIds)
+            : undefined,
+        provinceIds:
+          !allProvinces && selectedProvinceIds.size > 0
+            ? Array.from(selectedProvinceIds)
+            : undefined,
         industries:
           selectedIndustries.size > 0 ? Array.from(selectedIndustries) : undefined,
         limits: {
@@ -212,6 +289,10 @@ export default function DiplomacyModal({
               ? undefined
               : Math.max(0, Number(limitGlobal)),
         },
+        durationTurns:
+          durationTurns === '' || Number(durationTurns) <= 0
+            ? undefined
+            : Math.max(1, Number(durationTurns)),
       },
       reciprocal,
     });
@@ -222,12 +303,19 @@ export default function DiplomacyModal({
     setReciprocal(false);
     setAllCompanies(true);
     setSelectedCompanyIds(new Set());
+    setAllBuildings(true);
+    setSelectedBuildingIds(new Set());
+    setAllProvinces(true);
+    setSelectedProvinceIds(new Set());
+    setDurationTurns(0);
   };
 
   const canAddAgreement =
     Boolean(hostId && guestId && hostId !== guestId) &&
     (allowState || allowCompanies) &&
-    (!allowCompanies || allCompanies || selectedCompanyIds.size > 0);
+    (!allowCompanies || allCompanies || selectedCompanyIds.size > 0) &&
+    (allBuildings || selectedBuildingIds.size > 0) &&
+    (allProvinces || selectedProvinceIds.size > 0);
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -387,24 +475,13 @@ export default function DiplomacyModal({
                       ))}
                     </select>
                   </label>
-                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                  <div className="flex flex-col gap-1 text-white/70 text-sm">
                     Страна-гость
-                    <select
-                      value={guestId}
-                      onChange={(event) => setGuestId(event.target.value)}
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
-                    >
-                      {countries.map((country) => (
-                        <option
-                          key={country.id}
-                          value={country.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {country.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <div className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs flex items-center">
+                      {countries.find((country) => country.id === guestId)?.name ??
+                        'Страна не выбрана'}
+                    </div>
+                  </div>
                 </div>
                 <label className="flex items-center gap-2 text-white/70 text-sm">
                   <input
@@ -504,6 +581,112 @@ export default function DiplomacyModal({
                   </label>
                 </div>
               </div>
+              <div className="space-y-2">
+                <div className="text-white/60 text-xs">Здания</div>
+                <label className="flex items-center gap-2 text-white/70 text-xs">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-emerald-500"
+                    checked={allBuildings}
+                    onChange={(event) => setAllBuildings(event.target.checked)}
+                  />
+                  Все здания
+                </label>
+                {!allBuildings && (
+                  <div className="max-h-40 overflow-y-auto legend-scroll space-y-2 pr-1">
+                    {buildings.length > 0 ? (
+                      buildings.map((building) => (
+                        <label
+                          key={building.id}
+                          className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedBuildingIds.has(building.id)}
+                            onChange={(event) =>
+                              setSelectedBuildingIds((prev) => {
+                                const next = new Set(prev);
+                                if (event.target.checked) {
+                                  next.add(building.id);
+                                } else {
+                                  next.delete(building.id);
+                                }
+                                return next;
+                              })
+                            }
+                            className="w-4 h-4 accent-emerald-500"
+                          />
+                          <span>{building.name}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="text-white/40 text-xs">Нет зданий</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <div className="text-white/60 text-xs">Провинции</div>
+                <label className="flex items-center gap-2 text-white/70 text-xs">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-emerald-500"
+                    checked={allProvinces}
+                    onChange={(event) => setAllProvinces(event.target.checked)}
+                  />
+                  Все провинции страны-хозяина
+                </label>
+                {!allProvinces && (
+                  <div className="max-h-40 overflow-y-auto legend-scroll space-y-2 pr-1">
+                    {hostProvinces.length > 0 ? (
+                      hostProvinces.map((province) => (
+                        <label
+                          key={province.id}
+                          className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedProvinceIds.has(province.id)}
+                            onChange={(event) =>
+                              setSelectedProvinceIds((prev) => {
+                                const next = new Set(prev);
+                                if (event.target.checked) {
+                                  next.add(province.id);
+                                } else {
+                                  next.delete(province.id);
+                                }
+                                return next;
+                              })
+                            }
+                            className="w-4 h-4 accent-emerald-500"
+                          />
+                          <span>{province.id}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="text-white/40 text-xs">
+                        Нет провинций у страны-хозяина
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <label className="flex flex-col gap-2 text-white/70 text-sm">
+                Срок действия (ходов, 0 = бессрочно)
+                <input
+                  type="number"
+                  min={0}
+                  value={durationTurns}
+                  onChange={(event) =>
+                    setDurationTurns(
+                      event.target.value === ''
+                        ? ''
+                        : Math.max(0, Number(event.target.value) || 0),
+                    )
+                  }
+                  className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                />
+              </label>
 
               <button
                 onClick={handleAdd}
@@ -515,7 +698,7 @@ export default function DiplomacyModal({
                 }`}
               >
                 <Plus className="w-4 h-4" />
-                Добавить
+                Отправить
               </button>
             </div>
 
@@ -537,6 +720,19 @@ export default function DiplomacyModal({
                     const limitLabel = (value: number) =>
                       value && value > 0 ? value : '∞';
                     const usage = getAgreementUsage(agreement);
+                    const durationLabel =
+                      agreement.durationTurns && agreement.durationTurns > 0
+                        ? `${agreement.durationTurns} ход.`
+                        : 'Бессрочно';
+                    const remainingTurns =
+                      agreement.durationTurns &&
+                      agreement.durationTurns > 0 &&
+                      agreement.startTurn
+                        ? Math.max(
+                            0,
+                            agreement.durationTurns - (turn - agreement.startTurn),
+                          )
+                        : null;
                     const resolvedAllowState =
                       agreement.allowState ?? agreement.kind === 'state';
                     const resolvedAllowCompanies =
@@ -550,6 +746,18 @@ export default function DiplomacyModal({
                             )
                             .join(', ')
                         : 'Все компании';
+                    const allowedBuildingsLabel =
+                      agreement.buildingIds && agreement.buildingIds.length > 0
+                        ? agreement.buildingIds
+                            .map(
+                              (id) => buildings.find((b) => b.id === id)?.name ?? id,
+                            )
+                            .join(', ')
+                        : 'Все здания';
+                    const allowedProvincesLabel =
+                      agreement.provinceIds && agreement.provinceIds.length > 0
+                        ? agreement.provinceIds.join(', ')
+                        : 'Все провинции';
                     return (
                       <div
                         key={agreement.id}
@@ -572,12 +780,26 @@ export default function DiplomacyModal({
                             </div>
                           )}
                           <div className="text-white/50 text-xs">
+                            Здания: {allowedBuildingsLabel}
+                          </div>
+                          <div className="text-white/50 text-xs">
+                            Провинции: {allowedProvincesLabel}
+                          </div>
+                          <div className="text-white/50 text-xs">
                             Отрасли: {industryNames}
                           </div>
                           <div className="text-white/50 text-xs">
                             Лимиты: Пров. {limitLabel(perProvince)} / Гос.{' '}
                             {limitLabel(perCountry)} / Мир {limitLabel(global)}
                           </div>
+                          <div className="text-white/50 text-xs">
+                            Срок: {durationLabel}
+                          </div>
+                          {remainingTurns != null && (
+                            <div className="text-white/50 text-xs">
+                              Осталось: {remainingTurns} ход.
+                            </div>
+                          )}
                           <div className="text-white/60 text-xs">
                             Использовано: Пров. {usage.perProvince} / Гос.{' '}
                             {usage.perCountry} / Мир {usage.global}
