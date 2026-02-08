@@ -1310,6 +1310,17 @@ function App() {
     );
   };
 
+  const updateBuildingRequirements = (
+    id: string,
+    requirements?: BuildingDefinition['requirements'],
+  ) => {
+    setBuildings((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, requirements } : item,
+      ),
+    );
+  };
+
   const deleteBuilding = (id: string) => {
     setBuildings((prev) => prev.filter((b) => b.id !== id));
     setProvinces((prev) => {
@@ -2030,6 +2041,7 @@ function App() {
         onUpdateResourceIcon={updateResourceIcon}
         onUpdateBuildingIcon={updateBuildingIcon}
         onUpdateBuildingIndustry={updateBuildingIndustry}
+        onUpdateBuildingRequirements={updateBuildingRequirements}
         onUpdateClimateColor={(id, color) =>
           updateTraitColor(setClimates, id, color)
         }

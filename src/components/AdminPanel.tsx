@@ -86,6 +86,10 @@ type AdminPanelProps = {
   onUpdateBuildingIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateIndustryIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateBuildingIndustry: (id: string, industryId?: string) => void;
+  onUpdateBuildingRequirements: (
+    id: string,
+    requirements?: BuildingDefinition['requirements'],
+  ) => void;
   onUpdateIndustryColor: (id: string, color: string) => void;
   onUpdateCompanyColor: (id: string, color: string) => void;
   onUpdateClimateColor: (id: string, color: string) => void;
@@ -142,6 +146,7 @@ export default function AdminPanel({
   onUpdateBuildingIcon,
   onUpdateIndustryIcon,
   onUpdateBuildingIndustry,
+  onUpdateBuildingRequirements,
   onUpdateIndustryColor,
   onUpdateCompanyColor,
   onUpdateClimateColor,
@@ -184,6 +189,18 @@ export default function AdminPanel({
   const [reqDependencies, setReqDependencies] = useState<Set<string>>(
     () => new Set(),
   );
+  const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
+  const [editReqClimateId, setEditReqClimateId] = useState('');
+  const [editReqLandscapeId, setEditReqLandscapeId] = useState('');
+  const [editReqCultureId, setEditReqCultureId] = useState('');
+  const [editReqReligionId, setEditReqReligionId] = useState('');
+  const [editReqMaxPerProvince, setEditReqMaxPerProvince] = useState<number | ''>('');
+  const [editReqResources, setEditReqResources] = useState<Record<string, number>>(
+    {},
+  );
+  const [editReqDependencies, setEditReqDependencies] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [industryName, setIndustryName] = useState('');
   const [industryIcon, setIndustryIcon] = useState<string | undefined>(undefined);
   const [industryColor, setIndustryColor] = useState('#f59e0b');
@@ -204,6 +221,10 @@ export default function AdminPanel({
   }, [open, selectedProvinceId]);
 
   if (!open) return null;
+
+  const editingBuilding = editingBuildingId
+    ? buildings.find((building) => building.id === editingBuildingId)
+    : undefined;
 
   const handleAddClimate = () => {
     const name = climateName.trim();
@@ -276,6 +297,44 @@ export default function AdminPanel({
     setReqMaxPerProvince('');
     setReqResources({});
     setReqDependencies(new Set());
+  };
+
+  const openEditRequirements = (building: BuildingDefinition) => {
+    const requirements = building.requirements;
+    setEditingBuildingId(building.id);
+    setEditReqClimateId(requirements?.climateId ?? '');
+    setEditReqLandscapeId(requirements?.landscapeId ?? '');
+    setEditReqCultureId(requirements?.cultureId ?? '');
+    setEditReqReligionId(requirements?.religionId ?? '');
+    setEditReqMaxPerProvince(
+      requirements?.maxPerProvince == null ? '' : requirements.maxPerProvince,
+    );
+    setEditReqResources(requirements?.resources ?? {});
+    setEditReqDependencies(new Set(requirements?.dependencies ?? []));
+  };
+
+  const closeEditRequirements = () => {
+    setEditingBuildingId(null);
+  };
+
+  const saveEditRequirements = () => {
+    if (!editingBuildingId) return;
+    const requirements = {
+      resources:
+        Object.keys(editReqResources).length > 0 ? editReqResources : undefined,
+      climateId: editReqClimateId || undefined,
+      landscapeId: editReqLandscapeId || undefined,
+      cultureId: editReqCultureId || undefined,
+      religionId: editReqReligionId || undefined,
+      dependencies:
+        editReqDependencies.size > 0 ? Array.from(editReqDependencies) : undefined,
+      maxPerProvince:
+        editReqMaxPerProvince === ''
+          ? undefined
+          : Math.max(1, Number(editReqMaxPerProvince)),
+    };
+    onUpdateBuildingRequirements(editingBuildingId, requirements);
+    closeEditRequirements();
   };
 
   const handleAddIndustry = () => {
@@ -1595,6 +1654,12 @@ export default function AdminPanel({
                           </button>
                         )}
                         <button
+                          onClick={() => openEditRequirements(building)}
+                          className="h-7 px-2 rounded-lg border border-white/10 bg-black/30 text-white/60 text-[11px] hover:border-emerald-400/40"
+                        >
+                          Критерии
+                        </button>
+                        <button
                           onClick={() => onDeleteBuilding(building.id)}
                           className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
                         >
@@ -1917,6 +1982,226 @@ export default function AdminPanel({
           )}
         </div>
       </div>
+      {editingBuildingId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-[720px] max-w-[92vw] max-h-[90vh] bg-[#0b111b] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <div className="text-white text-lg font-semibold">
+                  Критерии здания
+                </div>
+                <div className="text-white/60 text-sm">
+                  {editingBuilding?.name ?? 'Здание'}
+                </div>
+              </div>
+              <button
+                onClick={closeEditRequirements}
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/70 flex items-center justify-center hover:border-emerald-400/40"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto legend-scroll px-5 py-4 space-y-4">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <div className="text-white/80 text-sm font-semibold">
+                  Требования
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Климат
+                    <select
+                      value={editReqClimateId}
+                      onChange={(event) => setEditReqClimateId(event.target.value)}
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    >
+                      <option value="" className="bg-[#0b111b] text-white">
+                        Не требуется
+                      </option>
+                      {climates.map((climate) => (
+                        <option
+                          key={climate.id}
+                          value={climate.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {climate.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Ландшафт
+                    <select
+                      value={editReqLandscapeId}
+                      onChange={(event) =>
+                        setEditReqLandscapeId(event.target.value)
+                      }
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    >
+                      <option value="" className="bg-[#0b111b] text-white">
+                        Не требуется
+                      </option>
+                      {landscapes.map((landscape) => (
+                        <option
+                          key={landscape.id}
+                          value={landscape.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {landscape.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Культура
+                    <select
+                      value={editReqCultureId}
+                      onChange={(event) => setEditReqCultureId(event.target.value)}
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    >
+                      <option value="" className="bg-[#0b111b] text-white">
+                        Не требуется
+                      </option>
+                      {cultures.map((culture) => (
+                        <option
+                          key={culture.id}
+                          value={culture.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {culture.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Религия
+                    <select
+                      value={editReqReligionId}
+                      onChange={(event) =>
+                        setEditReqReligionId(event.target.value)
+                      }
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    >
+                      <option value="" className="bg-[#0b111b] text-white">
+                        Не требуется
+                      </option>
+                      {religions.map((religion) => (
+                        <option
+                          key={religion.id}
+                          value={religion.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {religion.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Лимит на провинцию
+                    <input
+                      type="number"
+                      min={1}
+                      value={editReqMaxPerProvince}
+                      onChange={(event) =>
+                        setEditReqMaxPerProvince(
+                          event.target.value === ''
+                            ? ''
+                            : Math.max(1, Number(event.target.value) || 1),
+                        )
+                      }
+                      className="w-32 h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-white/70 text-sm">Ресурсы</div>
+                  {resources.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {resources.map((resource) => (
+                        <label
+                          key={resource.id}
+                          className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
+                        >
+                          <span className="flex-1">{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editReqResources[resource.id] ?? 0}
+                            onChange={(event) =>
+                              setEditReqResources((prev) => {
+                                const next = { ...prev };
+                                const value = Math.max(
+                                  0,
+                                  Number(event.target.value) || 0,
+                                );
+                                if (value > 0) next[resource.id] = value;
+                                else delete next[resource.id];
+                                return next;
+                              })
+                            }
+                            className="w-20 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white focus:outline-none focus:border-emerald-400/60"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-white/50 text-sm">Нет ресурсов</div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-white/70 text-sm">Зависимости</div>
+                  {buildings.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {buildings
+                        .filter((b) => b.id !== editingBuildingId)
+                        .map((b) => (
+                          <label
+                            key={b.id}
+                            className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={editReqDependencies.has(b.id)}
+                              onChange={(event) =>
+                                setEditReqDependencies((prev) => {
+                                  const next = new Set(prev);
+                                  if (event.target.checked) next.add(b.id);
+                                  else next.delete(b.id);
+                                  return next;
+                                })
+                              }
+                              className="w-4 h-4 accent-emerald-500"
+                            />
+                            <span>{b.name}</span>
+                          </label>
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-white/50 text-sm">Нет зданий</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-white/10">
+              <button
+                onClick={closeEditRequirements}
+                className="h-9 px-3 rounded-lg border border-white/10 bg-black/30 text-white/60 text-sm hover:border-emerald-400/40"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={saveEditRequirements}
+                className="h-9 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
