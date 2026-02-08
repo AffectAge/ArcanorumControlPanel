@@ -133,6 +133,14 @@ export default function ConstructionModal({
       ? target.countryId
       : companies.find((c) => c.id === target.companyId)?.countryId;
 
+  const progressMap = province.constructionProgress ?? {};
+  const builtList = province.buildingsBuilt ?? [];
+  const provincesList = provinces ? Object.values(provinces) : [province];
+  const isAgreementActive = (agreement: DiplomacyAgreement) => {
+    if (!agreement.durationTurns || agreement.durationTurns <= 0) return true;
+    if (!agreement.startTurn) return true;
+    return turn - agreement.startTurn < agreement.durationTurns;
+  };
   const resolvedStateCountryId =
     stateCountryId || activeCountryId || countries[0]?.id || 'state';
   const owner: BuildingOwner =
@@ -155,14 +163,6 @@ export default function ConstructionModal({
               isAgreementActive(agreement),
           )),
     );
-  const progressMap = province.constructionProgress ?? {};
-  const builtList = province.buildingsBuilt ?? [];
-  const provincesList = provinces ? Object.values(provinces) : [province];
-  const isAgreementActive = (agreement: DiplomacyAgreement) => {
-    if (!agreement.durationTurns || agreement.durationTurns <= 0) return true;
-    if (!agreement.startTurn) return true;
-    return turn - agreement.startTurn < agreement.durationTurns;
-  };
   const hasDiplomaticAccess = (
     building: BuildingDefinition,
     target: BuildingOwner,
