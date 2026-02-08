@@ -34,6 +34,7 @@ import type {
   BuildingOwner,
   TraitCriteria,
   RequirementNode,
+  DiplomacyAgreement,
   EventLogEntry,
   EventCategory,
   EventLogState,
@@ -262,6 +263,9 @@ function App() {
   const [buildings, setBuildings] = useState<BuildingDefinition[]>([]);
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [diplomacyAgreements, setDiplomacyAgreements] = useState<
+    DiplomacyAgreement[]
+  >([]);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -589,6 +593,7 @@ function App() {
       buildings,
       industries,
       companies,
+      diplomacy: diplomacyAgreements,
       settings: gameSettings,
       eventLog,
     }),
@@ -607,6 +612,7 @@ function App() {
       buildings,
       industries,
       companies,
+      diplomacyAgreements,
       gameSettings,
       eventLog,
     ],
@@ -668,6 +674,7 @@ function App() {
     setBuildings(save.data.buildings ?? buildings);
     setIndustries(save.data.industries ?? industries);
     setCompanies(save.data.companies ?? companies);
+    setDiplomacyAgreements(save.data.diplomacy ?? []);
     setGameSettings(
       save.data.settings ?? {
         colonizationPointsPerTurn: 10,
@@ -776,6 +783,7 @@ function App() {
     setBuildings([]);
     setIndustries([]);
     setCompanies([]);
+    setDiplomacyAgreements([]);
     setGameSettings({
       colonizationPointsPerTurn: 10,
       constructionPointsPerTurn: 10,
@@ -1373,6 +1381,31 @@ function App() {
     });
   };
 
+  const addDiplomacyAgreement = (
+    payload: Omit<DiplomacyAgreement, 'id'>,
+    reciprocal: boolean,
+  ) => {
+    setDiplomacyAgreements((prev) => {
+      const next = [...prev, { ...payload, id: createId() }];
+      if (
+        reciprocal &&
+        payload.hostCountryId !== payload.guestCountryId
+      ) {
+        next.push({
+          ...payload,
+          id: createId(),
+          hostCountryId: payload.guestCountryId,
+          guestCountryId: payload.hostCountryId,
+        });
+      }
+      return next;
+    });
+  };
+
+  const deleteDiplomacyAgreement = (id: string) => {
+    setDiplomacyAgreements((prev) => prev.filter((entry) => entry.id !== id));
+  };
+
   const updateBuildingIcon = (id: string, iconDataUrl?: string) => {
     setBuildings((prev) =>
       prev.map((item) => (item.id === id ? { ...item, iconDataUrl } : item)),
@@ -1437,6 +1470,91 @@ function App() {
       if (!province || province.ownerCountryId == null) return prev;
       const building = buildings.find((b) => b.id === buildingId);
       if (!building) return prev;
+      const getOwnerCountryId = (target: BuildingOwner) =>
+        target.type === 'state'
+          ? target.countryId
+          : companies.find((c) => c.id === target.companyId)?.countryId;
+      const hasDiplomacyAccess = () => {
+        const hostId = province.ownerCountryId;
+        const ownerCountryId = getOwnerCountryId(owner);
+        if (!hostId || !ownerCountryId) return false;
+        if (hostId === ownerCountryId) return true;
+        const kind = owner.type === 'state' ? 'state' : 'company';
+        const matches = diplomacyAgreements.filter(
+          (agreement) =>
+            agreement.kind === kind &&
+            agreement.hostCountryId === hostId &&
+            agreement.guestCountryId === ownerCountryId,
+        );
+        if (matches.length === 0) return false;
+
+        const industryAllowed = (agreement: DiplomacyAgreement, id: string) => {
+          if (!agreement.industries || agreement.industries.length === 0) {
+            return true;
+          }
+          const industryId =
+            buildings.find((item) => item.id === id)?.industryId ?? undefined;
+          return Boolean(industryId && agreement.industries.includes(industryId));
+        };
+
+        const countAgreementEntries = (
+          agreements: DiplomacyAgreement[],
+          provinceList: ProvinceData[],
+        ) =>
+          provinceList.reduce((sum, prov) => {
+            const built = (prov.buildingsBuilt ?? []).filter((entry) => {
+              if (entry.owner.type !== kind) return false;
+              const entryCountryId = getOwnerCountryId(entry.owner);
+              if (entryCountryId !== ownerCountryId) return false;
+              return agreements.some((agreement) =>
+                industryAllowed(agreement, entry.buildingId),
+              );
+            }).length;
+            const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
+              (sumProgress, [entryBuildingId, entries]) => {
+                const filtered = entries.filter((entry) => {
+                  if (entry.owner.type !== kind) return false;
+                  const entryCountryId = getOwnerCountryId(entry.owner);
+                  if (entryCountryId !== ownerCountryId) return false;
+                  return agreements.some((agreement) =>
+                    industryAllowed(agreement, entryBuildingId),
+                  );
+                });
+                return sumProgress + filtered.length;
+              },
+              0,
+            );
+            return sum + built + inProgress;
+          }, 0);
+
+        return matches.some((agreement) => {
+          if (!industryAllowed(agreement, buildingId)) return false;
+          const limits = agreement.limits ?? {};
+          const perProvince = limits.perProvince ?? 0;
+          const perCountry = limits.perCountry ?? 0;
+          const global = limits.global ?? 0;
+          if (perProvince > 0) {
+            const count = countAgreementEntries([agreement], [province]);
+            if (count >= perProvince) return false;
+          }
+          if (perCountry > 0) {
+            const hostProvinces = Object.values(prev).filter(
+              (prov) => prov.ownerCountryId === hostId,
+            );
+            const count = countAgreementEntries([agreement], hostProvinces);
+            if (count >= perCountry) return false;
+          }
+          if (global > 0) {
+            const count = countAgreementEntries([agreement], Object.values(prev));
+            if (count >= global) return false;
+          }
+          return true;
+        });
+      };
+
+      if (!hasDiplomacyAccess()) {
+        return prev;
+      }
       const requirements = building.requirements;
       const normalizeTraitCriteria = (
         criteria: TraitCriteria | undefined,
@@ -2211,6 +2329,7 @@ function App() {
         resources={resources}
         companies={companies}
         countries={countries}
+        diplomacyAgreements={diplomacyAgreements}
         activeCountryId={activeCountryId}
         activeCountryPoints={
           countries.find((country) => country.id === activeCountryId)
@@ -2244,6 +2363,7 @@ function App() {
         resources={resources}
         countries={countries}
         companies={companies}
+        diplomacyAgreements={diplomacyAgreements}
         activeCountryId={activeCountryId}
         activeCountryPoints={
           countries.find((country) => country.id === activeCountryId)
@@ -2406,6 +2526,7 @@ function App() {
         buildings={buildings}
         industries={industries}
         companies={companies}
+        diplomacyAgreements={diplomacyAgreements}
         onClose={() => setAdminOpen(false)}
         onAssignOwner={assignOwner}
         onAssignClimate={assignClimate}
@@ -2458,6 +2579,8 @@ function App() {
         onDeleteBuilding={deleteBuilding}
         onDeleteIndustry={deleteIndustry}
         onDeleteCompany={deleteCompany}
+        onAddDiplomacyAgreement={addDiplomacyAgreement}
+        onDeleteDiplomacyAgreement={deleteDiplomacyAgreement}
       />
     </div>
     </EventLogContext.Provider>

@@ -9,6 +9,7 @@ import type {
   TraitCriteria,
   RequirementNode,
   Trait,
+  DiplomacyAgreement,
 } from '../types';
 
 type ConstructionModalProps = {
@@ -20,6 +21,7 @@ type ConstructionModalProps = {
   resources: Trait[];
   companies: Company[];
   countries: Country[];
+  diplomacyAgreements: DiplomacyAgreement[];
   activeCountryId?: string;
   activeCountryPoints: number;
   onClose: () => void;
@@ -36,6 +38,7 @@ export default function ConstructionModal({
   resources,
   companies,
   countries,
+  diplomacyAgreements,
   activeCountryId,
   activeCountryPoints,
   onClose,
@@ -44,9 +47,6 @@ export default function ConstructionModal({
 }: ConstructionModalProps) {
   if (!open || !provinceId || !province) return null;
 
-  const isOwner = Boolean(
-    activeCountryId && province.ownerCountryId === activeCountryId,
-  );
   const [ownerType, setOwnerType] = useState<'state' | 'company'>('state');
   const [companyId, setCompanyId] = useState('');
   const [stateCountryId, setStateCountryId] = useState('');
@@ -131,9 +131,121 @@ export default function ConstructionModal({
     ownerType === 'company' && companyId
       ? { type: 'company', companyId }
       : { type: 'state', countryId: resolvedStateCountryId };
+  const ownerCountryId = getOwnerCountryId(owner);
+  const isController = Boolean(activeCountryId && ownerCountryId === activeCountryId);
+  const hasAnyDiplomaticAccess =
+    Boolean(
+      activeCountryId &&
+        province.ownerCountryId &&
+        (province.ownerCountryId === activeCountryId ||
+          diplomacyAgreements.some(
+            (agreement) =>
+              agreement.hostCountryId === province.ownerCountryId &&
+              agreement.guestCountryId === activeCountryId,
+          )),
+    );
   const progressMap = province.constructionProgress ?? {};
   const builtList = province.buildingsBuilt ?? [];
   const provincesList = provinces ? Object.values(provinces) : [province];
+  const getOwnerCountryId = (target: BuildingOwner) =>
+    target.type === 'state'
+      ? target.countryId
+      : companies.find((c) => c.id === target.companyId)?.countryId;
+  const hasDiplomaticAccess = (
+    building: BuildingDefinition,
+    target: BuildingOwner,
+  ) => {
+    const hostId = province.ownerCountryId;
+    const ownerCountryId = getOwnerCountryId(target);
+    if (!hostId || !ownerCountryId) return false;
+    if (hostId === ownerCountryId) return true;
+    const kind = target.type === 'state' ? 'state' : 'company';
+    const agreements = diplomacyAgreements.filter(
+      (agreement) =>
+        agreement.kind === kind &&
+        agreement.hostCountryId === hostId &&
+        agreement.guestCountryId === ownerCountryId,
+    );
+    if (agreements.length === 0) return false;
+    const industryAllowed = (agreement: DiplomacyAgreement, id: string) => {
+      if (!agreement.industries || agreement.industries.length === 0) return true;
+      const industryId =
+        buildings.find((item) => item.id === id)?.industryId ?? undefined;
+      return Boolean(industryId && agreement.industries.includes(industryId));
+    };
+    const countAgreementEntries = (
+      agreementsToUse: DiplomacyAgreement[],
+      provinceList: ProvinceData[],
+    ) =>
+      provinceList.reduce((sum, prov) => {
+        const built = (prov.buildingsBuilt ?? []).filter((entry) => {
+          if (entry.owner.type !== kind) return false;
+          const entryCountryId = getOwnerCountryId(entry.owner);
+          if (entryCountryId !== ownerCountryId) return false;
+          return agreementsToUse.some((agreement) =>
+            industryAllowed(agreement, entry.buildingId),
+          );
+        }).length;
+        const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
+          (sumProgress, [entryBuildingId, entries]) => {
+            const filtered = entries.filter((entry) => {
+              if (entry.owner.type !== kind) return false;
+              const entryCountryId = getOwnerCountryId(entry.owner);
+              if (entryCountryId !== ownerCountryId) return false;
+              return agreementsToUse.some((agreement) =>
+                industryAllowed(agreement, entryBuildingId),
+              );
+            });
+            return sumProgress + filtered.length;
+          },
+          0,
+        );
+        return sum + built + inProgress;
+      }, 0);
+
+    return agreements.some((agreement) => {
+      if (!industryAllowed(agreement, building.id)) return false;
+      const limits = agreement.limits ?? {};
+      const perProvince = limits.perProvince ?? 0;
+      const perCountry = limits.perCountry ?? 0;
+      const global = limits.global ?? 0;
+      if (perProvince > 0) {
+        const count = countAgreementEntries([agreement], [province]);
+        if (count >= perProvince) return false;
+      }
+      if (perCountry > 0) {
+        const hostProvinces = provincesList.filter(
+          (prov) => prov.ownerCountryId === hostId,
+        );
+        const count = countAgreementEntries([agreement], hostProvinces);
+        if (count >= perCountry) return false;
+      }
+      if (global > 0) {
+        const count = countAgreementEntries([agreement], provincesList);
+        if (count >= global) return false;
+      }
+      return true;
+    });
+  };
+  const getDiplomacyIssue = (
+    building: BuildingDefinition,
+    target: BuildingOwner,
+  ): string | null => {
+    const hostId = province.ownerCountryId;
+    const ownerCountry = getOwnerCountryId(target);
+    if (!hostId || !ownerCountry) return 'Нет владельца провинции';
+    if (hostId === ownerCountry) return null;
+    const kind = target.type === 'state' ? 'state' : 'company';
+    const agreements = diplomacyAgreements.filter(
+      (agreement) =>
+        agreement.kind === kind &&
+        agreement.hostCountryId === hostId &&
+        agreement.guestCountryId === ownerCountry,
+    );
+    if (agreements.length === 0) return 'Нет дипломатического разрешения';
+    if (hasDiplomaticAccess(building, target)) return null;
+    return 'Превышен лимит дипломатического соглашения';
+  };
   const isOwnerAllowed = (building: BuildingDefinition, target: BuildingOwner) => {
     const rules = building.requirements;
     if (!rules?.allowedCountries && !rules?.allowedCompanies) return true;
@@ -186,7 +298,7 @@ export default function ConstructionModal({
         </div>
 
         <div className="p-4 space-y-3 flex-1 min-h-0">
-          {!isOwner && (
+          {!hasAnyDiplomaticAccess && (
             <div className="text-white/60 text-sm border border-white/10 bg-white/5 rounded-xl p-3">
               Строительство доступно только владельцу провинции.
             </div>
@@ -211,8 +323,7 @@ export default function ConstructionModal({
                   ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200'
                   : 'bg-black/30 border-white/10 text-white/60 hover:border-emerald-400/40'
               }`}
-              disabled={!isOwner}
-            >
+                          >
               Компания
             </button>
             {ownerType === 'company' && (
@@ -597,6 +708,10 @@ export default function ConstructionModal({
               if (!ownerAllowed) {
                 issues.other.push('Владелец не может строить это здание');
               }
+              const diplomacyIssue = getDiplomacyIssue(building, owner);
+              if (diplomacyIssue) {
+                issues.other.push(diplomacyIssue);
+              }
               if (requirements?.buildings) {
                 Object.entries(requirements.buildings).forEach(
                   ([depId, constraint]) => {
@@ -685,8 +800,9 @@ export default function ConstructionModal({
                 issues.buildings.length > 0 ||
                 issues.other.length > 0;
               const isInactive = hasIssues || !ownerAllowed;
-              const canStart = isOwner;
-              const canCancel = isOwner && hasProgress;
+              const canStart =
+                isController && hasDiplomaticAccess(building, owner);
+              const canCancel = isController && hasProgress;
 
               return (
                 <div

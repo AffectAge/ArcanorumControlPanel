@@ -23,6 +23,7 @@ export type GameState = {
   buildings?: BuildingDefinition[];
   industries?: Industry[];
   companies?: Company[];
+  diplomacy?: DiplomacyAgreement[];
   settings?: GameSettings;
   eventLog?: EventLogState;
 };
@@ -145,6 +146,19 @@ export type Company = {
   countryId: string;
   iconDataUrl?: string;
   color?: string;
+};
+
+export type DiplomacyAgreement = {
+  id: string;
+  kind: 'company' | 'state';
+  hostCountryId: string;
+  guestCountryId: string;
+  industries?: string[];
+  limits?: {
+    perProvince?: number;
+    perCountry?: number;
+    global?: number;
+  };
 };
 
 export type BuildingOwner =

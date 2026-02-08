@@ -10,6 +10,7 @@ import type {
   TraitCriteria,
   RequirementNode,
   Trait,
+  DiplomacyAgreement,
 } from '../types';
 
 type IndustryModalProps = {
@@ -20,6 +21,7 @@ type IndustryModalProps = {
   countries: Country[];
   companies: Company[];
   resources: Trait[];
+  diplomacyAgreements: DiplomacyAgreement[];
   activeCountryId?: string;
   activeCountryPoints: number;
   demolitionCostPercent: number;
@@ -124,6 +126,8 @@ const isBuildingActiveForProvince = (
   provinces: ProvinceRecord,
   owner: { type: 'state'; countryId: string } | { type: 'company'; companyId: string },
   companies: Company[],
+  diplomacyAgreements: DiplomacyAgreement[],
+  allBuildings: BuildingDefinition[],
 ): boolean => {
   if (!building || !province) return true;
   const requirements = building.requirements;
@@ -327,6 +331,85 @@ const isBuildingActiveForProvince = (
     }
   }
 
+  const hostId = province.ownerCountryId;
+  const ownerCountryId = getOwnerCountryId(owner, companies);
+  if (hostId && ownerCountryId && hostId !== ownerCountryId) {
+    const kind = owner.type === 'state' ? 'state' : 'company';
+    const agreements = diplomacyAgreements.filter(
+      (agreement) =>
+        agreement.kind === kind &&
+        agreement.hostCountryId === hostId &&
+        agreement.guestCountryId === ownerCountryId,
+    );
+    if (agreements.length === 0) return false;
+
+    const industryAllowed = (agreement: DiplomacyAgreement, id: string) => {
+      if (!agreement.industries || agreement.industries.length === 0) return true;
+      const industryId =
+        allBuildings.find((item) => item.id === id)?.industryId ?? undefined;
+      return Boolean(industryId && agreement.industries.includes(industryId));
+    };
+
+    const countAgreementEntries = (
+      agreementsToUse: DiplomacyAgreement[],
+      provinceList: ProvinceData[],
+    ) =>
+      provinceList.reduce((sum, prov) => {
+        const built = (prov.buildingsBuilt ?? []).filter((entry) => {
+          if (entry.owner.type !== kind) return false;
+          const entryCountryId = getOwnerCountryId(entry.owner, companies);
+          if (entryCountryId !== ownerCountryId) return false;
+          return agreementsToUse.some((agreement) =>
+            industryAllowed(agreement, entry.buildingId),
+          );
+        }).length;
+        const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
+          (sumProgress, [entryBuildingId, entries]) => {
+            const filtered = entries.filter((entry) => {
+              if (entry.owner.type !== kind) return false;
+              const entryCountryId = getOwnerCountryId(entry.owner, companies);
+              if (entryCountryId !== ownerCountryId) return false;
+              return agreementsToUse.some((agreement) =>
+                industryAllowed(agreement, entryBuildingId),
+              );
+            });
+            return sumProgress + filtered.length;
+          },
+          0,
+        );
+        return sum + built + inProgress;
+      }, 0);
+
+    const allowed = agreements.some((agreement) => {
+      if (!industryAllowed(agreement, building.id)) return false;
+      const limits = agreement.limits ?? {};
+      const perProvince = limits.perProvince ?? 0;
+      const perCountry = limits.perCountry ?? 0;
+      const global = limits.global ?? 0;
+      if (perProvince > 0) {
+        const count = countAgreementEntries([agreement], [province]);
+        if (count >= perProvince) return false;
+      }
+      if (perCountry > 0) {
+        const hostProvinces = Object.values(provinces).filter(
+          (prov) => prov.ownerCountryId === hostId,
+        );
+        const count = countAgreementEntries([agreement], hostProvinces);
+        if (count >= perCountry) return false;
+      }
+      if (global > 0) {
+        const count = countAgreementEntries(
+          [agreement],
+          Object.values(provinces),
+        );
+        if (count >= global) return false;
+      }
+      return true;
+    });
+
+    if (!allowed) return false;
+  }
+
   return true;
 };
 
@@ -337,6 +420,8 @@ const getInactiveReasons = (
   owner: { type: 'state'; countryId: string } | { type: 'company'; companyId: string },
   companies: Company[],
   resources: Trait[],
+  diplomacyAgreements: DiplomacyAgreement[],
+  allBuildings: BuildingDefinition[],
 ): string[] => {
   if (!building || !province) return [];
   const reasons: string[] = [];
@@ -565,6 +650,88 @@ const getInactiveReasons = (
     }
   }
 
+  const hostId = province.ownerCountryId;
+  const ownerCountryId = getOwnerCountryId(owner, companies);
+  if (hostId && ownerCountryId && hostId !== ownerCountryId) {
+    const kind = owner.type === 'state' ? 'state' : 'company';
+    const agreements = diplomacyAgreements.filter(
+      (agreement) =>
+        agreement.kind === kind &&
+        agreement.hostCountryId === hostId &&
+        agreement.guestCountryId === ownerCountryId,
+    );
+    if (agreements.length === 0) {
+      reasons.push('Нет дипломатического разрешения');
+    } else {
+      const industryAllowed = (agreement: DiplomacyAgreement, id: string) => {
+        if (!agreement.industries || agreement.industries.length === 0) return true;
+        const industryId =
+          allBuildings.find((item) => item.id === id)?.industryId ?? undefined;
+        return Boolean(industryId && agreement.industries.includes(industryId));
+      };
+      const countAgreementEntries = (
+        agreementsToUse: DiplomacyAgreement[],
+        provinceList: ProvinceData[],
+      ) =>
+        provinceList.reduce((sum, prov) => {
+          const built = (prov.buildingsBuilt ?? []).filter((entry) => {
+            if (entry.owner.type !== kind) return false;
+            const entryCountryId = getOwnerCountryId(entry.owner, companies);
+            if (entryCountryId !== ownerCountryId) return false;
+            return agreementsToUse.some((agreement) =>
+              industryAllowed(agreement, entry.buildingId),
+            );
+          }).length;
+          const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
+            (sumProgress, [entryBuildingId, entries]) => {
+              const filtered = entries.filter((entry) => {
+                if (entry.owner.type !== kind) return false;
+                const entryCountryId = getOwnerCountryId(entry.owner, companies);
+                if (entryCountryId !== ownerCountryId) return false;
+                return agreementsToUse.some((agreement) =>
+                  industryAllowed(agreement, entryBuildingId),
+                );
+              });
+              return sumProgress + filtered.length;
+            },
+            0,
+          );
+          return sum + built + inProgress;
+        }, 0);
+
+      const allowed = agreements.some((agreement) => {
+        if (!industryAllowed(agreement, building?.id ?? '')) return false;
+        const limits = agreement.limits ?? {};
+        const perProvince = limits.perProvince ?? 0;
+        const perCountry = limits.perCountry ?? 0;
+        const global = limits.global ?? 0;
+        if (perProvince > 0) {
+          const count = countAgreementEntries([agreement], [province]);
+          if (count >= perProvince) return false;
+        }
+        if (perCountry > 0) {
+          const hostProvinces = Object.values(provinces).filter(
+            (prov) => prov.ownerCountryId === hostId,
+          );
+          const count = countAgreementEntries([agreement], hostProvinces);
+          if (count >= perCountry) return false;
+        }
+        if (global > 0) {
+          const count = countAgreementEntries(
+            [agreement],
+            Object.values(provinces),
+          );
+          if (count >= global) return false;
+        }
+        return true;
+      });
+
+      if (!allowed) {
+        reasons.push('Превышен лимит дипломатического соглашения');
+      }
+    }
+  }
+
   return reasons;
 };
 
@@ -576,6 +743,7 @@ export default function IndustryModal({
   resources,
   countries,
   companies,
+  diplomacyAgreements,
   activeCountryId,
   activeCountryPoints,
   demolitionCostPercent,
@@ -641,6 +809,8 @@ export default function IndustryModal({
           provinces,
           entry.owner,
           companies,
+          diplomacyAgreements,
+          buildings,
         ),
       })),
     );
@@ -663,6 +833,8 @@ export default function IndustryModal({
               provinces,
               entry.owner,
               companies,
+              diplomacyAgreements,
+              buildings,
             ),
           })),
       ),
@@ -691,7 +863,7 @@ export default function IndustryModal({
       }));
 
     return [...builtCards, ...constructionCards, ...emptyCards];
-  }, [rows, filterProvinceId, buildings, provinces, companies]);
+  }, [rows, filterProvinceId, buildings, provinces, companies, diplomacyAgreements]);
 
   const filteredCards = useMemo(() => {
     const filtered = cards.filter((card) => {
@@ -1070,6 +1242,8 @@ export default function IndustryModal({
                     card.owner,
                     companies,
                     resources,
+                    diplomacyAgreements,
+                    buildings,
                   );
                   const isActive = inactiveReasons.length === 0;
                         const baseCost = Math.max(1, building?.cost ?? 1);
@@ -1447,6 +1621,8 @@ export default function IndustryModal({
                     card.owner,
                     companies,
                     resources,
+                    diplomacyAgreements,
+                    buildings,
                   );
                   const isActive = inactiveReasons.length === 0;
                   return (
