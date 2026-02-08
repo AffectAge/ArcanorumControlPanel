@@ -9,6 +9,7 @@ import type {
   ProvinceData,
   TraitCriteria,
   RequirementNode,
+  Trait,
 } from '../types';
 
 type IndustryModalProps = {
@@ -18,6 +19,7 @@ type IndustryModalProps = {
   industries: Industry[];
   countries: Country[];
   companies: Company[];
+  resources: Trait[];
   activeCountryId?: string;
   activeCountryPoints: number;
   demolitionCostPercent: number;
@@ -328,11 +330,250 @@ const isBuildingActiveForProvince = (
   return true;
 };
 
+const getInactiveReasons = (
+  building: BuildingDefinition | undefined,
+  province: ProvinceData | undefined,
+  provinces: ProvinceRecord,
+  owner: { type: 'state'; countryId: string } | { type: 'company'; companyId: string },
+  companies: Company[],
+  resources: Trait[],
+): string[] => {
+  if (!building || !province) return [];
+  const reasons: string[] = [];
+  const requirements = building.requirements;
+  if (!requirements) return reasons;
+
+  if (requirements.logic) {
+    if (!evaluateRequirementNode(requirements.logic, province)) {
+      reasons.push('Логические критерии не выполнены');
+    }
+  } else {
+    const climateReq = normalizeTraitCriteria(
+      requirements.climate,
+      requirements.climateId,
+    );
+    if (
+      climateReq.anyOf.length > 0 &&
+      (!province.climateId || !climateReq.anyOf.includes(province.climateId))
+    ) {
+      reasons.push('Нужен другой климат');
+    }
+    if (
+      climateReq.noneOf.length > 0 &&
+      province.climateId &&
+      climateReq.noneOf.includes(province.climateId)
+    ) {
+      reasons.push('Запрещенный климат');
+    }
+
+    const landscapeReq = normalizeTraitCriteria(
+      requirements.landscape,
+      requirements.landscapeId,
+    );
+    if (
+      landscapeReq.anyOf.length > 0 &&
+      (!province.landscapeId ||
+        !landscapeReq.anyOf.includes(province.landscapeId))
+    ) {
+      reasons.push('Нужен другой ландшафт');
+    }
+    if (
+      landscapeReq.noneOf.length > 0 &&
+      province.landscapeId &&
+      landscapeReq.noneOf.includes(province.landscapeId)
+    ) {
+      reasons.push('Запрещенный ландшафт');
+    }
+
+    const cultureReq = normalizeTraitCriteria(
+      requirements.culture,
+      requirements.cultureId,
+    );
+    if (
+      cultureReq.anyOf.length > 0 &&
+      (!province.cultureId || !cultureReq.anyOf.includes(province.cultureId))
+    ) {
+      reasons.push('Нужна другая культура');
+    }
+    if (
+      cultureReq.noneOf.length > 0 &&
+      province.cultureId &&
+      cultureReq.noneOf.includes(province.cultureId)
+    ) {
+      reasons.push('Запрещенная культура');
+    }
+
+    const religionReq = normalizeTraitCriteria(
+      requirements.religion,
+      requirements.religionId,
+    );
+    if (
+      religionReq.anyOf.length > 0 &&
+      (!province.religionId || !religionReq.anyOf.includes(province.religionId))
+    ) {
+      reasons.push('Нужна другая религия');
+    }
+    if (
+      religionReq.noneOf.length > 0 &&
+      province.religionId &&
+      religionReq.noneOf.includes(province.religionId)
+    ) {
+      reasons.push('Запрещенная религия');
+    }
+  }
+
+  if (requirements.resources) {
+    const amounts = province.resourceAmounts ?? {};
+    const legacyRequired = Object.entries(requirements.resources)
+      .filter(([, value]) => typeof value === 'number' && value > 0)
+      .map(([id]) => id);
+    const required = requirements.resources.anyOf ?? legacyRequired;
+    const forbidden = requirements.resources.noneOf ?? [];
+    if (required.length > 0) {
+      const missing = required.filter((id) => (amounts[id] ?? 0) <= 0);
+      if (missing.length > 0) {
+        const names = missing
+          .map((id) => resources.find((r) => r.id === id)?.name ?? id)
+          .join(', ');
+        reasons.push(`Нет ресурсов: ${names}`);
+      }
+    }
+    if (forbidden.length > 0) {
+      const present = forbidden.filter((id) => (amounts[id] ?? 0) > 0);
+      if (present.length > 0) {
+        const names = present
+          .map((id) => resources.find((r) => r.id === id)?.name ?? id)
+          .join(', ');
+        reasons.push(`Запрещены ресурсы: ${names}`);
+      }
+    }
+  }
+
+  if (requirements.radiation) {
+    const value = province.radiation ?? 0;
+    if (requirements.radiation.min != null && value < requirements.radiation.min) {
+      reasons.push(`Радиация ниже ${requirements.radiation.min}`);
+    }
+    if (requirements.radiation.max != null && value > requirements.radiation.max) {
+      reasons.push(`Радиация выше ${requirements.radiation.max}`);
+    }
+  }
+
+  if (requirements.pollution) {
+    const value = province.pollution ?? 0;
+    if (requirements.pollution.min != null && value < requirements.pollution.min) {
+      reasons.push(`Загрязнение ниже ${requirements.pollution.min}`);
+    }
+    if (requirements.pollution.max != null && value > requirements.pollution.max) {
+      reasons.push(`Загрязнение выше ${requirements.pollution.max}`);
+    }
+  }
+
+  if (requirements.buildings) {
+    const provinceCount = (depId: string) =>
+      province.buildingsBuilt?.filter((entry) => entry.buildingId === depId)
+        .length ?? 0;
+    const ownerCountryId = getOwnerCountryId(owner, companies);
+    const countryCount = (depId: string) =>
+      ownerCountryId
+        ? Object.values(provinces).reduce((sum, prov) => {
+            const list = prov.buildingsBuilt ?? [];
+            return (
+              sum +
+              list.filter((entry) => {
+                if (entry.buildingId !== depId) return false;
+                if (entry.owner.type === 'state') {
+                  return entry.owner.countryId === ownerCountryId;
+                }
+                const companyCountry = companies.find(
+                  (c) => c.id === entry.owner.companyId,
+                )?.countryId;
+                return companyCountry === ownerCountryId;
+              }).length
+            );
+          }, 0)
+        : 0;
+    const globalCount = (depId: string) =>
+      Object.values(provinces).reduce(
+        (sum, prov) =>
+          sum +
+          (prov.buildingsBuilt ?? []).filter(
+            (entry) => entry.buildingId === depId,
+          ).length,
+        0,
+      );
+
+    Object.entries(requirements.buildings).forEach(([depId, constraint]) => {
+      const name = building?.name ?? depId;
+      const provinceRule = (constraint as any).province ?? constraint;
+      const countryRule = (constraint as any).country;
+      const globalRule = (constraint as any).global;
+      const pCount = provinceCount(depId);
+      const cCount = countryCount(depId);
+      const gCount = globalCount(depId);
+      if (provinceRule?.min != null && pCount < provinceRule.min) {
+        reasons.push(`Провинция: нужно ${provinceRule.min} "${name}"`);
+      }
+      if (provinceRule?.max != null && pCount > provinceRule.max) {
+        reasons.push(`Провинция: не больше ${provinceRule.max} "${name}"`);
+      }
+      if (countryRule?.min != null && cCount < countryRule.min) {
+        reasons.push(`Государство: нужно ${countryRule.min} "${name}"`);
+      }
+      if (countryRule?.max != null && cCount > countryRule.max) {
+        reasons.push(`Государство: не больше ${countryRule.max} "${name}"`);
+      }
+      if (globalRule?.min != null && gCount < globalRule.min) {
+        reasons.push(`Мир: нужно ${globalRule.min} "${name}"`);
+      }
+      if (globalRule?.max != null && gCount > globalRule.max) {
+        reasons.push(`Мир: не больше ${globalRule.max} "${name}"`);
+      }
+    });
+  } else if (requirements.dependencies) {
+    const ok = requirements.dependencies.every(
+      (depId) =>
+        province.buildingsBuilt?.filter((entry) => entry.buildingId === depId)
+          .length ?? 0 > 0,
+    );
+    if (!ok) reasons.push('Нет требуемых зданий');
+  }
+
+  if (requirements.allowedCountries || requirements.allowedCompanies) {
+    if (owner.type === 'state') {
+      const mode = requirements.allowedCountriesMode ?? 'allow';
+      const list = requirements.allowedCountries ?? [];
+      if (list.length === 0) {
+        if (mode === 'allow') reasons.push('Страна не разрешена');
+      } else {
+        const included = list.includes(owner.countryId);
+        if ((mode === 'allow' && !included) || (mode === 'deny' && included)) {
+          reasons.push('Страна не разрешена');
+        }
+      }
+    } else {
+      const mode = requirements.allowedCompaniesMode ?? 'allow';
+      const list = requirements.allowedCompanies ?? [];
+      if (list.length === 0) {
+        if (mode === 'allow') reasons.push('Компания не разрешена');
+      } else {
+        const included = list.includes(owner.companyId);
+        if ((mode === 'allow' && !included) || (mode === 'deny' && included)) {
+          reasons.push('Компания не разрешена');
+        }
+      }
+    }
+  }
+
+  return reasons;
+};
+
 export default function IndustryModal({
   open,
   provinces,
   buildings,
   industries,
+  resources,
   countries,
   companies,
   activeCountryId,
@@ -822,13 +1063,15 @@ export default function IndustryModal({
                         const building = buildings.find((b) => b.id === card.buildingId);
                         const country = countries.find((c) => c.id === card.countryId);
                         const activeProvince = provinces[card.provinceId];
-                        const isActive = isBuildingActiveForProvince(
-                          building,
-                          activeProvince,
-                          provinces,
-                          card.owner,
-                          companies,
-                        );
+                  const inactiveReasons = getInactiveReasons(
+                    building,
+                    activeProvince,
+                    provinces,
+                    card.owner,
+                    companies,
+                    resources,
+                  );
+                  const isActive = inactiveReasons.length === 0;
                         const baseCost = Math.max(1, building?.cost ?? 1);
                         const demolishCost = Math.ceil(
                           (baseCost * (demolitionCostPercent ?? 0)) / 100,
@@ -886,13 +1129,16 @@ export default function IndustryModal({
                                   <div className="text-white/80 text-sm font-semibold flex items-center gap-2">
                                     <span>{building?.name ?? card.buildingId}</span>
                                     {!isActive && (
-                                      <span className="px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
-									  Неактивное
+                                      <span className="relative group px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
+                                        ??????????
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                          {inactiveReasons.join(', ')}
+                                        </span>
                                       </span>
                                     )}
                                   </div>
                                   <div className="text-white/40 text-xs">
-                                    Стоимость: {Math.max(1, building?.cost ?? 1)}
+                                    ?????????: {Math.max(1, building?.cost ?? 1)}
                                   </div>
                                   {card.kind === 'construction' && (
                                     <div className="mt-2">
@@ -903,7 +1149,7 @@ export default function IndustryModal({
                                         />
                                       </div>
                                       <div className="text-white/50 text-[11px] mt-1">
-                                        Прогресс: {progressPercent}%
+                                        ????????: {progressPercent}%
                                       </div>
                                     </div>
                                   )}
@@ -916,13 +1162,12 @@ export default function IndustryModal({
                                       setCancelTarget({
                                         provinceId: card.provinceId,
                                         buildingId: card.buildingId,
-                                        buildingName:
-                                          building?.name ?? card.buildingId,
+                                        buildingName: building?.name ?? card.buildingId,
                                         index: card.index,
                                       })
                                     }
                                     className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="Отменить строительство"
+                                    title="???????? ?????????????"
                                   >
                                     <X className="w-4 h-4" />
                                   </button>
@@ -933,19 +1178,18 @@ export default function IndustryModal({
                                       setConfirmTarget({
                                         provinceId: card.provinceId,
                                         buildingId: card.buildingId,
-                                        buildingName:
-                                          building?.name ?? card.buildingId,
+                                        buildingName: building?.name ?? card.buildingId,
                                         cost: demolishCost,
                                       });
                                     }}
                                     className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="Снести"
+                                    title="??????"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
                                 )}
                               </div>
-                            </div>
+</div>
                             <div className="flex flex-col gap-2 text-white/60 text-xs">
                               {industry && (
                                 <div className="flex items-center gap-2">
@@ -1196,13 +1440,15 @@ export default function IndustryModal({
                       : undefined;
                   const isEditing = ownerEditor?.key === card.key;
                   const activeProvince = provinces[card.provinceId];
-                  const isActive = isBuildingActiveForProvince(
+                  const inactiveReasons = getInactiveReasons(
                     building,
                     activeProvince,
                     provinces,
                     card.owner,
                     companies,
+                    resources,
                   );
+                  const isActive = inactiveReasons.length === 0;
                   return (
                     <div
                       key={card.key}
@@ -1215,81 +1461,83 @@ export default function IndustryModal({
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                        {building?.iconDataUrl ? (
-                          <img
-                            src={building.iconDataUrl}
-                            alt=""
-                            className="w-12 h-12 rounded-lg object-cover border border-white/10"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center">
-                            <Factory className="w-5 h-5 text-white/60" />
-                          </div>
-                        )}
-                        <div>
-                          <div className="text-white/80 text-sm font-semibold flex items-center gap-2">
-                            <span>{building?.name ?? card.buildingId}</span>
-                            {!isActive && (
-                              <span className="px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
-                                Неактивное
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-white/40 text-xs">
-                            Стоимость: {Math.max(1, building?.cost ?? 1)}
-                          </div>
-                          {card.kind === 'construction' && (
-                            <div className="mt-2">
-                              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                                <div
-                                  className="h-full bg-emerald-400/70"
-                                  style={{ width: `${progressPercent}%` }}
-                                />
+                              <div className="flex items-center gap-3">
+                                {building?.iconDataUrl ? (
+                                  <img
+                                    src={building.iconDataUrl}
+                                    alt=""
+                                    className="w-12 h-12 rounded-lg object-cover border border-white/10"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center">
+                                    <Factory className="w-5 h-5 text-white/60" />
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="text-white/80 text-sm font-semibold flex items-center gap-2">
+                                    <span>{building?.name ?? card.buildingId}</span>
+                                    {!isActive && (
+                                      <span className="relative group px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
+                                        ??????????
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                          {inactiveReasons.join(', ')}
+                                        </span>
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-white/40 text-xs">
+                                    ?????????: {Math.max(1, building?.cost ?? 1)}
+                                  </div>
+                                  {card.kind === 'construction' && (
+                                    <div className="mt-2">
+                                      <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                                        <div
+                                          className="h-full bg-emerald-400/70"
+                                          style={{ width: `${progressPercent}%` }}
+                                        />
+                                      </div>
+                                      <div className="text-white/50 text-[11px] mt-1">
+                                        ????????: {progressPercent}%
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-white/50 text-[11px] mt-1">
-                                Прогресс: {progressPercent}%
+                              <div className="flex items-center gap-2">
+                                {card.kind === 'construction' && (
+                                  <button
+                                    onClick={() =>
+                                      setCancelTarget({
+                                        provinceId: card.provinceId,
+                                        buildingId: card.buildingId,
+                                        buildingName: building?.name ?? card.buildingId,
+                                        index: card.index,
+                                      })
+                                    }
+                                    className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                                    title="???????? ?????????????"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {card.kind === 'built' && (
+                                  <button
+                                    onClick={() => {
+                                      setConfirmTarget({
+                                        provinceId: card.provinceId,
+                                        buildingId: card.buildingId,
+                                        buildingName: building?.name ?? card.buildingId,
+                                        cost: demolishCost,
+                                      });
+                                    }}
+                                    className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                                    title="??????"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
-                            </div>
-                          )}
-                        </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div />
-                          {card.kind === 'construction' && (
-                            <button
-                              onClick={() =>
-                                setCancelTarget({
-                                  provinceId: card.provinceId,
-                                  buildingId: card.buildingId,
-                                  buildingName: building?.name ?? card.buildingId,
-                                  index: card.index,
-                                })
-                              }
-                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                              title="Отменить строительство"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          )}
-                          {card.kind === 'built' && (
-                            <button
-                              onClick={() => {
-                                setConfirmTarget({
-                                  provinceId: card.provinceId,
-                                  buildingId: card.buildingId,
-                                  buildingName: building?.name ?? card.buildingId,
-                                  cost: demolishCost,
-                                });
-                              }}
-                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                              title="Снести"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
+</div>
                       <div className="flex flex-col gap-2 text-white/60 text-xs">
                         {industry && (
                           <div className="flex items-center gap-2">

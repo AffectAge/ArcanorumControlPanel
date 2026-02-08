@@ -2241,6 +2241,7 @@ function App() {
         provinces={provinces}
         buildings={buildings}
         industries={industries}
+        resources={resources}
         countries={countries}
         companies={companies}
         activeCountryId={activeCountryId}
