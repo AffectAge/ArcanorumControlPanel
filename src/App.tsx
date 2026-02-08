@@ -67,6 +67,13 @@ const pollutionColor = (value: number) => {
   return `hsl(${hue} 60% ${65 - t * 25}%)`;
 };
 
+const fertilityColor = (value: number) => {
+  const t = clamp01(value / 100);
+  const hue = 35 + 85 * t;
+  const lightness = 40 + t * 30;
+  return `hsl(${hue} 55% ${lightness}%)`;
+};
+
 const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
   const next: ProvinceRecord = { ...record };
   Object.values(next).forEach((province) => {
@@ -211,9 +218,12 @@ const initialMapLayers: MapLayer[] = [
   { id: 'political', name: 'Политическая', visible: true },
   { id: 'cultural', name: 'Культурная', visible: false },
   { id: 'landscape', name: 'Ландшафт', visible: false },
+  { id: 'continent', name: 'Континент', visible: false },
+  { id: 'region', name: 'Регион', visible: false },
   { id: 'climate', name: 'Климат', visible: false },
   { id: 'religion', name: 'Религии', visible: false },
   { id: 'resources', name: 'Ресурсы', visible: false },
+  { id: 'fertility', name: 'Плодородность', visible: false },
   { id: 'radiation', name: 'Радиация', visible: false },
   { id: 'pollution', name: 'Загрязнения', visible: false },
   { id: 'colonization', name: 'Колонизация', visible: false },
@@ -273,6 +283,8 @@ function App() {
     { id: createId(), name: 'Равнина', color: '#22c55e' },
     { id: createId(), name: 'Горы', color: '#10b981' },
   ]);
+  const [continents, setContinents] = useState<Trait[]>([]);
+  const [regions, setRegions] = useState<Trait[]>([]);
   const [cultures, setCultures] = useState<Trait[]>([
     { id: createId(), name: 'Северяне', color: '#fb7185' },
     { id: createId(), name: 'Южане', color: '#f97316' },
@@ -760,6 +772,8 @@ function App() {
       climates,
       religions,
       landscapes,
+      continents,
+      regions,
       cultures,
       resources,
       buildings,
@@ -780,6 +794,8 @@ function App() {
       climates,
       religions,
       landscapes,
+      continents,
+      regions,
       cultures,
       resources,
       buildings,
@@ -849,6 +865,8 @@ function App() {
     setClimates(save.data.climates ?? climates);
     setReligions(save.data.religions ?? religions);
     setLandscapes(save.data.landscapes ?? landscapes);
+    setContinents(save.data.continents ?? continents);
+    setRegions(save.data.regions ?? regions);
     setCultures(save.data.cultures ?? cultures);
     setResources(save.data.resources ?? resources);
     setBuildings(save.data.buildings ?? buildings);
@@ -970,6 +988,8 @@ function App() {
       { id: createId(), name: 'Равнина', color: '#22c55e' },
       { id: createId(), name: 'Горы', color: '#10b981' },
     ]);
+    setContinents([]);
+    setRegions([]);
     setCultures([
       { id: createId(), name: 'Северяне', color: '#fb7185' },
       { id: createId(), name: 'Южане', color: '#f97316' },
@@ -986,6 +1006,19 @@ function App() {
       demolitionCostPercent: 20,
       eventLogRetainTurns: 3,
       diplomacyProposalExpireTurns: 3,
+      startingColonizationPoints: 100,
+      startingConstructionPoints: 100,
+      sciencePointsPerTurn: 0,
+      culturePointsPerTurn: 0,
+      religionPointsPerTurn: 0,
+      goldPerTurn: 0,
+      ducatsPerTurn: 0,
+      startingSciencePoints: 0,
+      startingCulturePoints: 0,
+      startingReligionPoints: 0,
+      startingGold: 0,
+      startingDucats: 100000,
+      colonizationMaxActive: 0,
     });
     setEventLog(createDefaultLog());
     setHotseatOpen(false);
@@ -1013,6 +1046,7 @@ function App() {
             religionId: religions.find((r) => r.color === religionColor)?.id,
             radiation: 0,
             pollution: 0,
+            fertility: 0,
             resourceAmounts: {},
             colonizationCost: 100,
             colonizationProgress: {},
@@ -1064,6 +1098,10 @@ function App() {
           existing.pollution = 0;
           updated = true;
         }
+        if (existing.fertility == null) {
+          existing.fertility = 0;
+          updated = true;
+        }
         if (updated) changed = true;
       });
       return changed ? next : prev;
@@ -1098,6 +1136,20 @@ function App() {
           paint.landscape[province.id] = landscape.color;
         }
       }
+      if (province.continentId) {
+        const continent = continents.find((c) => c.id === province.continentId);
+        if (continent) {
+          paint.continent ??= {};
+          paint.continent[province.id] = continent.color;
+        }
+      }
+      if (province.regionId) {
+        const region = regions.find((r) => r.id === province.regionId);
+        if (region) {
+          paint.region ??= {};
+          paint.region[province.id] = region.color;
+        }
+      }
       if (province.climateId) {
         const climate = climates.find((c) => c.id === province.climateId);
         if (climate) {
@@ -1115,6 +1167,10 @@ function App() {
       if (province.radiation != null) {
         paint.radiation ??= {};
         paint.radiation[province.id] = radiationColor(province.radiation);
+      }
+      if (province.fertility != null) {
+        paint.fertility ??= {};
+        paint.fertility[province.id] = fertilityColor(province.fertility);
       }
       if (province.pollution != null) {
         paint.pollution ??= {};
@@ -1140,6 +1196,8 @@ function App() {
     climates,
     religions,
     landscapes,
+    continents,
+    regions,
     cultures,
     resources,
     selectedResourceId,
@@ -1240,6 +1298,14 @@ function App() {
       label: item.name,
       color: item.color,
     }));
+    legends.continent = continents.map((item) => ({
+      label: item.name,
+      color: item.color,
+    }));
+    legends.region = regions.map((item) => ({
+      label: item.name,
+      color: item.color,
+    }));
     legends.cultural = cultures.map((item) => ({
       label: item.name,
       color: item.color,
@@ -1263,6 +1329,13 @@ function App() {
         color: radiationColor(from),
       };
     });
+    legends.fertility = envSteps.slice(0, -1).map((from, index) => {
+      const to = envSteps[index + 1];
+      return {
+        label: `${from}-${to}%`,
+        color: fertilityColor(from),
+      };
+    });
     legends.pollution = envSteps.slice(0, -1).map((from, index) => {
       const to = envSteps[index + 1];
       return {
@@ -1271,7 +1344,17 @@ function App() {
       };
     });
     return legends;
-  }, [climates, religions, landscapes, cultures, resources, selectedResourceId, countries]);
+  }, [
+    climates,
+    religions,
+    landscapes,
+    continents,
+    regions,
+    cultures,
+    resources,
+    selectedResourceId,
+    countries,
+  ]);
 
   const selectedProvince = selectedProvinceId
     ? provinces[selectedProvinceId]
@@ -1338,6 +1421,28 @@ function App() {
     }));
   };
 
+  const assignContinent = (provinceId: string, continentId?: string) => {
+    setProvinces((prev) => ({
+      ...prev,
+      [provinceId]: {
+        ...(prev[provinceId] as ProvinceData),
+        id: provinceId,
+        continentId,
+      },
+    }));
+  };
+
+  const assignRegion = (provinceId: string, regionId?: string) => {
+    setProvinces((prev) => ({
+      ...prev,
+      [provinceId]: {
+        ...(prev[provinceId] as ProvinceData),
+        id: provinceId,
+        regionId,
+      },
+    }));
+  };
+
   const assignCulture = (provinceId: string, cultureId?: string) => {
     setProvinces((prev) => ({
       ...prev,
@@ -1378,6 +1483,17 @@ function App() {
         ...(prev[provinceId] as ProvinceData),
         id: provinceId,
         pollution: value,
+      },
+    }));
+  };
+
+  const setFertility = (provinceId: string, value: number) => {
+    setProvinces((prev) => ({
+      ...prev,
+      [provinceId]: {
+        ...(prev[provinceId] as ProvinceData),
+        id: provinceId,
+        fertility: value,
       },
     }));
   };
@@ -1468,6 +1584,14 @@ function App() {
 
   const addLandscape = (name: string, color: string) => {
     setLandscapes((prev) => [...prev, { id: createId(), name, color }]);
+  };
+
+  const addContinent = (name: string, color: string) => {
+    setContinents((prev) => [...prev, { id: createId(), name, color }]);
+  };
+
+  const addRegion = (name: string, color: string) => {
+    setRegions((prev) => [...prev, { id: createId(), name, color }]);
   };
 
   const addCulture = (name: string, color: string, iconDataUrl?: string) => {
@@ -2400,6 +2524,32 @@ function App() {
     });
   };
 
+  const deleteContinent = (id: string) => {
+    setContinents((prev) => prev.filter((c) => c.id !== id));
+    setProvinces((prev) => {
+      const next: ProvinceRecord = { ...prev };
+      Object.values(next).forEach((province) => {
+        if (province.continentId === id) {
+          province.continentId = undefined;
+        }
+      });
+      return next;
+    });
+  };
+
+  const deleteRegion = (id: string) => {
+    setRegions((prev) => prev.filter((r) => r.id !== id));
+    setProvinces((prev) => {
+      const next: ProvinceRecord = { ...prev };
+      Object.values(next).forEach((province) => {
+        if (province.regionId === id) {
+          province.regionId = undefined;
+        }
+      });
+      return next;
+    });
+  };
+
   const deleteCulture = (id: string) => {
     setCultures((prev) => prev.filter((c) => c.id !== id));
     setProvinces((prev) => {
@@ -2634,6 +2784,18 @@ function App() {
                   ?.name
               : undefined
           }
+          continent={
+            selectedProvinceId
+              ? continents.find((c) => c.id === provinces[selectedProvinceId]?.continentId)
+                  ?.name
+              : undefined
+          }
+          region={
+            selectedProvinceId
+              ? regions.find((r) => r.id === provinces[selectedProvinceId]?.regionId)
+                  ?.name
+              : undefined
+          }
           religion={
             selectedProvinceId
               ? religions.find((r) => r.id === provinces[selectedProvinceId]?.religionId)
@@ -2667,6 +2829,11 @@ function App() {
           pollution={
             selectedProvinceId
               ? provinces[selectedProvinceId]?.pollution ?? 0
+              : undefined
+          }
+          fertility={
+            selectedProvinceId
+              ? provinces[selectedProvinceId]?.fertility ?? 0
               : undefined
           }
           colonizationAllowed={
@@ -2999,6 +3166,8 @@ function App() {
         climates={climates}
         religions={religions}
         landscapes={landscapes}
+        continents={continents}
+        regions={regions}
         cultures={cultures}
         resources={resources}
         buildings={buildings}
@@ -3009,15 +3178,20 @@ function App() {
         onAssignClimate={assignClimate}
         onAssignReligion={assignReligion}
         onAssignLandscape={assignLandscape}
+        onAssignContinent={assignContinent}
+        onAssignRegion={assignRegion}
         onAssignCulture={assignCulture}
         onSetProvinceResourceAmount={setProvinceResourceAmount}
         onSetColonizationCost={setColonizationCost}
         onSetColonizationDisabled={setColonizationDisabled}
         onSetRadiation={setRadiation}
         onSetPollution={setPollution}
+        onSetFertility={setFertility}
         onAddClimate={addClimate}
         onAddReligion={addReligion}
         onAddLandscape={addLandscape}
+        onAddContinent={addContinent}
+        onAddRegion={addRegion}
         onAddCulture={addCulture}
         onAddResource={addResource}
         onAddBuilding={addBuilding}
@@ -3042,6 +3216,12 @@ function App() {
         onUpdateLandscapeColor={(id, color) =>
           updateTraitColor(setLandscapes, id, color)
         }
+        onUpdateContinentColor={(id, color) =>
+          updateTraitColor(setContinents, id, color)
+        }
+        onUpdateRegionColor={(id, color) =>
+          updateTraitColor(setRegions, id, color)
+        }
         onUpdateCultureColor={(id, color) =>
           updateTraitColor(setCultures, id, color)
         }
@@ -3051,6 +3231,8 @@ function App() {
         onDeleteClimate={deleteClimate}
         onDeleteReligion={deleteReligion}
         onDeleteLandscape={deleteLandscape}
+        onDeleteContinent={deleteContinent}
+        onDeleteRegion={deleteRegion}
         onDeleteCulture={deleteCulture}
         onDeleteResource={deleteResource}
         onDeleteBuilding={deleteBuilding}

@@ -75,7 +75,11 @@ export default function ConstructionModal({
             ? province.landscapeId
             : node.category === 'culture'
               ? province.cultureId
-              : province.religionId;
+              : node.category === 'religion'
+                ? province.religionId
+                : node.category === 'continent'
+                  ? province.continentId
+                  : province.regionId;
       return Boolean(key && key === node.id);
     }
     if (node.op === 'and') {
@@ -731,6 +735,43 @@ export default function ConstructionModal({
                   religionReq.noneOf.includes(province.religionId)
                 ) {
                   issues.logic.push('Запрещенная религия');
+                }
+
+                const continentReq = normalizeTraitCriteria(
+                  requirements?.continent,
+                  requirements?.continentId,
+                );
+                if (
+                  continentReq.anyOf.length > 0 &&
+                  (!province.continentId ||
+                    !continentReq.anyOf.includes(province.continentId))
+                ) {
+                  issues.logic.push('Нужен другой континент');
+                }
+                if (
+                  continentReq.noneOf.length > 0 &&
+                  province.continentId &&
+                  continentReq.noneOf.includes(province.continentId)
+                ) {
+                  issues.logic.push('Запрещенный континент');
+                }
+
+                const regionReq = normalizeTraitCriteria(
+                  requirements?.region,
+                  requirements?.regionId,
+                );
+                if (
+                  regionReq.anyOf.length > 0 &&
+                  (!province.regionId || !regionReq.anyOf.includes(province.regionId))
+                ) {
+                  issues.logic.push('Нужен другой регион');
+                }
+                if (
+                  regionReq.noneOf.length > 0 &&
+                  province.regionId &&
+                  regionReq.noneOf.includes(province.regionId)
+                ) {
+                  issues.logic.push('Запрещенный регион');
                 }
               }
               if (requirements?.resources) {

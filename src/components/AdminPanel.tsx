@@ -7,6 +7,8 @@ import {
   Cloud,
   Landmark,
   Mountain,
+  Globe2,
+  Map,
   Palette,
   Package,
   Sliders,
@@ -31,6 +33,8 @@ type AdminTab =
   | 'climates'
   | 'religions'
   | 'landscapes'
+  | 'continents'
+  | 'regions'
   | 'cultures'
   | 'resources'
   | 'buildings'
@@ -45,6 +49,8 @@ type AdminPanelProps = {
   climates: Trait[];
   religions: Trait[];
   landscapes: Trait[];
+  continents: Trait[];
+  regions: Trait[];
   cultures: Trait[];
   resources: Trait[];
   buildings: BuildingDefinition[];
@@ -55,6 +61,8 @@ type AdminPanelProps = {
   onAssignClimate: (provinceId: string, climateId?: string) => void;
   onAssignReligion: (provinceId: string, religionId?: string) => void;
   onAssignLandscape: (provinceId: string, landscapeId?: string) => void;
+  onAssignContinent: (provinceId: string, continentId?: string) => void;
+  onAssignRegion: (provinceId: string, regionId?: string) => void;
   onAssignCulture: (provinceId: string, cultureId?: string) => void;
   onSetProvinceResourceAmount: (
     provinceId: string,
@@ -65,9 +73,12 @@ type AdminPanelProps = {
   onSetColonizationDisabled: (provinceId: string, disabled: boolean) => void;
   onSetRadiation: (provinceId: string, value: number) => void;
   onSetPollution: (provinceId: string, value: number) => void;
+  onSetFertility: (provinceId: string, value: number) => void;
   onAddClimate: (name: string, color: string) => void;
   onAddReligion: (name: string, color: string, iconDataUrl?: string) => void;
   onAddLandscape: (name: string, color: string) => void;
+  onAddContinent: (name: string, color: string) => void;
+  onAddRegion: (name: string, color: string) => void;
   onAddCulture: (name: string, color: string, iconDataUrl?: string) => void;
   onAddResource: (name: string, color: string, iconDataUrl?: string) => void;
   onAddBuilding: (
@@ -100,11 +111,15 @@ type AdminPanelProps = {
   onUpdateClimateColor: (id: string, color: string) => void;
   onUpdateReligionColor: (id: string, color: string) => void;
   onUpdateLandscapeColor: (id: string, color: string) => void;
+  onUpdateContinentColor: (id: string, color: string) => void;
+  onUpdateRegionColor: (id: string, color: string) => void;
   onUpdateCultureColor: (id: string, color: string) => void;
   onUpdateResourceColor: (id: string, color: string) => void;
   onDeleteClimate: (id: string) => void;
   onDeleteReligion: (id: string) => void;
   onDeleteLandscape: (id: string) => void;
+  onDeleteContinent: (id: string) => void;
+  onDeleteRegion: (id: string) => void;
   onDeleteCulture: (id: string) => void;
   onDeleteResource: (id: string) => void;
   onDeleteBuilding: (id: string) => void;
@@ -122,6 +137,8 @@ export default function AdminPanel({
   climates,
   religions,
   landscapes,
+  continents,
+  regions,
   cultures,
   resources,
   buildings,
@@ -132,15 +149,20 @@ export default function AdminPanel({
   onAssignClimate,
   onAssignReligion,
   onAssignLandscape,
+  onAssignContinent,
+  onAssignRegion,
   onAssignCulture,
   onSetProvinceResourceAmount,
   onSetColonizationCost,
   onSetColonizationDisabled,
   onSetRadiation,
   onSetPollution,
+  onSetFertility,
   onAddClimate,
   onAddReligion,
   onAddLandscape,
+  onAddContinent,
+  onAddRegion,
   onAddCulture,
   onAddResource,
   onAddBuilding,
@@ -159,11 +181,15 @@ export default function AdminPanel({
   onUpdateClimateColor,
   onUpdateReligionColor,
   onUpdateLandscapeColor,
+  onUpdateContinentColor,
+  onUpdateRegionColor,
   onUpdateCultureColor,
   onUpdateResourceColor,
   onDeleteClimate,
   onDeleteReligion,
   onDeleteLandscape,
+  onDeleteContinent,
+  onDeleteRegion,
   onDeleteCulture,
   onDeleteResource,
   onDeleteBuilding,
@@ -179,6 +205,10 @@ export default function AdminPanel({
   const [religionIcon, setReligionIcon] = useState<string | undefined>(undefined);
   const [landscapeName, setLandscapeName] = useState('');
   const [landscapeColor, setLandscapeColor] = useState('#22c55e');
+  const [continentName, setContinentName] = useState('');
+  const [continentColor, setContinentColor] = useState('#22c55e');
+  const [regionName, setRegionName] = useState('');
+  const [regionColor, setRegionColor] = useState('#22c55e');
   const [cultureName, setCultureName] = useState('');
   const [cultureColor, setCultureColor] = useState('#fb7185');
   const [cultureIcon, setCultureIcon] = useState<string | undefined>(undefined);
@@ -276,6 +306,20 @@ export default function AdminPanel({
     setLandscapeName('');
   };
 
+  const handleAddContinent = () => {
+    const name = continentName.trim();
+    if (!name) return;
+    onAddContinent(name, continentColor);
+    setContinentName('');
+  };
+
+  const handleAddRegion = () => {
+    const name = regionName.trim();
+    if (!name) return;
+    onAddRegion(name, regionColor);
+    setRegionName('');
+  };
+
   const handleAddCulture = () => {
     const name = cultureName.trim();
     if (!name) return;
@@ -312,7 +356,13 @@ export default function AdminPanel({
   const openEditRequirements = (building: BuildingDefinition) => {
     const requirements = building.requirements;
     const buildTraitNode = (
-      category: 'climate' | 'landscape' | 'culture' | 'religion',
+      category:
+        | 'climate'
+        | 'landscape'
+        | 'culture'
+        | 'religion'
+        | 'continent'
+        | 'region',
       criteria?: TraitCriteria,
       legacyId?: string,
     ): RequirementNode | undefined => {
@@ -383,6 +433,18 @@ export default function AdminPanel({
       requirements?.religionId,
     );
     if (religionNode) legacyNodes.push(religionNode);
+    const continentNode = buildTraitNode(
+      'continent',
+      requirements?.continent,
+      requirements?.continentId,
+    );
+    if (continentNode) legacyNodes.push(continentNode);
+    const regionNode = buildTraitNode(
+      'region',
+      requirements?.region,
+      requirements?.regionId,
+    );
+    if (regionNode) legacyNodes.push(regionNode);
     const derivedLogic =
       requirements?.logic ??
       (legacyNodes.length > 0
@@ -598,12 +660,20 @@ export default function AdminPanel({
     reader.readAsDataURL(file);
   };
 
-  type TraitCategory = 'climate' | 'landscape' | 'culture' | 'religion';
+  type TraitCategory =
+    | 'climate'
+    | 'landscape'
+    | 'culture'
+    | 'religion'
+    | 'continent'
+    | 'region';
   const traitOptions: Record<TraitCategory, Trait[]> = {
     climate: climates,
     landscape: landscapes,
     culture: cultures,
     religion: religions,
+    continent: continents,
+    region: regions,
   };
 
   const updateNodeAt = (
@@ -737,6 +807,12 @@ export default function AdminPanel({
             </option>
             <option value="religion" className="bg-[#0b111b] text-white">
               Религия
+            </option>
+            <option value="continent" className="bg-[#0b111b] text-white">
+              Континент
+            </option>
+            <option value="region" className="bg-[#0b111b] text-white">
+              Регион
             </option>
           </select>
           <select
@@ -965,6 +1041,28 @@ export default function AdminPanel({
             Ландшафт
           </button>
           <button
+            onClick={() => setTab('continents')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'continents'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Globe2 className="w-4 h-4" />
+            Континенты
+          </button>
+          <button
+            onClick={() => setTab('regions')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'regions'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Map className="w-4 h-4" />
+            Регионы
+          </button>
+          <button
             onClick={() => setTab('cultures')}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
               tab === 'cultures'
@@ -1167,6 +1265,60 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Континент
+                    <select
+                      value={activeProvince.continentId ?? ''}
+                      onChange={(event) =>
+                        onAssignContinent(
+                          activeProvince.id,
+                          event.target.value || undefined,
+                        )
+                      }
+                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    >
+                      <option value="" className="bg-[#0b111b] text-white">
+                        Не назначен
+                      </option>
+                      {continents.map((continent) => (
+                        <option
+                          key={continent.id}
+                          value={continent.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {continent.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Регион
+                    <select
+                      value={activeProvince.regionId ?? ''}
+                      onChange={(event) =>
+                        onAssignRegion(
+                          activeProvince.id,
+                          event.target.value || undefined,
+                        )
+                      }
+                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    >
+                      <option value="" className="bg-[#0b111b] text-white">
+                        Не назначен
+                      </option>
+                      {regions.map((region) => (
+                        <option
+                          key={region.id}
+                          value={region.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {region.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
                     Культура
                     <select
                       value={activeProvince.cultureId ?? ''}
@@ -1281,6 +1433,23 @@ export default function AdminPanel({
                       value={activeProvince.pollution ?? 0}
                       onChange={(event) =>
                         onSetPollution(
+                          activeProvince.id,
+                          Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Плодородность (%)
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={activeProvince.fertility ?? 0}
+                      onChange={(event) =>
+                        onSetFertility(
                           activeProvince.id,
                           Math.max(0, Number(event.target.value) || 0),
                         )
@@ -1626,6 +1795,142 @@ export default function AdminPanel({
                     />
                     <button
                       onClick={() => onDeleteLandscape(landscape.id)}
+                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                    >
+                      <Trash2 className="w-4 h-4 text-white/60" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {tab === 'continents' && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Континенты</h2>
+                <p className="text-white/60 text-sm">
+                  Добавляйте и редактируйте континенты.
+                </p>
+              </div>
+
+              <div className="flex gap-3 items-end">
+                <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm">
+                  Название
+                  <input
+                    value={continentName}
+                    onChange={(event) => setContinentName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цвет
+                  <input
+                    type="color"
+                    value={continentColor}
+                    onChange={(event) => setContinentColor(event.target.value)}
+                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                  />
+                </label>
+                <button
+                  onClick={handleAddContinent}
+                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {continents.map((continent) => (
+                  <div
+                    key={continent.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-4 h-4 rounded-full border border-white/10"
+                        style={{ backgroundColor: continent.color }}
+                      />
+                      <span className="text-white/80 text-sm">{continent.name}</span>
+                    </div>
+                    <input
+                      type="color"
+                      value={continent.color}
+                      onChange={(event) =>
+                        onUpdateContinentColor(continent.id, event.target.value)
+                      }
+                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                    />
+                    <button
+                      onClick={() => onDeleteContinent(continent.id)}
+                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                    >
+                      <Trash2 className="w-4 h-4 text-white/60" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {tab === 'regions' && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Регионы</h2>
+                <p className="text-white/60 text-sm">
+                  Добавляйте и редактируйте регионы.
+                </p>
+              </div>
+
+              <div className="flex gap-3 items-end">
+                <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm">
+                  Название
+                  <input
+                    value={regionName}
+                    onChange={(event) => setRegionName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цвет
+                  <input
+                    type="color"
+                    value={regionColor}
+                    onChange={(event) => setRegionColor(event.target.value)}
+                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                  />
+                </label>
+                <button
+                  onClick={handleAddRegion}
+                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {regions.map((region) => (
+                  <div
+                    key={region.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-4 h-4 rounded-full border border-white/10"
+                        style={{ backgroundColor: region.color }}
+                      />
+                      <span className="text-white/80 text-sm">{region.name}</span>
+                    </div>
+                    <input
+                      type="color"
+                      value={region.color}
+                      onChange={(event) =>
+                        onUpdateRegionColor(region.id, event.target.value)
+                      }
+                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                    />
+                    <button
+                      onClick={() => onDeleteRegion(region.id)}
                       className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
                     >
                       <Trash2 className="w-4 h-4 text-white/60" />

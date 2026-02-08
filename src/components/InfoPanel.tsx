@@ -6,11 +6,13 @@
   Globe2,
   Feather,
   MapPin,
+  Map,
   Cross,
   TrendingUp,
   XCircle,
   Coins,
   Factory,
+  Leaf,
 } from 'lucide-react';
 
 interface InfoPanelProps {
@@ -21,10 +23,13 @@ interface InfoPanelProps {
   culture?: string;
   cultureIconDataUrl?: string;
   landscape?: string;
+  continent?: string;
+  region?: string;
   religion?: string;
   religionIconDataUrl?: string;
   radiation?: number;
   pollution?: number;
+  fertility?: number;
   resources?: { name: string; amount: number; iconDataUrl?: string }[];
   onClose: () => void;
   colonizationCost?: number;
@@ -39,10 +44,13 @@ export default function InfoPanel({
   culture,
   cultureIconDataUrl,
   landscape,
+  continent,
+  region,
   religion,
   religionIconDataUrl,
   radiation,
   pollution,
+  fertility,
   resources = [],
   onClose,
   colonizationCost,
@@ -140,6 +148,14 @@ export default function InfoPanel({
             <span>Ландшафт: {landscape ?? '—'}</span>
           </div>
           <div className="flex items-center gap-2">
+            <Globe2 className="w-3.5 h-3.5 text-white/60" />
+            <span>Континент: {continent ?? '—'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Map className="w-3.5 h-3.5 text-white/60" />
+            <span>Регион: {region ?? '—'}</span>
+          </div>
+          <div className="flex items-center gap-2">
             <Cross className="w-3.5 h-3.5 text-white/60" />
             <span className="flex items-center gap-2">
               Религия:
@@ -164,6 +180,10 @@ export default function InfoPanel({
           <div className="flex items-center gap-2">
             <Coins className="w-3.5 h-3.5 text-white/60" />
             <span>Стоимость колонизации: {colonizationCost ?? 100}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Leaf className="w-3.5 h-3.5 text-white/60" />
+            <span>Плодородность: {fertility ?? 0}%</span>
           </div>
           <div className="flex items-center gap-2">
             {colonizationAllowed ? (

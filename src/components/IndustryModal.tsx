@@ -66,7 +66,11 @@ const evaluateRequirementNode = (
           ? province.landscapeId
           : node.category === 'culture'
             ? province.cultureId
-            : province.religionId;
+            : node.category === 'religion'
+              ? province.religionId
+              : node.category === 'continent'
+                ? province.continentId
+                : province.regionId;
     return Boolean(key && key === node.id);
   }
   if (node.op === 'and') {
@@ -202,6 +206,41 @@ const isBuildingActiveForProvince = (
       religionReq.noneOf.length > 0 &&
       province.religionId &&
       religionReq.noneOf.includes(province.religionId)
+    ) {
+      return false;
+    }
+    const continentReq = normalizeTraitCriteria(
+      requirements.continent,
+      requirements.continentId,
+    );
+    if (
+      continentReq.anyOf.length > 0 &&
+      (!province.continentId ||
+        !continentReq.anyOf.includes(province.continentId))
+    ) {
+      return false;
+    }
+    if (
+      continentReq.noneOf.length > 0 &&
+      province.continentId &&
+      continentReq.noneOf.includes(province.continentId)
+    ) {
+      return false;
+    }
+    const regionReq = normalizeTraitCriteria(
+      requirements.region,
+      requirements.regionId,
+    );
+    if (
+      regionReq.anyOf.length > 0 &&
+      (!province.regionId || !regionReq.anyOf.includes(province.regionId))
+    ) {
+      return false;
+    }
+    if (
+      regionReq.noneOf.length > 0 &&
+      province.regionId &&
+      regionReq.noneOf.includes(province.regionId)
     ) {
       return false;
     }
@@ -536,6 +575,43 @@ const getInactiveReasons = (
       religionReq.noneOf.includes(province.religionId)
     ) {
       reasons.push('Запрещенная религия');
+    }
+
+    const continentReq = normalizeTraitCriteria(
+      requirements.continent,
+      requirements.continentId,
+    );
+    if (
+      continentReq.anyOf.length > 0 &&
+      (!province.continentId ||
+        !continentReq.anyOf.includes(province.continentId))
+    ) {
+      reasons.push('Нужен другой континент');
+    }
+    if (
+      continentReq.noneOf.length > 0 &&
+      province.continentId &&
+      continentReq.noneOf.includes(province.continentId)
+    ) {
+      reasons.push('Запрещенный континент');
+    }
+
+    const regionReq = normalizeTraitCriteria(
+      requirements.region,
+      requirements.regionId,
+    );
+    if (
+      regionReq.anyOf.length > 0 &&
+      (!province.regionId || !regionReq.anyOf.includes(province.regionId))
+    ) {
+      reasons.push('Нужен другой регион');
+    }
+    if (
+      regionReq.noneOf.length > 0 &&
+      province.regionId &&
+      regionReq.noneOf.includes(province.regionId)
+    ) {
+      reasons.push('Запрещенный регион');
     }
   }
 

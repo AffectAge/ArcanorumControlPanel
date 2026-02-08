@@ -24,6 +24,8 @@ export type GameState = {
   religions?: Trait[];
   cultures?: Trait[];
   landscapes?: Trait[];
+  continents?: Trait[];
+  regions?: Trait[];
   resources?: Trait[];
   buildings?: BuildingDefinition[];
   industries?: Industry[];
@@ -58,8 +60,11 @@ export type ProvinceData = {
   religionId?: string;
   cultureId?: string;
   landscapeId?: string;
+  continentId?: string;
+  regionId?: string;
   radiation?: number;
   pollution?: number;
+  fertility?: number;
   resourceAmounts?: Record<string, number>;
   colonizationCost?: number;
   colonizationProgress?: Record<string, number>;
@@ -125,10 +130,14 @@ export type BuildingDefinition = {
     landscape?: TraitCriteria;
     culture?: TraitCriteria;
     religion?: TraitCriteria;
+    continent?: TraitCriteria;
+    region?: TraitCriteria;
     climateId?: string;
     landscapeId?: string;
     cultureId?: string;
     religionId?: string;
+    continentId?: string;
+    regionId?: string;
     dependencies?: string[];
     maxPerProvince?: number;
     maxPerCountry?: number;
@@ -149,7 +158,13 @@ export type RequirementNode =
     }
   | {
       type: 'trait';
-      category: 'climate' | 'landscape' | 'culture' | 'religion';
+      category:
+        | 'climate'
+        | 'landscape'
+        | 'culture'
+        | 'religion'
+        | 'continent'
+        | 'region';
       id: string;
     };
 
