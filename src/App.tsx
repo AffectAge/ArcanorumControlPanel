@@ -1566,6 +1566,26 @@ function App() {
     });
   };
 
+  const withdrawDiplomacyProposal = (proposalId: string) => {
+    setDiplomacyProposals((prev) =>
+      prev.filter((entry) => entry.id !== proposalId),
+    );
+    const proposal = diplomacyProposals.find((entry) => entry.id === proposalId);
+    if (!proposal) return;
+    const fromName =
+      countries.find((country) => country.id === proposal.fromCountryId)?.name ??
+      proposal.fromCountryId;
+    const toName =
+      countries.find((country) => country.id === proposal.toCountryId)?.name ??
+      proposal.toCountryId;
+    addEvent({
+      category: 'diplomacy',
+      message: `${fromName} отозвала предложение договора для ${toName}.`,
+      countryId: proposal.fromCountryId,
+      priority: 'low',
+    });
+  };
+
   const deleteDiplomacyAgreement = (id: string) => {
     const agreement = diplomacyAgreements.find((entry) => entry.id === id);
     setDiplomacyAgreements((prev) => prev.filter((entry) => entry.id !== id));
@@ -2794,11 +2814,13 @@ function App() {
         buildings={buildings}
         companies={companies}
         agreements={diplomacyAgreements}
+        proposals={diplomacyProposals}
         turn={turn}
         activeCountryId={activeCountryId}
         onClose={() => setDiplomacyOpen(false)}
         onCreateProposal={addDiplomacyProposal}
         onDeleteAgreement={deleteDiplomacyAgreement}
+        onWithdrawProposal={withdrawDiplomacyProposal}
       />
       <DiplomacyProposalsModal
         open={diplomacyInboxOpen}

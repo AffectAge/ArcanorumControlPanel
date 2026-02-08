@@ -1,5 +1,20 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { X, Plus, Trash2, Handshake } from 'lucide-react';
+import {
+  X,
+  Plus,
+  Trash2,
+  Handshake,
+  ArrowRight,
+  Landmark,
+  Briefcase,
+  Factory,
+  MapPin,
+  Layers,
+  Gauge,
+  BarChart3,
+  Clock,
+  Hourglass,
+} from 'lucide-react';
 import type {
   Country,
   Industry,
@@ -18,6 +33,7 @@ type DiplomacyModalProps = {
   buildings: BuildingDefinition[];
   companies: Company[];
   agreements: DiplomacyAgreement[];
+  proposals: DiplomacyProposal[];
   turn: number;
   activeCountryId?: string;
   onClose: () => void;
@@ -25,6 +41,7 @@ type DiplomacyModalProps = {
     proposal: Omit<DiplomacyProposal, 'id' | 'createdTurn'>,
   ) => void;
   onDeleteAgreement: (id: string) => void;
+  onWithdrawProposal: (id: string) => void;
 };
 
 export default function DiplomacyModal({
@@ -35,11 +52,13 @@ export default function DiplomacyModal({
   buildings,
   companies,
   agreements,
+  proposals,
   turn,
   activeCountryId,
   onClose,
   onCreateProposal,
   onDeleteAgreement,
+  onWithdrawProposal,
 }: DiplomacyModalProps) {
   const treatyTypes = [
     {
@@ -323,6 +342,30 @@ export default function DiplomacyModal({
       agreement.hostCountryId === activeCountryId ||
       agreement.guestCountryId === activeCountryId,
   );
+  const visibleProposals = proposals.filter(
+    (proposal) => activeCountryId && proposal.fromCountryId === activeCountryId,
+  );
+
+  const items = [
+    ...visibleProposals.map((proposal) => ({
+      type: 'proposal' as const,
+      id: proposal.id,
+      agreement: proposal.agreement,
+      createdTurn: proposal.createdTurn,
+    })),
+    ...visibleAgreements.map((agreement) => ({
+      type: 'agreement' as const,
+      id: agreement.id,
+      agreement,
+    })),
+  ];
+
+  const formatListSummary = (names: string[], allLabel: string) => {
+    if (!names.length) return allLabel;
+    const preview = names.slice(0, 3).join(', ');
+    const suffix = names.length > 3 ? ` +${names.length - 3}` : '';
+    return `${names.length}: ${preview}${suffix}`;
+  };
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -710,28 +753,32 @@ export default function DiplomacyModal({
             </div>
 
               <div className="space-y-3">
-                {visibleAgreements.length > 0 ? (
-                  visibleAgreements.map((agreement) => {
+                {items.length > 0 ? (
+                  items.map((item) => {
+                    const agreement = item.agreement;
                     const host = countries.find((c) => c.id === agreement.hostCountryId);
                     const guest = countries.find((c) => c.id === agreement.guestCountryId);
                     const industryNames = agreement.industries?.length
                       ? agreement.industries
                           .map(
-                            (id) => industries.find((item) => item.id === id)?.name ?? id,
+                            (id) => industries.find((entry) => entry.id === id)?.name ?? id,
                           )
-                          .join(', ')
-                      : 'Все отрасли';
+                      : [];
                     const perProvince = agreement.limits?.perProvince ?? 0;
                     const perCountry = agreement.limits?.perCountry ?? 0;
                     const global = agreement.limits?.global ?? 0;
                     const limitLabel = (value: number) =>
                       value && value > 0 ? value : '∞';
-                    const usage = getAgreementUsage(agreement);
+                    const usage =
+                      item.type === 'agreement'
+                        ? getAgreementUsage(agreement)
+                        : { perProvince: 0, perCountry: 0, global: 0 };
                     const durationLabel =
                       agreement.durationTurns && agreement.durationTurns > 0
                         ? `${agreement.durationTurns} ход.`
                         : 'Бессрочно';
                     const remainingTurns =
+                      item.type === 'agreement' &&
                       agreement.durationTurns &&
                       agreement.durationTurns > 0 &&
                       agreement.startTurn
@@ -744,80 +791,223 @@ export default function DiplomacyModal({
                       agreement.allowState ?? agreement.kind === 'state';
                     const resolvedAllowCompanies =
                       agreement.allowCompanies ?? agreement.kind === 'company';
-                    const allowedCompaniesLabel =
-                      agreement.companyIds && agreement.companyIds.length > 0
-                        ? agreement.companyIds
-                            .map(
-                              (id) =>
-                                companies.find((item) => item.id === id)?.name ?? id,
-                            )
-                            .join(', ')
-                        : 'Все компании';
-                    const allowedBuildingsLabel =
-                      agreement.buildingIds && agreement.buildingIds.length > 0
-                        ? agreement.buildingIds
-                            .map(
-                              (id) => buildings.find((b) => b.id === id)?.name ?? id,
-                            )
-                            .join(', ')
-                        : 'Все здания';
-                    const allowedProvincesLabel =
-                      agreement.provinceIds && agreement.provinceIds.length > 0
-                        ? agreement.provinceIds.join(', ')
-                        : 'Все провинции';
+                    const allowedCompanies = agreement.companyIds?.length
+                      ? agreement.companyIds.map(
+                          (id) =>
+                            companies.find((entry) => entry.id === id)?.name ?? id,
+                        )
+                      : [];
+                    const allowedBuildings = agreement.buildingIds?.length
+                      ? agreement.buildingIds.map(
+                          (id) => buildings.find((entry) => entry.id === id)?.name ?? id,
+                        )
+                      : [];
+                    const allowedProvinces = agreement.provinceIds?.length
+                      ? agreement.provinceIds
+                      : [];
+                    const companiesLabel = resolvedAllowCompanies
+                      ? formatListSummary(allowedCompanies, 'Все компании')
+                      : 'Не разрешено';
+                    const buildingsLabel = formatListSummary(
+                      allowedBuildings,
+                      'Все здания',
+                    );
+                    const provincesLabel = formatListSummary(
+                      allowedProvinces,
+                      'Все провинции',
+                    );
+                    const industriesLabel = formatListSummary(
+                      industryNames,
+                      'Все отрасли',
+                    );
+                    const statusLabel =
+                      item.type === 'proposal' ? 'Ожидаем ответа' : 'Действует';
+                    const statusStyle =
+                      item.type === 'proposal'
+                        ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
+                        : 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200';
                     return (
                       <div
-                        key={agreement.id}
+                        key={item.id}
                         className="rounded-xl border border-white/10 bg-black/30 p-4 flex items-start justify-between gap-3"
                       >
-                        <div className="space-y-2">
-                          <div className="text-white/80 text-sm font-semibold">
-                            {host?.name ?? agreement.hostCountryId} →{' '}
-                            {guest?.name ?? agreement.guestCountryId}
-                          </div>
-                          <div className="text-white/50 text-xs">
-                            Разрешено:{' '}
-                            {resolvedAllowState ? 'Государство' : ''}
-                            {resolvedAllowState && resolvedAllowCompanies ? ' + ' : ''}
-                            {resolvedAllowCompanies ? 'Компании' : ''}
-                          </div>
-                          {resolvedAllowCompanies && (
-                            <div className="text-white/50 text-xs">
-                              Компании: {allowedCompaniesLabel}
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2 text-white/80 text-sm font-semibold">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-6 rounded-md border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center">
+                                {host?.flagDataUrl ? (
+                                  <img
+                                    src={host.flagDataUrl}
+                                    alt={`${host?.name ?? 'Host'} flag`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-[10px] text-white/40">
+                                    Flag
+                                  </span>
+                                )}
+                              </div>
+                              <span>{host?.name ?? agreement.hostCountryId}</span>
                             </div>
-                          )}
-                          <div className="text-white/50 text-xs">
-                            Здания: {allowedBuildingsLabel}
-                          </div>
-                          <div className="text-white/50 text-xs">
-                            Провинции: {allowedProvincesLabel}
-                          </div>
-                          <div className="text-white/50 text-xs">
-                            Отрасли: {industryNames}
-                          </div>
-                          <div className="text-white/50 text-xs">
-                            Лимиты: Пров. {limitLabel(perProvince)} / Гос.{' '}
-                            {limitLabel(perCountry)} / Мир {limitLabel(global)}
-                          </div>
-                          <div className="text-white/50 text-xs">
-                            Срок: {durationLabel}
-                          </div>
-                          {remainingTurns != null && (
-                            <div className="text-white/50 text-xs">
-                              Осталось: {remainingTurns} ход.
+                            <ArrowRight className="w-4 h-4 text-white/40" />
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-6 rounded-md border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center">
+                                {guest?.flagDataUrl ? (
+                                  <img
+                                    src={guest.flagDataUrl}
+                                    alt={`${guest?.name ?? 'Guest'} flag`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-[10px] text-white/40">
+                                    Flag
+                                  </span>
+                                )}
+                              </div>
+                              <span>{guest?.name ?? agreement.guestCountryId}</span>
                             </div>
-                          )}
-                          <div className="text-white/60 text-xs">
-                            Использовано: Пров. {usage.perProvince} / Гос.{' '}
-                            {usage.perCountry} / Мир {usage.global}
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                            {resolvedAllowState && (
+                              <span className="px-2 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-200 relative group inline-flex items-center gap-1">
+                                <Landmark className="w-3.5 h-3.5" />
+                                Государство
+                                <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Разрешено строить государству
+                                </span>
+                              </span>
+                            )}
+                            {resolvedAllowCompanies && (
+                              <span className="px-2 py-0.5 rounded-full border border-sky-400/40 bg-sky-500/10 text-sky-200 relative group inline-flex items-center gap-1">
+                                <Briefcase className="w-3.5 h-3.5" />
+                                Компании
+                                <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Разрешено строить компаниям
+                                </span>
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-white/50 text-xs">
+                            <div>
+                              <span className="relative group text-white/60 inline-flex items-center gap-1">
+                                <Briefcase className="w-3.5 h-3.5 text-white/60" />
+                                Компании:
+                                <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Какие компании имеют право строить
+                                </span>
+                              </span>{' '}
+                              {companiesLabel}
+                            </div>
+                            <div>
+                              <span className="relative group text-white/60 inline-flex items-center gap-1">
+                                <Factory className="w-3.5 h-3.5 text-white/60" />
+                                Здания:
+                                <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Какие здания разрешены по договору
+                                </span>
+                              </span>{' '}
+                              {buildingsLabel}
+                            </div>
+                            <div>
+                              <span className="relative group text-white/60 inline-flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5 text-white/60" />
+                                Провинции:
+                                <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  В каких провинциях действует договор
+                                </span>
+                              </span>{' '}
+                              {provincesLabel}
+                            </div>
+                            <div>
+                              <span className="relative group text-white/60 inline-flex items-center gap-1">
+                                <Layers className="w-3.5 h-3.5 text-white/60" />
+                                Отрасли:
+                                <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Ограничение по отраслям зданий
+                                </span>
+                              </span>{' '}
+                              {industriesLabel}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-white/50 text-xs">
+                            <div>
+                              <span className="relative group text-white/60 inline-flex items-center gap-1">
+                                <Gauge className="w-3.5 h-3.5 text-white/60" />
+                                Лимиты:
+                                <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Максимум построек по провинции, стране и миру
+                                </span>
+                              </span>{' '}
+                              Пров. {limitLabel(perProvince)} / Гос.{' '}
+                              {limitLabel(perCountry)} / Мир {limitLabel(global)}
+                            </div>
+                            <div>
+                              <span className="relative group text-white/60 inline-flex items-center gap-1">
+                                <BarChart3 className="w-3.5 h-3.5 text-white/60" />
+                                Использовано:
+                                <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Сколько лимитов уже занято
+                                </span>
+                              </span>{' '}
+                              Пров. {usage.perProvince} / Гос.{' '}
+                              {usage.perCountry} / Мир {usage.global}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 text-white/50 text-xs">
+                            <div>
+                              <span className="relative group text-white/60 inline-flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-white/60" />
+                                Срок:
+                                <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Длительность действия договора
+                                </span>
+                              </span>{' '}
+                              {durationLabel}
+                            </div>
+                            {remainingTurns != null && (
+                              <div>
+                                <span className="relative group text-white/60 inline-flex items-center gap-1">
+                                  <Hourglass className="w-3.5 h-3.5 text-white/60" />
+                                  Осталось:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Сколько ходов до окончания договора
+                                  </span>
+                                </span>{' '}
+                                {remainingTurns} ход.
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <button
-                          onClick={() => onDeleteAgreement(agreement.id)}
-                          className="w-9 h-9 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                        >
-                          <Trash2 className="w-4 h-4 text-white/60" />
-                        </button>
+                        <div className="flex flex-col items-end gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded-full border text-[11px] ${statusStyle}`}
+                          >
+                            {statusLabel}
+                          </span>
+                          {item.type === 'agreement' && (
+                            <button
+                              onClick={() => onDeleteAgreement(item.id)}
+                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                            >
+                              <Trash2 className="w-4 h-4 text-white/60" />
+                            </button>
+                          )}
+                          {item.type === 'proposal' && (
+                            <button
+                              onClick={() => onWithdrawProposal(item.id)}
+                              className="w-9 h-9 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
+                            >
+                              <Trash2 className="w-4 h-4 text-white/60" />
+                              <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                Отозвать предложение
+                              </span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })
