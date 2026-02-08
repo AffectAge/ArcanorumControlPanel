@@ -24,6 +24,8 @@ type TopBarProps = {
   religionGainPerTurn: number;
   goldGainPerTurn: number;
   ducatsGainPerTurn: number;
+  colonizationActiveCount: number;
+  colonizationActiveLimit: number;
   onSelectCountry: (id: string) => void;
   onEndTurn: () => void;
   onOpenHotseat: () => void;
@@ -44,6 +46,8 @@ export default function TopBar({
   religionGainPerTurn,
   goldGainPerTurn,
   ducatsGainPerTurn,
+  colonizationActiveCount,
+  colonizationActiveLimit,
   onSelectCountry,
   onEndTurn,
   onOpenHotseat,
@@ -217,6 +221,23 @@ export default function TopBar({
               +{formatPoints(colonizationGainPerTurn)}
             </span>
           )}
+          <div
+            className="text-white/50 text-xs"
+            onMouseEnter={(event) =>
+              showTooltip('Активные колонизации / лимит', event)
+            }
+            onMouseMove={moveTooltip}
+            onMouseLeave={hideTooltip}
+            style={
+              colonizationActiveLimit > 0 &&
+              colonizationActiveCount >= colonizationActiveLimit
+                ? { color: '#f87171' }
+                : undefined
+            }
+          >
+            {colonizationActiveCount}/
+            {colonizationActiveLimit > 0 ? colonizationActiveLimit : '∞'}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">

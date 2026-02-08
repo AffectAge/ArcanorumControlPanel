@@ -237,6 +237,7 @@ function App() {
     startingReligionPoints: 0,
     startingGold: 0,
     startingDucats: 100000,
+    colonizationMaxActive: 0,
   });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | undefined>(
@@ -308,6 +309,14 @@ function App() {
   const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>(
     undefined,
   );
+
+  const getActiveColonizationsCount = (countryId?: string) => {
+    if (!countryId) return 0;
+    return Object.values(provinces).reduce((sum, province) => {
+      if (!province.colonizationProgress) return sum;
+      return countryId in province.colonizationProgress ? sum + 1 : sum;
+    }, 0);
+  };
 
   const createCountry = (country: Omit<Country, 'id' | 'colonizationPoints'>) => {
     const id = createId();
@@ -866,6 +875,7 @@ function App() {
         startingReligionPoints: 0,
         startingGold: 0,
         startingDucats: 100000,
+        colonizationMaxActive: 0,
       },
     );
     setEventLog(normalizeEventLog(save.data.eventLog));
@@ -1388,6 +1398,17 @@ function App() {
 
   const startColonization = (provinceId: string, countryId: string) => {
     const country = countries.find((c) => c.id === countryId);
+    const activeLimit = gameSettings.colonizationMaxActive ?? 0;
+    const activeCount = getActiveColonizationsCount(countryId);
+    if (activeLimit > 0 && activeCount >= activeLimit) {
+      addEvent({
+        category: 'colonization',
+        message: `${country?.name ?? 'Страна'} достигла лимита активных колонизаций (${activeLimit}).`,
+        countryId,
+        priority: 'low',
+      });
+      return;
+    }
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId || province.colonizationDisabled) {
@@ -2522,6 +2543,8 @@ function App() {
         religionGainPerTurn={gameSettings.religionPointsPerTurn ?? 0}
         goldGainPerTurn={gameSettings.goldPerTurn ?? 0}
         ducatsGainPerTurn={gameSettings.ducatsPerTurn ?? 0}
+        colonizationActiveCount={getActiveColonizationsCount(activeCountryId)}
+        colonizationActiveLimit={gameSettings.colonizationMaxActive ?? 0}
         onSelectCountry={selectCountry}
         onEndTurn={endTurn}
         onOpenHotseat={() => setHotseatOpen(true)}

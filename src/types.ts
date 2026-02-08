@@ -95,6 +95,7 @@ export type GameSettings = {
   startingReligionPoints?: number;
   startingGold?: number;
   startingDucats?: number;
+  colonizationMaxActive?: number;
 };
 
 export type BuildingDefinition = {
