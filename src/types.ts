@@ -81,6 +81,15 @@ export type BuildingDefinition = {
   cost: number;
   iconDataUrl?: string;
   industryId?: string;
+  requirements?: {
+    resources?: Record<string, number>;
+    climateId?: string;
+    landscapeId?: string;
+    cultureId?: string;
+    religionId?: string;
+    dependencies?: string[];
+    maxPerProvince?: number;
+  };
 };
 
 export type Industry = {

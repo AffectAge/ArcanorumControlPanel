@@ -235,6 +235,47 @@ export default function ConstructionModal({
               const average = entries.length
                 ? Math.min(100, Math.round((progressSum / entries.length / cost) * 100))
                 : 0;
+              const requirements = building.requirements;
+              const issues: string[] = [];
+              if (requirements?.maxPerProvince != null) {
+                const limit = Math.max(1, requirements.maxPerProvince);
+                if (builtCount + entries.length >= limit) {
+                  issues.push(`Лимит на провинцию: ${limit}`);
+                }
+              }
+              if (requirements?.climateId && province.climateId !== requirements.climateId) {
+                issues.push('Нужен другой климат');
+              }
+              if (
+                requirements?.landscapeId &&
+                province.landscapeId !== requirements.landscapeId
+              ) {
+                issues.push('Нужен другой ландшафт');
+              }
+              if (requirements?.cultureId && province.cultureId !== requirements.cultureId) {
+                issues.push('Нужна другая культура');
+              }
+              if (
+                requirements?.religionId &&
+                province.religionId !== requirements.religionId
+              ) {
+                issues.push('Нужна другая религия');
+              }
+              if (requirements?.resources) {
+                const amounts = province.resourceAmounts ?? {};
+                Object.entries(requirements.resources).forEach(([id, amount]) => {
+                  if ((amounts[id] ?? 0) < Math.max(0, amount)) {
+                    issues.push('Недостаточно ресурсов');
+                  }
+                });
+              }
+              if (requirements?.dependencies) {
+                const ok = requirements.dependencies.every(
+                  (depId) =>
+                    builtList.filter((entry) => entry.buildingId === depId).length > 0,
+                );
+                if (!ok) issues.push('Нет требуемых зданий');
+              }
               const canStart = isOwner;
               const canCancel = isOwner && hasProgress;
 
@@ -278,12 +319,21 @@ export default function ConstructionModal({
                       {builtCount > 0 && !hasProgress ? '100%' : `${average}%`}
                       {hasProgress && ` (ср.)`}
                     </div>
+                    {issues.length > 0 && (
+                      <div className="text-red-300 text-[11px] mt-1">
+                        {Array.from(new Set(issues)).join(', ')}
+                      </div>
+                    )}
                   </div>
 
                   <div className="col-span-2 flex items-center justify-end gap-2">
                     <button
                       onClick={() => onStart(building.id, owner)}
-                      disabled={!canStart || (ownerType === 'company' && !companyId)}
+                      disabled={
+                        !canStart ||
+                        issues.length > 0 ||
+                        (ownerType === 'company' && !companyId)
+                      }
                       className={`h-8 px-2 rounded-lg border text-[11px] flex items-center gap-1 ${
                         canStart
                           ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200 hover:bg-emerald-500/30'

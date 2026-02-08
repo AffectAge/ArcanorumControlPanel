@@ -1187,10 +1187,11 @@ function App() {
     cost: number,
     iconDataUrl?: string,
     industryId?: string,
+    requirements?: BuildingDefinition['requirements'],
   ) => {
     setBuildings((prev) => [
       ...prev,
-      { id: createId(), name, cost, iconDataUrl, industryId },
+      { id: createId(), name, cost, iconDataUrl, industryId, requirements },
     ]);
   };
 
@@ -1346,6 +1347,44 @@ function App() {
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId == null) return prev;
+      const building = buildings.find((b) => b.id === buildingId);
+      if (!building) return prev;
+      const requirements = building.requirements;
+      const builtCount = (id: string) =>
+        province.buildingsBuilt?.filter((entry) => entry.buildingId === id)
+          .length ?? 0;
+      const inProgressCount = (id: string) =>
+        province.constructionProgress?.[id]?.length ?? 0;
+      if (requirements?.maxPerProvince != null) {
+        const limit = Math.max(1, requirements.maxPerProvince);
+        if (builtCount(buildingId) + inProgressCount(buildingId) >= limit) {
+          return prev;
+        }
+      }
+      if (requirements?.climateId && province.climateId !== requirements.climateId) {
+        return prev;
+      }
+      if (requirements?.landscapeId && province.landscapeId !== requirements.landscapeId) {
+        return prev;
+      }
+      if (requirements?.cultureId && province.cultureId !== requirements.cultureId) {
+        return prev;
+      }
+      if (requirements?.religionId && province.religionId !== requirements.religionId) {
+        return prev;
+      }
+      if (requirements?.resources) {
+        const amounts = province.resourceAmounts ?? {};
+        const ok = Object.entries(requirements.resources).every(
+          ([resourceId, amount]) =>
+            (amounts[resourceId] ?? 0) >= Math.max(0, amount),
+        );
+        if (!ok) return prev;
+      }
+      if (requirements?.dependencies) {
+        const ok = requirements.dependencies.every((depId) => builtCount(depId) > 0);
+        if (!ok) return prev;
+      }
       const progress = { ...(province.constructionProgress ?? {}) };
       const entries = Array.isArray(progress[buildingId])
         ? [...progress[buildingId]]
