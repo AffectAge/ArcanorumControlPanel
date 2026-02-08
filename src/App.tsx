@@ -32,6 +32,8 @@ import type {
   Industry,
   Company,
   BuildingOwner,
+  TraitCriteria,
+  RequirementNode,
   EventLogEntry,
   EventCategory,
   EventLogState,
@@ -1361,28 +1363,238 @@ function App() {
       const building = buildings.find((b) => b.id === buildingId);
       if (!building) return prev;
       const requirements = building.requirements;
+      const normalizeTraitCriteria = (
+        criteria: TraitCriteria | undefined,
+        legacyId?: string,
+      ) => ({
+        anyOf: criteria?.anyOf ?? (legacyId ? [legacyId] : []),
+        noneOf: criteria?.noneOf ?? [],
+      });
+      const evaluateRequirementNode = (
+        node: RequirementNode,
+        provinceData: ProvinceData,
+      ): boolean => {
+        if (node.type === 'trait') {
+          const key =
+            node.category === 'climate'
+              ? provinceData.climateId
+              : node.category === 'landscape'
+                ? provinceData.landscapeId
+                : node.category === 'culture'
+                  ? provinceData.cultureId
+                  : provinceData.religionId;
+          return Boolean(key && key === node.id);
+        }
+        if (node.op === 'and') {
+          return node.children.every((child) =>
+            evaluateRequirementNode(child, provinceData),
+          );
+        }
+        if (node.op === 'or') {
+          return node.children.some((child) =>
+            evaluateRequirementNode(child, provinceData),
+          );
+        }
+        if (node.op === 'not') {
+          if (node.children.length === 0) return true;
+          return !node.children.some((child) =>
+            evaluateRequirementNode(child, provinceData),
+          );
+        }
+        if (node.op === 'xor') {
+          const matches = node.children.filter((child) =>
+            evaluateRequirementNode(child, provinceData),
+          ).length;
+          return matches === 1;
+        }
+        if (node.op === 'nand') {
+          return !node.children.every((child) =>
+            evaluateRequirementNode(child, provinceData),
+          );
+        }
+        if (node.op === 'nor') {
+          return !node.children.some((child) =>
+            evaluateRequirementNode(child, provinceData),
+          );
+        }
+        if (node.op === 'implies') {
+          if (node.children.length < 2) return true;
+          const [a, b] = node.children;
+          return !evaluateRequirementNode(a, provinceData) ||
+            evaluateRequirementNode(b, provinceData);
+        }
+        if (node.op === 'eq') {
+          if (node.children.length < 2) return true;
+          const results = node.children.map((child) =>
+            evaluateRequirementNode(child, provinceData),
+          );
+          return results.every((value) => value === results[0]);
+        }
+        return true;
+      };
       const builtCount = (id: string) =>
         province.buildingsBuilt?.filter((entry) => entry.buildingId === id)
           .length ?? 0;
       const inProgressCount = (id: string) =>
         province.constructionProgress?.[id]?.length ?? 0;
       if (requirements?.maxPerProvince != null) {
-        const limit = Math.max(1, requirements.maxPerProvince);
-        if (builtCount(buildingId) + inProgressCount(buildingId) >= limit) {
+        const limit = requirements.maxPerProvince;
+        if (limit > 0 && builtCount(buildingId) + inProgressCount(buildingId) >= limit) {
           return prev;
         }
       }
-      if (requirements?.climateId && province.climateId !== requirements.climateId) {
-        return prev;
+      if (requirements?.maxPerCountry != null) {
+        const limit = requirements.maxPerCountry;
+        if (limit > 0) {
+          const ownerCountryId =
+            owner.type === 'state'
+              ? owner.countryId
+              : companies.find((c) => c.id === owner.companyId)?.countryId;
+          if (ownerCountryId) {
+            const builtForCountry = Object.values(prev).reduce(
+              (sum, prov) => {
+                const list = prov.buildingsBuilt ?? [];
+                return (
+                  sum +
+                  list.filter((entry) => {
+                    if (entry.buildingId !== buildingId) return false;
+                    if (entry.owner.type === 'state') {
+                      return entry.owner.countryId === ownerCountryId;
+                    }
+                    const companyCountry = companies.find(
+                      (c) => c.id === entry.owner.companyId,
+                    )?.countryId;
+                    return companyCountry === ownerCountryId;
+                  }).length
+                );
+              },
+              0,
+            );
+            const inProgressForCountry = Object.values(prev).reduce(
+              (sum, prov) => {
+                const list = prov.constructionProgress?.[buildingId] ?? [];
+                return (
+                  sum +
+                  list.filter((entry) => {
+                    if (entry.owner.type === 'state') {
+                      return entry.owner.countryId === ownerCountryId;
+                    }
+                    const companyCountry = companies.find(
+                      (c) => c.id === entry.owner.companyId,
+                    )?.countryId;
+                    return companyCountry === ownerCountryId;
+                  }).length
+                );
+              },
+              0,
+            );
+            if (builtForCountry + inProgressForCountry >= limit) {
+              return prev;
+            }
+          }
+        }
       }
-      if (requirements?.landscapeId && province.landscapeId !== requirements.landscapeId) {
-        return prev;
+      if (requirements?.maxGlobal != null) {
+        const limit = requirements.maxGlobal;
+        if (limit > 0) {
+          const builtGlobal = Object.values(prev).reduce(
+            (sum, prov) =>
+              sum +
+              (prov.buildingsBuilt ?? []).filter(
+                (entry) => entry.buildingId === buildingId,
+              ).length,
+            0,
+          );
+          const inProgressGlobal = Object.values(prev).reduce(
+            (sum, prov) =>
+              sum + (prov.constructionProgress?.[buildingId]?.length ?? 0),
+            0,
+          );
+          if (builtGlobal + inProgressGlobal >= limit) {
+            return prev;
+          }
+        }
       }
-      if (requirements?.cultureId && province.cultureId !== requirements.cultureId) {
-        return prev;
-      }
-      if (requirements?.religionId && province.religionId !== requirements.religionId) {
-        return prev;
+      if (requirements?.logic) {
+        if (!evaluateRequirementNode(requirements.logic, province)) {
+          return prev;
+        }
+      } else {
+        const climateReq = normalizeTraitCriteria(
+          requirements?.climate,
+          requirements?.climateId,
+        );
+        if (
+          climateReq.anyOf.length > 0 &&
+          (!province.climateId ||
+            !climateReq.anyOf.includes(province.climateId))
+        ) {
+          return prev;
+        }
+        if (
+          climateReq.noneOf.length > 0 &&
+          province.climateId &&
+          climateReq.noneOf.includes(province.climateId)
+        ) {
+          return prev;
+        }
+
+        const landscapeReq = normalizeTraitCriteria(
+          requirements?.landscape,
+          requirements?.landscapeId,
+        );
+        if (
+          landscapeReq.anyOf.length > 0 &&
+          (!province.landscapeId ||
+            !landscapeReq.anyOf.includes(province.landscapeId))
+        ) {
+          return prev;
+        }
+        if (
+          landscapeReq.noneOf.length > 0 &&
+          province.landscapeId &&
+          landscapeReq.noneOf.includes(province.landscapeId)
+        ) {
+          return prev;
+        }
+
+        const cultureReq = normalizeTraitCriteria(
+          requirements?.culture,
+          requirements?.cultureId,
+        );
+        if (
+          cultureReq.anyOf.length > 0 &&
+          (!province.cultureId ||
+            !cultureReq.anyOf.includes(province.cultureId))
+        ) {
+          return prev;
+        }
+        if (
+          cultureReq.noneOf.length > 0 &&
+          province.cultureId &&
+          cultureReq.noneOf.includes(province.cultureId)
+        ) {
+          return prev;
+        }
+
+        const religionReq = normalizeTraitCriteria(
+          requirements?.religion,
+          requirements?.religionId,
+        );
+        if (
+          religionReq.anyOf.length > 0 &&
+          (!province.religionId ||
+            !religionReq.anyOf.includes(province.religionId))
+        ) {
+          return prev;
+        }
+        if (
+          religionReq.noneOf.length > 0 &&
+          province.religionId &&
+          religionReq.noneOf.includes(province.religionId)
+        ) {
+          return prev;
+        }
       }
       if (requirements?.resources) {
         const amounts = province.resourceAmounts ?? {};
@@ -1817,8 +2029,8 @@ function App() {
         open={constructionModalOpen}
         provinceId={selectedProvinceId}
         province={selectedProvince}
+        provinces={provinces}
         buildings={buildings}
-        industries={industries}
         companies={companies}
         countries={countries}
         activeCountryId={activeCountryId}

@@ -21,6 +21,8 @@ import type {
   BuildingDefinition,
   Company,
   Industry,
+  TraitCriteria,
+  RequirementNode,
 } from '../types';
 
 type AdminTab =
@@ -180,27 +182,21 @@ export default function AdminPanel({
   const [buildingCost, setBuildingCost] = useState(100);
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
   const [buildingIndustryId, setBuildingIndustryId] = useState<string>('');
-  const [reqClimateId, setReqClimateId] = useState('');
-  const [reqLandscapeId, setReqLandscapeId] = useState('');
-  const [reqCultureId, setReqCultureId] = useState('');
-  const [reqReligionId, setReqReligionId] = useState('');
-  const [reqMaxPerProvince, setReqMaxPerProvince] = useState<number | ''>('');
-  const [reqResources, setReqResources] = useState<Record<string, number>>({});
-  const [reqDependencies, setReqDependencies] = useState<Set<string>>(
-    () => new Set(),
-  );
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
-  const [editReqClimateId, setEditReqClimateId] = useState('');
-  const [editReqLandscapeId, setEditReqLandscapeId] = useState('');
-  const [editReqCultureId, setEditReqCultureId] = useState('');
-  const [editReqReligionId, setEditReqReligionId] = useState('');
-  const [editReqMaxPerProvince, setEditReqMaxPerProvince] = useState<number | ''>('');
+  const [editReqMaxPerProvince, setEditReqMaxPerProvince] = useState<number | ''>(0);
+  const [editReqMaxPerCountry, setEditReqMaxPerCountry] = useState<number | ''>(0);
+  const [editReqMaxGlobal, setEditReqMaxGlobal] = useState<number | ''>(0);
   const [editReqResources, setEditReqResources] = useState<Record<string, number>>(
     {},
   );
   const [editReqDependencies, setEditReqDependencies] = useState<Set<string>>(
     () => new Set(),
   );
+  const [editReqLogic, setEditReqLogic] = useState<RequirementNode>({
+    type: 'group',
+    op: 'and',
+    children: [],
+  });
   const [industryName, setIndustryName] = useState('');
   const [industryIcon, setIndustryIcon] = useState<string | undefined>(undefined);
   const [industryColor, setIndustryColor] = useState('#f59e0b');
@@ -268,49 +264,106 @@ export default function AdminPanel({
   const handleAddBuilding = () => {
     const name = buildingName.trim();
     if (!name) return;
-    const requirements = {
-      resources: Object.keys(reqResources).length > 0 ? reqResources : undefined,
-      climateId: reqClimateId || undefined,
-      landscapeId: reqLandscapeId || undefined,
-      cultureId: reqCultureId || undefined,
-      religionId: reqReligionId || undefined,
-      dependencies:
-        reqDependencies.size > 0 ? Array.from(reqDependencies) : undefined,
-      maxPerProvince:
-        reqMaxPerProvince === '' ? undefined : Math.max(1, Number(reqMaxPerProvince)),
-    };
     onAddBuilding(
       name,
       Math.max(1, Number(buildingCost) || 1),
       buildingIcon,
       buildingIndustryId || undefined,
-      requirements,
     );
     setBuildingName('');
     setBuildingCost(100);
     setBuildingIcon(undefined);
     setBuildingIndustryId('');
-    setReqClimateId('');
-    setReqLandscapeId('');
-    setReqCultureId('');
-    setReqReligionId('');
-    setReqMaxPerProvince('');
-    setReqResources({});
-    setReqDependencies(new Set());
   };
 
   const openEditRequirements = (building: BuildingDefinition) => {
     const requirements = building.requirements;
-    setEditingBuildingId(building.id);
-    setEditReqClimateId(requirements?.climateId ?? '');
-    setEditReqLandscapeId(requirements?.landscapeId ?? '');
-    setEditReqCultureId(requirements?.cultureId ?? '');
-    setEditReqReligionId(requirements?.religionId ?? '');
-    setEditReqMaxPerProvince(
-      requirements?.maxPerProvince == null ? '' : requirements.maxPerProvince,
+    const buildTraitNode = (
+      category: 'climate' | 'landscape' | 'culture' | 'religion',
+      criteria?: TraitCriteria,
+      legacyId?: string,
+    ): RequirementNode | undefined => {
+      const anyList = criteria?.anyOf ?? (legacyId ? [legacyId] : []);
+      const noneList = criteria?.noneOf ?? [];
+      const nodes: RequirementNode[] = [];
+      if (anyList.length > 0) {
+        nodes.push(
+          anyList.length === 1
+            ? { type: 'trait', category, id: anyList[0] }
+            : {
+                type: 'group',
+                op: 'or',
+                children: anyList.map((id) => ({
+                  type: 'trait',
+                  category,
+                  id,
+                })),
+              },
+        );
+      }
+      if (noneList.length > 0) {
+        nodes.push({
+          type: 'group',
+          op: 'not',
+          children: [
+            noneList.length === 1
+              ? { type: 'trait', category, id: noneList[0] }
+              : {
+                  type: 'group',
+                  op: 'or',
+                  children: noneList.map((id) => ({
+                    type: 'trait',
+                    category,
+                    id,
+                  })),
+                },
+          ],
+        });
+      }
+      if (nodes.length === 0) return undefined;
+      if (nodes.length === 1) return nodes[0];
+      return { type: 'group', op: 'and', children: nodes };
+    };
+
+    const legacyNodes: RequirementNode[] = [];
+    const climateNode = buildTraitNode(
+      'climate',
+      requirements?.climate,
+      requirements?.climateId,
     );
+    if (climateNode) legacyNodes.push(climateNode);
+    const landscapeNode = buildTraitNode(
+      'landscape',
+      requirements?.landscape,
+      requirements?.landscapeId,
+    );
+    if (landscapeNode) legacyNodes.push(landscapeNode);
+    const cultureNode = buildTraitNode(
+      'culture',
+      requirements?.culture,
+      requirements?.cultureId,
+    );
+    if (cultureNode) legacyNodes.push(cultureNode);
+    const religionNode = buildTraitNode(
+      'religion',
+      requirements?.religion,
+      requirements?.religionId,
+    );
+    if (religionNode) legacyNodes.push(religionNode);
+    const derivedLogic =
+      requirements?.logic ??
+      (legacyNodes.length > 0
+        ? { type: 'group', op: 'and', children: legacyNodes }
+        : { type: 'group', op: 'and', children: [] });
+    setEditingBuildingId(building.id);
+    setEditReqMaxPerProvince(
+      requirements?.maxPerProvince ?? 0,
+    );
+    setEditReqMaxPerCountry(requirements?.maxPerCountry ?? 0);
+    setEditReqMaxGlobal(requirements?.maxGlobal ?? 0);
     setEditReqResources(requirements?.resources ?? {});
     setEditReqDependencies(new Set(requirements?.dependencies ?? []));
+    setEditReqLogic(derivedLogic);
   };
 
   const closeEditRequirements = () => {
@@ -322,16 +375,25 @@ export default function AdminPanel({
     const requirements = {
       resources:
         Object.keys(editReqResources).length > 0 ? editReqResources : undefined,
-      climateId: editReqClimateId || undefined,
-      landscapeId: editReqLandscapeId || undefined,
-      cultureId: editReqCultureId || undefined,
-      religionId: editReqReligionId || undefined,
+      logic:
+        editReqLogic &&
+        (editReqLogic.type !== 'group' || editReqLogic.children.length > 0)
+          ? editReqLogic
+          : undefined,
       dependencies:
         editReqDependencies.size > 0 ? Array.from(editReqDependencies) : undefined,
       maxPerProvince:
-        editReqMaxPerProvince === ''
+        editReqMaxPerProvince === '' || Number(editReqMaxPerProvince) <= 0
           ? undefined
           : Math.max(1, Number(editReqMaxPerProvince)),
+      maxPerCountry:
+        editReqMaxPerCountry === '' || Number(editReqMaxPerCountry) <= 0
+          ? undefined
+          : Math.max(1, Number(editReqMaxPerCountry)),
+      maxGlobal:
+        editReqMaxGlobal === '' || Number(editReqMaxGlobal) <= 0
+          ? undefined
+          : Math.max(1, Number(editReqMaxGlobal)),
     };
     onUpdateBuildingRequirements(editingBuildingId, requirements);
     closeEditRequirements();
@@ -370,6 +432,316 @@ export default function AdminPanel({
       onDone(result ?? undefined);
     };
     reader.readAsDataURL(file);
+  };
+
+  type TraitCategory = 'climate' | 'landscape' | 'culture' | 'religion';
+  const traitOptions: Record<TraitCategory, Trait[]> = {
+    climate: climates,
+    landscape: landscapes,
+    culture: cultures,
+    religion: religions,
+  };
+
+  const updateNodeAt = (
+    node: RequirementNode,
+    path: number[],
+    updater: (current: RequirementNode) => RequirementNode,
+  ): RequirementNode => {
+    if (path.length === 0) return updater(node);
+    if (node.type !== 'group') return node;
+    const [index, ...rest] = path;
+    const nextChildren = node.children.map((child, childIndex) =>
+      childIndex === index ? updateNodeAt(child, rest, updater) : child,
+    );
+    return { ...node, children: nextChildren };
+  };
+
+  const removeNodeAt = (node: RequirementNode, path: number[]): RequirementNode => {
+    if (path.length === 0) return node;
+    if (node.type !== 'group') return node;
+    const [index, ...rest] = path;
+    if (rest.length === 0) {
+      return {
+        ...node,
+        children: node.children.filter((_, childIndex) => childIndex !== index),
+      };
+    }
+    const nextChildren = node.children.map((child, childIndex) =>
+      childIndex === index ? removeNodeAt(child, rest) : child,
+    );
+    return { ...node, children: nextChildren };
+  };
+
+  const addChildAt = (
+    node: RequirementNode,
+    path: number[],
+    child: RequirementNode,
+  ): RequirementNode =>
+    updateNodeAt(node, path, (current) => {
+      if (current.type !== 'group') return current;
+      if (current.op === 'not' && current.children.length > 0) return current;
+      return { ...current, children: [...current.children, child] };
+    });
+
+  const renderLogicNode = (node: RequirementNode, path: number[] = []) => {
+    const getOperatorHint = (op: RequirementNode['op']) => {
+      switch (op) {
+        case 'and':
+          return 'AND — все условия должны быть истинны';
+        case 'or':
+          return 'OR — хотя бы одно условие истинно';
+        case 'not':
+          return 'NOT — отрицание условий (ни одно не должно быть истинным)';
+        case 'xor':
+          return 'XOR — ровно одно условие истинно';
+        case 'nand':
+          return 'NAND — НЕ (AND), хотя бы одно условие ложно';
+        case 'nor':
+          return 'NOR — НЕ (OR), ни одно условие не истинно';
+        case 'implies':
+          return 'IMPLIES — если A, то B';
+        case 'eq':
+          return 'EQ — все условия имеют одинаковое значение';
+        default:
+          return '';
+      }
+    };
+
+    const getValidationMessage = (current: RequirementNode): string | null => {
+      if (current.type === 'trait') {
+        return current.id ? null : 'Выберите значение';
+      }
+      const count = current.children.length;
+      if (current.op === 'not') {
+        return count < 1 ? 'NOT требует минимум 1 условие' : null;
+      }
+      if (current.op === 'implies') {
+        return count < 2 ? 'IMPLIES требует минимум 2 условия' : null;
+      }
+      if (current.op === 'eq') {
+        return count < 2 ? 'EQ требует минимум 2 условия' : null;
+      }
+      if (current.op === 'xor') {
+        return count < 2 ? 'XOR требует минимум 2 условия' : null;
+      }
+      if (current.op === 'and' || current.op === 'or') {
+        return count < 1 ? 'Группа должна содержать условия' : null;
+      }
+      if (current.op === 'nand' || current.op === 'nor') {
+        return count < 1 ? 'Группа должна содержать условия' : null;
+      }
+      return null;
+    };
+
+    if (node.type === 'trait') {
+      const options = traitOptions[node.category];
+      const isInvalid = !node.id;
+      return (
+        <div
+          className={`flex items-center gap-2 rounded-lg border bg-black/30 px-3 py-2 ${
+            isInvalid ? 'border-red-400/50' : 'border-white/10'
+          }`}
+        >
+          <select
+            value={node.category}
+            onChange={(event) =>
+              setEditReqLogic((prev) =>
+                updateNodeAt(prev, path, (current) =>
+                  current.type !== 'trait'
+                    ? current
+                    : {
+                        ...current,
+                        category: event.target.value as TraitCategory,
+                        id:
+                          traitOptions[
+                            event.target.value as TraitCategory
+                          ][0]?.id ?? '',
+                      },
+                ),
+              )
+            }
+            className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+          >
+            <option value="climate" className="bg-[#0b111b] text-white">
+              Климат
+            </option>
+            <option value="landscape" className="bg-[#0b111b] text-white">
+              Ландшафт
+            </option>
+            <option value="culture" className="bg-[#0b111b] text-white">
+              Культура
+            </option>
+            <option value="religion" className="bg-[#0b111b] text-white">
+              Религия
+            </option>
+          </select>
+          <select
+            value={node.id}
+            onChange={(event) =>
+              setEditReqLogic((prev) =>
+                updateNodeAt(prev, path, (current) =>
+                  current.type !== 'trait'
+                    ? current
+                    : { ...current, id: event.target.value },
+                ),
+              )
+            }
+            className="flex-1 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+          >
+            {options.map((item) => (
+              <option
+                key={item.id}
+                value={item.id}
+                className="bg-[#0b111b] text-white"
+              >
+                {item.name}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setEditReqLogic((prev) => removeNodeAt(prev, path))}
+            className="h-8 w-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+            title="Удалить условие"
+          >
+            <Trash2 className="w-4 h-4 text-white/60" />
+          </button>
+        </div>
+      );
+    }
+
+    const isRoot = path.length === 0;
+    const canAddChild = true;
+    const validationMessage = getValidationMessage(node);
+    return (
+      <div
+        className={`rounded-xl border bg-white/5 p-3 space-y-2 ${
+          validationMessage ? 'border-red-400/50' : 'border-white/10'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <div className="relative group">
+            <select
+              value={node.op}
+              onChange={(event) =>
+                setEditReqLogic((prev) =>
+                  updateNodeAt(prev, path, (current) =>
+                    current.type !== 'group'
+                      ? current
+                      : {
+                          ...current,
+                          op: event.target.value as RequirementNode['op'],
+                          children:
+                            event.target.value === 'not' &&
+                            current.children.length > 1
+                              ? current.children
+                              : current.children,
+                        },
+                  ),
+                )
+              }
+              className={`h-8 rounded-lg bg-black/40 border px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60 ${
+                validationMessage ? 'border-red-400/50' : 'border-white/10'
+              }`}
+            >
+              <option value="and" className="bg-[#0b111b] text-white">
+                AND
+              </option>
+              <option value="or" className="bg-[#0b111b] text-white">
+                OR
+              </option>
+              <option value="not" className="bg-[#0b111b] text-white">
+                NOT
+              </option>
+              <option value="xor" className="bg-[#0b111b] text-white">
+                XOR
+              </option>
+              <option value="nand" className="bg-[#0b111b] text-white">
+                NAND
+              </option>
+              <option value="nor" className="bg-[#0b111b] text-white">
+                NOR
+              </option>
+              <option value="implies" className="bg-[#0b111b] text-white">
+                IMPLIES
+              </option>
+              <option value="eq" className="bg-[#0b111b] text-white">
+                EQ
+              </option>
+            </select>
+            <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+              {getOperatorHint(node.op)}
+            </span>
+          </div>
+          <button
+            onClick={() =>
+              setEditReqLogic((prev) =>
+                addChildAt(prev, path, {
+                  type: 'trait',
+                  category: 'climate',
+                  id: climates[0]?.id ?? '',
+                }),
+              )
+            }
+            disabled={!canAddChild}
+            className={`h-8 px-2 rounded-lg border text-[11px] flex items-center gap-1 ${
+              canAddChild
+                ? 'bg-black/30 border-white/10 text-white/70 hover:border-emerald-400/40'
+                : 'bg-black/30 border-white/10 text-white/30 cursor-not-allowed'
+            }`}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Условие
+          </button>
+          <button
+            onClick={() =>
+              setEditReqLogic((prev) =>
+                addChildAt(prev, path, {
+                  type: 'group',
+                  op: 'and',
+                  children: [],
+                }),
+              )
+            }
+            disabled={!canAddChild}
+            className={`h-8 px-2 rounded-lg border text-[11px] flex items-center gap-1 ${
+              canAddChild
+                ? 'bg-black/30 border-white/10 text-white/70 hover:border-emerald-400/40'
+                : 'bg-black/30 border-white/10 text-white/30 cursor-not-allowed'
+            }`}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Группа
+          </button>
+          {!isRoot && (
+            <button
+              onClick={() =>
+                setEditReqLogic((prev) => removeNodeAt(prev, path))
+              }
+              className="ml-auto h-8 w-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+              title="Удалить группу"
+            >
+              <Trash2 className="w-4 h-4 text-white/60" />
+            </button>
+          )}
+        </div>
+        {validationMessage && (
+          <div className="text-red-300 text-[11px]">{validationMessage}</div>
+        )}
+        <div className="space-y-2">
+          {node.children.length > 0 ? (
+            node.children.map((child, index) => (
+              <div key={`${path.join('.')}-${index}`}>
+                {renderLogicNode(child, [...path, index])}
+              </div>
+            ))
+          ) : (
+            <div className="text-white/40 text-xs">
+              Добавьте условия или группу.
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1363,22 +1735,6 @@ export default function AdminPanel({
                   </select>
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Лимит на провинцию
-                  <input
-                    type="number"
-                    min={1}
-                    value={reqMaxPerProvince}
-                    onChange={(event) =>
-                      setReqMaxPerProvince(
-                        event.target.value === ''
-                          ? ''
-                          : Math.max(1, Number(event.target.value) || 1),
-                      )
-                    }
-                    className="w-24 h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Логотип
                   <div className="flex items-center gap-2">
                     <input
@@ -1413,163 +1769,6 @@ export default function AdminPanel({
                   <Plus className="w-4 h-4" />
                   Добавить
                 </button>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                <div className="text-white/80 text-sm font-semibold">Требования</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Климат
-                    <select
-                      value={reqClimateId}
-                      onChange={(event) => setReqClimateId(event.target.value)}
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не требуется
-                      </option>
-                      {climates.map((climate) => (
-                        <option
-                          key={climate.id}
-                          value={climate.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {climate.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Ландшафт
-                    <select
-                      value={reqLandscapeId}
-                      onChange={(event) => setReqLandscapeId(event.target.value)}
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не требуется
-                      </option>
-                      {landscapes.map((landscape) => (
-                        <option
-                          key={landscape.id}
-                          value={landscape.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {landscape.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Культура
-                    <select
-                      value={reqCultureId}
-                      onChange={(event) => setReqCultureId(event.target.value)}
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не требуется
-                      </option>
-                      {cultures.map((culture) => (
-                        <option
-                          key={culture.id}
-                          value={culture.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {culture.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Религия
-                    <select
-                      value={reqReligionId}
-                      onChange={(event) => setReqReligionId(event.target.value)}
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не требуется
-                      </option>
-                      {religions.map((religion) => (
-                        <option
-                          key={religion.id}
-                          value={religion.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {religion.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-white/70 text-sm">Ресурсы</div>
-                  {resources.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {resources.map((resource) => (
-                        <label
-                          key={resource.id}
-                          className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
-                        >
-                          <span className="flex-1">{resource.name}</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={reqResources[resource.id] ?? 0}
-                            onChange={(event) =>
-                              setReqResources((prev) => {
-                                const next = { ...prev };
-                                const value = Math.max(
-                                  0,
-                                  Number(event.target.value) || 0,
-                                );
-                                if (value > 0) next[resource.id] = value;
-                                else delete next[resource.id];
-                                return next;
-                              })
-                            }
-                            className="w-20 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white focus:outline-none focus:border-emerald-400/60"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-white/50 text-sm">Нет ресурсов</div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-white/70 text-sm">Зависимости</div>
-                  {buildings.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {buildings.map((b) => (
-                        <label
-                          key={b.id}
-                          className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={reqDependencies.has(b.id)}
-                            onChange={(event) =>
-                              setReqDependencies((prev) => {
-                                const next = new Set(prev);
-                                if (event.target.checked) next.add(b.id);
-                                else next.delete(b.id);
-                                return next;
-                              })
-                            }
-                            className="w-4 h-4 accent-emerald-500"
-                          />
-                          <span>{b.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-white/50 text-sm">Нет зданий</div>
-                  )}
-                </div>
               </div>
 
               <div className="space-y-2">
@@ -2007,111 +2206,62 @@ export default function AdminPanel({
                 <div className="text-white/80 text-sm font-semibold">
                   Требования
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Климат
-                    <select
-                      value={editReqClimateId}
-                      onChange={(event) => setEditReqClimateId(event.target.value)}
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не требуется
-                      </option>
-                      {climates.map((climate) => (
-                        <option
-                          key={climate.id}
-                          value={climate.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {climate.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Ландшафт
-                    <select
-                      value={editReqLandscapeId}
-                      onChange={(event) =>
-                        setEditReqLandscapeId(event.target.value)
-                      }
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не требуется
-                      </option>
-                      {landscapes.map((landscape) => (
-                        <option
-                          key={landscape.id}
-                          value={landscape.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {landscape.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Культура
-                    <select
-                      value={editReqCultureId}
-                      onChange={(event) => setEditReqCultureId(event.target.value)}
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не требуется
-                      </option>
-                      {cultures.map((culture) => (
-                        <option
-                          key={culture.id}
-                          value={culture.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {culture.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Религия
-                    <select
-                      value={editReqReligionId}
-                      onChange={(event) =>
-                        setEditReqReligionId(event.target.value)
-                      }
-                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не требуется
-                      </option>
-                      {religions.map((religion) => (
-                        <option
-                          key={religion.id}
-                          value={religion.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {religion.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
                     Лимит на провинцию
                     <input
                       type="number"
-                      min={1}
+                      min={0}
                       value={editReqMaxPerProvince}
                       onChange={(event) =>
                         setEditReqMaxPerProvince(
                           event.target.value === ''
                             ? ''
-                            : Math.max(1, Number(event.target.value) || 1),
+                            : Math.max(0, Number(event.target.value) || 0),
                         )
                       }
                       className="w-32 h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                     />
                   </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Лимит на государство
+                    <input
+                      type="number"
+                      min={0}
+                      value={editReqMaxPerCountry}
+                      onChange={(event) =>
+                        setEditReqMaxPerCountry(
+                          event.target.value === ''
+                            ? ''
+                            : Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                      className="w-32 h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Лимит на мир
+                    <input
+                      type="number"
+                      min={0}
+                      value={editReqMaxGlobal}
+                      onChange={(event) =>
+                        setEditReqMaxGlobal(
+                          event.target.value === ''
+                            ? ''
+                            : Math.max(0, Number(event.target.value) || 0),
+                        )
+                      }
+                      className="w-32 h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-white/70 text-sm">
+                    Логические группы (климат/ландшафт/культура/религия)
+                  </div>
+                  {renderLogicNode(editReqLogic)}
                 </div>
 
                 <div className="space-y-2">

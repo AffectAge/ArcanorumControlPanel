@@ -83,14 +83,38 @@ export type BuildingDefinition = {
   industryId?: string;
   requirements?: {
     resources?: Record<string, number>;
+    logic?: RequirementNode;
+    climate?: TraitCriteria;
+    landscape?: TraitCriteria;
+    culture?: TraitCriteria;
+    religion?: TraitCriteria;
     climateId?: string;
     landscapeId?: string;
     cultureId?: string;
     religionId?: string;
     dependencies?: string[];
     maxPerProvince?: number;
+    maxPerCountry?: number;
+    maxGlobal?: number;
   };
 };
+
+export type TraitCriteria = {
+  anyOf?: string[];
+  noneOf?: string[];
+};
+
+export type RequirementNode =
+  | {
+      type: 'group';
+      op: 'and' | 'or' | 'not' | 'xor' | 'nand' | 'nor' | 'implies' | 'eq';
+      children: RequirementNode[];
+    }
+  | {
+      type: 'trait';
+      category: 'climate' | 'landscape' | 'culture' | 'religion';
+      id: string;
+    };
 
 export type Industry = {
   id: string;

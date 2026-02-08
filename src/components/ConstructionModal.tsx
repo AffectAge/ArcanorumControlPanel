@@ -6,12 +6,15 @@ import type {
   ProvinceData,
   BuildingOwner,
   Country,
+  TraitCriteria,
+  RequirementNode,
 } from '../types';
 
 type ConstructionModalProps = {
   open: boolean;
   provinceId?: string;
   province?: ProvinceData;
+  provinces?: Record<string, ProvinceData>;
   buildings: BuildingDefinition[];
   companies: Company[];
   countries: Country[];
@@ -26,6 +29,7 @@ export default function ConstructionModal({
   open,
   provinceId,
   province,
+  provinces,
   buildings,
   companies,
   countries,
@@ -47,6 +51,76 @@ export default function ConstructionModal({
     () => companies.filter((company) => company.countryId === activeCountryId),
     [companies, activeCountryId],
   );
+  const normalizeTraitCriteria = (
+    criteria: TraitCriteria | undefined,
+    legacyId?: string,
+  ) => ({
+    anyOf: criteria?.anyOf ?? (legacyId ? [legacyId] : []),
+    noneOf: criteria?.noneOf ?? [],
+  });
+
+  const evaluateRequirementNode = (
+    node: RequirementNode,
+    province: ProvinceData,
+  ): boolean => {
+    if (node.type === 'trait') {
+      const key =
+        node.category === 'climate'
+          ? province.climateId
+          : node.category === 'landscape'
+            ? province.landscapeId
+            : node.category === 'culture'
+              ? province.cultureId
+              : province.religionId;
+      return Boolean(key && key === node.id);
+    }
+    if (node.op === 'and') {
+      return node.children.every((child) =>
+        evaluateRequirementNode(child, province),
+      );
+    }
+    if (node.op === 'or') {
+      return node.children.some((child) =>
+        evaluateRequirementNode(child, province),
+      );
+    }
+    if (node.op === 'not') {
+      if (node.children.length === 0) return true;
+      return !node.children.some((child) =>
+        evaluateRequirementNode(child, province),
+      );
+    }
+    if (node.op === 'xor') {
+      const matches = node.children.filter((child) =>
+        evaluateRequirementNode(child, province),
+      ).length;
+      return matches === 1;
+    }
+    if (node.op === 'nand') {
+      return !node.children.every((child) =>
+        evaluateRequirementNode(child, province),
+      );
+    }
+    if (node.op === 'nor') {
+      return !node.children.some((child) =>
+        evaluateRequirementNode(child, province),
+      );
+    }
+    if (node.op === 'implies') {
+      if (node.children.length < 2) return true;
+      const [a, b] = node.children;
+      return !evaluateRequirementNode(a, province) ||
+        evaluateRequirementNode(b, province);
+    }
+    if (node.op === 'eq') {
+      if (node.children.length < 2) return true;
+      const results = node.children.map((child) =>
+        evaluateRequirementNode(child, province),
+      );
+      return results.every((value) => value === results[0]);
+    }
+    return true;
+  };
   const resolvedStateCountryId =
     stateCountryId || activeCountryId || countries[0]?.id || 'state';
   const owner: BuildingOwner =
@@ -55,6 +129,7 @@ export default function ConstructionModal({
       : { type: 'state', countryId: resolvedStateCountryId };
   const progressMap = province.constructionProgress ?? {};
   const builtList = province.buildingsBuilt ?? [];
+  const provincesList = provinces ? Object.values(provinces) : [province];
   const activeTasks = Object.values(progressMap).reduce(
     (sum, entries) => sum + entries.length,
     0,
@@ -238,28 +313,160 @@ export default function ConstructionModal({
               const requirements = building.requirements;
               const issues: string[] = [];
               if (requirements?.maxPerProvince != null) {
-                const limit = Math.max(1, requirements.maxPerProvince);
-                if (builtCount + entries.length >= limit) {
+                const limit = requirements.maxPerProvince;
+                if (limit > 0 && builtCount + entries.length >= limit) {
                   issues.push(`Лимит на провинцию: ${limit}`);
                 }
               }
-              if (requirements?.climateId && province.climateId !== requirements.climateId) {
-                issues.push('Нужен другой климат');
+              if (requirements?.maxPerCountry != null) {
+                const limit = requirements.maxPerCountry;
+                if (limit > 0) {
+                  const ownerCountryId =
+                    owner.type === 'state'
+                      ? owner.countryId
+                      : companies.find((c) => c.id === owner.companyId)
+                          ?.countryId;
+                  if (ownerCountryId) {
+                    const countryBuilt = provincesList.reduce((sum, prov) => {
+                      const list = prov.buildingsBuilt ?? [];
+                      return (
+                        sum +
+                        list.filter((entry) => {
+                          if (entry.buildingId !== building.id) return false;
+                          if (entry.owner.type === 'state') {
+                            return entry.owner.countryId === ownerCountryId;
+                          }
+                          const companyCountry = companies.find(
+                            (c) => c.id === entry.owner.companyId,
+                          )?.countryId;
+                          return companyCountry === ownerCountryId;
+                        }).length
+                      );
+                    }, 0);
+                    const countryInProgress = provincesList.reduce((sum, prov) => {
+                      const prog = prov.constructionProgress?.[building.id] ?? [];
+                      return (
+                        sum +
+                        prog.filter((entry) => {
+                          if (entry.owner.type === 'state') {
+                            return entry.owner.countryId === ownerCountryId;
+                          }
+                          const companyCountry = companies.find(
+                            (c) => c.id === entry.owner.companyId,
+                          )?.countryId;
+                          return companyCountry === ownerCountryId;
+                        }).length
+                      );
+                    }, 0);
+                    if (countryBuilt + countryInProgress >= limit) {
+                      issues.push(`Лимит на государство: ${limit}`);
+                    }
+                  }
+                }
               }
-              if (
-                requirements?.landscapeId &&
-                province.landscapeId !== requirements.landscapeId
-              ) {
-                issues.push('Нужен другой ландшафт');
+              if (requirements?.maxGlobal != null) {
+                const limit = requirements.maxGlobal;
+                if (limit > 0) {
+                  const globalBuilt = provincesList.reduce((sum, prov) => {
+                    const list = prov.buildingsBuilt ?? [];
+                    return (
+                      sum +
+                      list.filter((entry) => entry.buildingId === building.id)
+                        .length
+                    );
+                  }, 0);
+                  const globalInProgress = provincesList.reduce((sum, prov) => {
+                    const prog = prov.constructionProgress?.[building.id] ?? [];
+                    return sum + prog.length;
+                  }, 0);
+                  if (globalBuilt + globalInProgress >= limit) {
+                    issues.push(`Лимит на мир: ${limit}`);
+                  }
+                }
               }
-              if (requirements?.cultureId && province.cultureId !== requirements.cultureId) {
-                issues.push('Нужна другая культура');
+              const logicOk = requirements?.logic
+                ? evaluateRequirementNode(requirements.logic, province)
+                : true;
+              if (!logicOk) {
+                issues.push('Не выполнены логические критерии');
               }
-              if (
-                requirements?.religionId &&
-                province.religionId !== requirements.religionId
-              ) {
-                issues.push('Нужна другая религия');
+
+              if (!requirements?.logic) {
+                const climateReq = normalizeTraitCriteria(
+                  requirements?.climate,
+                  requirements?.climateId,
+                );
+                if (
+                  climateReq.anyOf.length > 0 &&
+                  (!province.climateId ||
+                    !climateReq.anyOf.includes(province.climateId))
+                ) {
+                  issues.push('Нужен другой климат');
+                }
+                if (
+                  climateReq.noneOf.length > 0 &&
+                  province.climateId &&
+                  climateReq.noneOf.includes(province.climateId)
+                ) {
+                  issues.push('Запрещенный климат');
+                }
+
+                const landscapeReq = normalizeTraitCriteria(
+                  requirements?.landscape,
+                  requirements?.landscapeId,
+                );
+                if (
+                  landscapeReq.anyOf.length > 0 &&
+                  (!province.landscapeId ||
+                    !landscapeReq.anyOf.includes(province.landscapeId))
+                ) {
+                  issues.push('Нужен другой ландшафт');
+                }
+                if (
+                  landscapeReq.noneOf.length > 0 &&
+                  province.landscapeId &&
+                  landscapeReq.noneOf.includes(province.landscapeId)
+                ) {
+                  issues.push('Запрещенный ландшафт');
+                }
+
+                const cultureReq = normalizeTraitCriteria(
+                  requirements?.culture,
+                  requirements?.cultureId,
+                );
+                if (
+                  cultureReq.anyOf.length > 0 &&
+                  (!province.cultureId ||
+                    !cultureReq.anyOf.includes(province.cultureId))
+                ) {
+                  issues.push('Нужна другая культура');
+                }
+                if (
+                  cultureReq.noneOf.length > 0 &&
+                  province.cultureId &&
+                  cultureReq.noneOf.includes(province.cultureId)
+                ) {
+                  issues.push('Запрещенная культура');
+                }
+
+                const religionReq = normalizeTraitCriteria(
+                  requirements?.religion,
+                  requirements?.religionId,
+                );
+                if (
+                  religionReq.anyOf.length > 0 &&
+                  (!province.religionId ||
+                    !religionReq.anyOf.includes(province.religionId))
+                ) {
+                  issues.push('Нужна другая религия');
+                }
+                if (
+                  religionReq.noneOf.length > 0 &&
+                  province.religionId &&
+                  religionReq.noneOf.includes(province.religionId)
+                ) {
+                  issues.push('Запрещенная религия');
+                }
               }
               if (requirements?.resources) {
                 const amounts = province.resourceAmounts ?? {};
