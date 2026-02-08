@@ -91,7 +91,15 @@ export default function SettingsModal({
             {tab === 'points' && (
               <>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Базовый прирост очков колонизации за ход
+                  <span className="flex items-center gap-2">
+                    Базовый прирост очков колонизации за ход
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько очков колонизации получает страна в конце глобального хода.
+                      </span>
+                    </span>
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -110,7 +118,15 @@ export default function SettingsModal({
                 </label>
 
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Базовый прирост очков строительства за ход
+                  <span className="flex items-center gap-2">
+                    Базовый прирост очков строительства за ход
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько очков строительства начисляется стране в конце глобального хода.
+                      </span>
+                    </span>
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -136,7 +152,15 @@ export default function SettingsModal({
             {tab === 'build' && (
               <>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Стоимость сноса (% от цены здания)
+                  <span className="flex items-center gap-2">
+                    Стоимость сноса (% от цены здания)
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Доля стоимости здания, которую нужно заплатить очками строительства при сносе.
+                      </span>
+                    </span>
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -160,7 +184,15 @@ export default function SettingsModal({
             {tab === 'log' && (
               <>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Хранить события за последние (ходов)
+                  <span className="flex items-center gap-2">
+                    Хранить события за последние (ходов)
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько ходов хранится в журнале событий до авто‑очистки.
+                      </span>
+                    </span>
+                  </span>
                   <input
                     type="number"
                     min={1}
@@ -183,7 +215,15 @@ export default function SettingsModal({
             {tab === 'diplomacy' && (
               <>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Авто-отклонение дипломатических предложений (ходов)
+                  <span className="flex items-center gap-2">
+                    Авто-отклонение дипломатических предложений (ходов)
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Через сколько ходов неотвеченные предложения будут автоматически отклонены.
+                      </span>
+                    </span>
+                  </span>
                   <input
                     type="number"
                     min={1}
