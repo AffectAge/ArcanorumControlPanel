@@ -1130,7 +1130,7 @@ export default function IndustryModal({
                                     <span>{building?.name ?? card.buildingId}</span>
                                     {!isActive && (
                                       <span className="relative group px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
-                                        ??????????
+                                        Неактивное
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                                           {inactiveReasons.join(', ')}
                                         </span>
@@ -1138,7 +1138,7 @@ export default function IndustryModal({
                                     )}
                                   </div>
                                   <div className="text-white/40 text-xs">
-                                    ?????????: {Math.max(1, building?.cost ?? 1)}
+                                    Стоимость: {Math.max(1, building?.cost ?? 1)}
                                   </div>
                                   {card.kind === 'construction' && (
                                     <div className="mt-2">
@@ -1149,7 +1149,7 @@ export default function IndustryModal({
                                         />
                                       </div>
                                       <div className="text-white/50 text-[11px] mt-1">
-                                        ????????: {progressPercent}%
+                                        Прогресс: {progressPercent}%
                                       </div>
                                     </div>
                                   )}
@@ -1167,7 +1167,7 @@ export default function IndustryModal({
                                       })
                                     }
                                     className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="???????? ?????????????"
+                                    title="Отменить строительство"
                                   >
                                     <X className="w-4 h-4" />
                                   </button>
@@ -1183,7 +1183,7 @@ export default function IndustryModal({
                                       });
                                     }}
                                     className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="??????"
+                                    title="Снести"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
@@ -1478,7 +1478,7 @@ export default function IndustryModal({
                                     <span>{building?.name ?? card.buildingId}</span>
                                     {!isActive && (
                                       <span className="relative group px-2 py-0.5 rounded-full border border-red-400/40 bg-red-500/10 text-[10px] text-red-200">
-                                        ??????????
+                                        Неактивное
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                                           {inactiveReasons.join(', ')}
                                         </span>
@@ -1486,7 +1486,7 @@ export default function IndustryModal({
                                     )}
                                   </div>
                                   <div className="text-white/40 text-xs">
-                                    ?????????: {Math.max(1, building?.cost ?? 1)}
+                                    Стоимость: {Math.max(1, building?.cost ?? 1)}
                                   </div>
                                   {card.kind === 'construction' && (
                                     <div className="mt-2">
@@ -1497,7 +1497,7 @@ export default function IndustryModal({
                                         />
                                       </div>
                                       <div className="text-white/50 text-[11px] mt-1">
-                                        ????????: {progressPercent}%
+                                        Прогресс: {progressPercent}%
                                       </div>
                                     </div>
                                   )}
@@ -1515,7 +1515,7 @@ export default function IndustryModal({
                                       })
                                     }
                                     className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="???????? ?????????????"
+                                    title="Отменить строительство"
                                   >
                                     <X className="w-4 h-4" />
                                   </button>
@@ -1531,7 +1531,7 @@ export default function IndustryModal({
                                       });
                                     }}
                                     className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="??????"
+                                    title="Снести"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
