@@ -225,6 +225,8 @@ function App() {
     constructionPointsPerTurn: 10,
     demolitionCostPercent: 20,
     eventLogRetainTurns: 3,
+    startingColonizationPoints: 100,
+    startingConstructionPoints: 100,
   });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | undefined>(
@@ -299,7 +301,18 @@ function App() {
 
   const createCountry = (country: Omit<Country, 'id' | 'colonizationPoints'>) => {
     const id = createId();
-    const newCountry: Country = { id, colonizationPoints: 100, constructionPoints: 0, ...country };
+    const newCountry: Country = {
+      id,
+      colonizationPoints: Math.max(
+        0,
+        gameSettings.startingColonizationPoints ?? 100,
+      ),
+      constructionPoints: Math.max(
+        0,
+        gameSettings.startingConstructionPoints ?? 0,
+      ),
+      ...country,
+    };
     setCountries((prev) => [...prev, newCountry]);
     if (!activeCountryId) {
       setActiveCountryId(id);
@@ -775,6 +788,8 @@ function App() {
         demolitionCostPercent: 20,
         eventLogRetainTurns: 3,
         diplomacyProposalExpireTurns: 3,
+        startingColonizationPoints: 100,
+        startingConstructionPoints: 100,
       },
     );
     setEventLog(normalizeEventLog(save.data.eventLog));

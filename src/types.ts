@@ -78,6 +78,8 @@ export type GameSettings = {
   constructionPointsPerTurn?: number;
   demolitionCostPercent?: number;
   diplomacyProposalExpireTurns?: number;
+  startingColonizationPoints?: number;
+  startingConstructionPoints?: number;
 };
 
 export type BuildingDefinition = {
