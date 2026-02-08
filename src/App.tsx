@@ -2602,6 +2602,14 @@ function App() {
                 )?.name
               : undefined
           }
+          ownerFlagDataUrl={
+            selectedProvinceId
+              ? countries.find(
+                  (country) =>
+                    country.id === provinces[selectedProvinceId]?.ownerCountryId,
+                )?.flagDataUrl
+              : undefined
+          }
           climate={
             selectedProvinceId
               ? climates.find((c) => c.id === provinces[selectedProvinceId]?.climateId)
@@ -2612,6 +2620,12 @@ function App() {
             selectedProvinceId
               ? cultures.find((c) => c.id === provinces[selectedProvinceId]?.cultureId)
                   ?.name
+              : undefined
+          }
+          cultureIconDataUrl={
+            selectedProvinceId
+              ? cultures.find((c) => c.id === provinces[selectedProvinceId]?.cultureId)
+                  ?.iconDataUrl
               : undefined
           }
           landscape={
@@ -2626,16 +2640,34 @@ function App() {
                   ?.name
               : undefined
           }
+          religionIconDataUrl={
+            selectedProvinceId
+              ? religions.find((r) => r.id === provinces[selectedProvinceId]?.religionId)
+                  ?.iconDataUrl
+              : undefined
+          }
           resources={
             selectedProvinceId
               ? Object.entries(provinces[selectedProvinceId]?.resourceAmounts ?? {})
                   .filter(([, amount]) => amount > 0)
                   .map(([resourceId, amount]) => {
                     const resource = resources.find((item) => item.id === resourceId);
-                    return resource ? { name: resource.name, amount } : null;
+                    return resource
+                      ? { name: resource.name, amount, iconDataUrl: resource.iconDataUrl }
+                      : null;
                   })
                   .filter(Boolean)
               : []
+          }
+          radiation={
+            selectedProvinceId
+              ? provinces[selectedProvinceId]?.radiation ?? 0
+              : undefined
+          }
+          pollution={
+            selectedProvinceId
+              ? provinces[selectedProvinceId]?.pollution ?? 0
+              : undefined
           }
           colonizationAllowed={
             selectedProvinceId

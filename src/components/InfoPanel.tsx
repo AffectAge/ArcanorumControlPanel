@@ -1,13 +1,31 @@
-﻿import { X, Flag, ShieldCheck, ShieldX } from 'lucide-react';
+﻿import {
+  X,
+  Flag,
+  ShieldCheck,
+  ShieldX,
+  Globe2,
+  Feather,
+  MapPin,
+  Cross,
+  TrendingUp,
+  XCircle,
+  Coins,
+  Factory,
+} from 'lucide-react';
 
 interface InfoPanelProps {
   province: string;
   owner?: string;
+  ownerFlagDataUrl?: string;
   climate?: string;
   culture?: string;
+  cultureIconDataUrl?: string;
   landscape?: string;
   religion?: string;
-  resources?: { name: string; amount: number }[];
+  religionIconDataUrl?: string;
+  radiation?: number;
+  pollution?: number;
+  resources?: { name: string; amount: number; iconDataUrl?: string }[];
   onClose: () => void;
   colonizationCost?: number;
   colonizationAllowed?: boolean;
@@ -16,10 +34,15 @@ interface InfoPanelProps {
 export default function InfoPanel({
   province,
   owner,
+  ownerFlagDataUrl,
   climate,
   culture,
+  cultureIconDataUrl,
   landscape,
   religion,
+  religionIconDataUrl,
+  radiation,
+  pollution,
   resources = [],
   onClose,
   colonizationCost,
@@ -39,8 +62,16 @@ export default function InfoPanel({
 
       <div className="p-3 space-y-2">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-black/30 border border-white/10">
-          <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
-            <Flag className="w-4 h-4 text-white/80" />
+          <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+            {ownerFlagDataUrl ? (
+              <img
+                src={ownerFlagDataUrl}
+                alt={owner ? `${owner} flag` : 'Flag'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Flag className="w-4 h-4 text-white/80" />
+            )}
           </div>
           <div className="flex-1">
             <div className="text-white/80 text-sm font-medium">
@@ -52,7 +83,10 @@ export default function InfoPanel({
 
         <div className="space-y-1 text-white/60 text-xs">
           <div className="mt-2">
-            <div className="text-white/70 text-xs font-semibold">Ресурсы</div>
+            <div className="text-white/70 text-xs font-semibold flex items-center gap-2">
+              <Factory className="w-3.5 h-3.5 text-white/60" />
+              Ресурсы
+            </div>
             {resources.length > 0 ? (
               <div className="mt-1 space-y-1">
                 {resources.map((resource) => (
@@ -60,7 +94,20 @@ export default function InfoPanel({
                     key={resource.name}
                     className="flex items-center justify-between text-white/60 text-xs"
                   >
-                    <span>{resource.name}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-md border border-white/10 bg-black/30 overflow-hidden flex items-center justify-center">
+                        {resource.iconDataUrl ? (
+                          <img
+                            src={resource.iconDataUrl}
+                            alt={resource.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-[9px] text-white/40">?</span>
+                        )}
+                      </div>
+                      <span>{resource.name}</span>
+                    </div>
                     <span className="text-white/80">{resource.amount}</span>
                   </div>
                 ))}
@@ -70,11 +117,54 @@ export default function InfoPanel({
             )}
           </div>
 
-          <div>Климат: {climate ?? '—'}</div>
-          <div>Культура: {culture ?? '—'}</div>
-          <div>Ландшафт: {landscape ?? '—'}</div>
-          <div>Религия: {religion ?? '—'}</div>
-          <div>Стоимость колонизации: {colonizationCost ?? 100}</div>
+          <div className="flex items-center gap-2">
+            <Globe2 className="w-3.5 h-3.5 text-white/60" />
+            <span>Климат: {climate ?? '—'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Feather className="w-3.5 h-3.5 text-white/60" />
+            <span className="flex items-center gap-2">
+              Культура:
+              {cultureIconDataUrl && (
+                <img
+                  src={cultureIconDataUrl}
+                  alt={culture ?? 'Культура'}
+                  className="w-4 h-4 rounded-sm border border-white/10 object-cover"
+                />
+              )}
+              <span>{culture ?? '—'}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <MapPin className="w-3.5 h-3.5 text-white/60" />
+            <span>Ландшафт: {landscape ?? '—'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Cross className="w-3.5 h-3.5 text-white/60" />
+            <span className="flex items-center gap-2">
+              Религия:
+              {religionIconDataUrl && (
+                <img
+                  src={religionIconDataUrl}
+                  alt={religion ?? 'Религия'}
+                  className="w-4 h-4 rounded-sm border border-white/10 object-cover"
+                />
+              )}
+              <span>{religion ?? '—'}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-3.5 h-3.5 text-white/60" />
+            <span>Радиация: {radiation ?? 0}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <XCircle className="w-3.5 h-3.5 text-white/60" />
+            <span>Загрязнение: {pollution ?? 0}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Coins className="w-3.5 h-3.5 text-white/60" />
+            <span>Стоимость колонизации: {colonizationCost ?? 100}</span>
+          </div>
           <div className="flex items-center gap-2">
             {colonizationAllowed ? (
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
