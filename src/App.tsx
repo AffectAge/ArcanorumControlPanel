@@ -227,6 +227,16 @@ function App() {
     eventLogRetainTurns: 3,
     startingColonizationPoints: 100,
     startingConstructionPoints: 100,
+    sciencePointsPerTurn: 0,
+    culturePointsPerTurn: 0,
+    religionPointsPerTurn: 0,
+    goldPerTurn: 0,
+    ducatsPerTurn: 0,
+    startingSciencePoints: 0,
+    startingCulturePoints: 0,
+    startingReligionPoints: 0,
+    startingGold: 0,
+    startingDucats: 100000,
   });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | undefined>(
@@ -309,8 +319,13 @@ function App() {
       ),
       constructionPoints: Math.max(
         0,
-        gameSettings.startingConstructionPoints ?? 0,
+        gameSettings.startingConstructionPoints ?? 100,
       ),
+      sciencePoints: Math.max(0, gameSettings.startingSciencePoints ?? 0),
+      culturePoints: Math.max(0, gameSettings.startingCulturePoints ?? 0),
+      religionPoints: Math.max(0, gameSettings.startingReligionPoints ?? 0),
+      gold: Math.max(0, gameSettings.startingGold ?? 0),
+      ducats: Math.max(0, gameSettings.startingDucats ?? 100000),
       ...country,
     };
     setCountries((prev) => [...prev, newCountry]);
@@ -607,6 +622,51 @@ function App() {
           ),
         );
       }
+      const scienceGain = Math.max(0, gameSettings.sciencePointsPerTurn ?? 0);
+      if (scienceGain > 0) {
+        setCountries((prev) =>
+          prev.map((country) => ({
+            ...country,
+            sciencePoints: (country.sciencePoints ?? 0) + scienceGain,
+          })),
+        );
+      }
+      const cultureGain = Math.max(0, gameSettings.culturePointsPerTurn ?? 0);
+      if (cultureGain > 0) {
+        setCountries((prev) =>
+          prev.map((country) => ({
+            ...country,
+            culturePoints: (country.culturePoints ?? 0) + cultureGain,
+          })),
+        );
+      }
+      const religionGain = Math.max(0, gameSettings.religionPointsPerTurn ?? 0);
+      if (religionGain > 0) {
+        setCountries((prev) =>
+          prev.map((country) => ({
+            ...country,
+            religionPoints: (country.religionPoints ?? 0) + religionGain,
+          })),
+        );
+      }
+      const goldGain = Math.max(0, gameSettings.goldPerTurn ?? 0);
+      if (goldGain > 0) {
+        setCountries((prev) =>
+          prev.map((country) => ({
+            ...country,
+            gold: (country.gold ?? 0) + goldGain,
+          })),
+        );
+      }
+      const ducatsGain = Math.max(0, gameSettings.ducatsPerTurn ?? 0);
+      if (ducatsGain > 0) {
+        setCountries((prev) =>
+          prev.map((country) => ({
+            ...country,
+            ducats: (country.ducats ?? 0) + ducatsGain,
+          })),
+        );
+      }
       const expiry = Math.max(
         1,
         gameSettings.diplomacyProposalExpireTurns ?? 3,
@@ -763,6 +823,12 @@ function App() {
       save.data.countries.map((country) => ({
         ...country,
         colonizationPoints: country.colonizationPoints ?? 100,
+        constructionPoints: country.constructionPoints ?? 0,
+        sciencePoints: country.sciencePoints ?? 0,
+        culturePoints: country.culturePoints ?? 0,
+        religionPoints: country.religionPoints ?? 0,
+        gold: country.gold ?? 0,
+        ducats: country.ducats ?? 0,
       })),
     );
     setActiveCountryId(
@@ -790,6 +856,16 @@ function App() {
         diplomacyProposalExpireTurns: 3,
         startingColonizationPoints: 100,
         startingConstructionPoints: 100,
+        sciencePointsPerTurn: 0,
+        culturePointsPerTurn: 0,
+        religionPointsPerTurn: 0,
+        goldPerTurn: 0,
+        ducatsPerTurn: 0,
+        startingSciencePoints: 0,
+        startingCulturePoints: 0,
+        startingReligionPoints: 0,
+        startingGold: 0,
+        startingDucats: 100000,
       },
     );
     setEventLog(normalizeEventLog(save.data.eventLog));
@@ -2441,6 +2517,11 @@ function App() {
         activeCountryId={activeCountryId}
         colonizationGainPerTurn={gameSettings.colonizationPointsPerTurn}
         constructionGainPerTurn={gameSettings.constructionPointsPerTurn ?? 0}
+        scienceGainPerTurn={gameSettings.sciencePointsPerTurn ?? 0}
+        cultureGainPerTurn={gameSettings.culturePointsPerTurn ?? 0}
+        religionGainPerTurn={gameSettings.religionPointsPerTurn ?? 0}
+        goldGainPerTurn={gameSettings.goldPerTurn ?? 0}
+        ducatsGainPerTurn={gameSettings.ducatsPerTurn ?? 0}
         onSelectCountry={selectCountry}
         onEndTurn={endTurn}
         onOpenHotseat={() => setHotseatOpen(true)}

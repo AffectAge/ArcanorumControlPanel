@@ -6,6 +6,11 @@ export type Country = {
   coatDataUrl?: string;
   colonizationPoints: number;
   constructionPoints?: number;
+  sciencePoints?: number;
+  culturePoints?: number;
+  religionPoints?: number;
+  gold?: number;
+  ducats?: number;
 };
 
 export type GameState = {
@@ -80,6 +85,16 @@ export type GameSettings = {
   diplomacyProposalExpireTurns?: number;
   startingColonizationPoints?: number;
   startingConstructionPoints?: number;
+  sciencePointsPerTurn?: number;
+  culturePointsPerTurn?: number;
+  religionPointsPerTurn?: number;
+  goldPerTurn?: number;
+  ducatsPerTurn?: number;
+  startingSciencePoints?: number;
+  startingCulturePoints?: number;
+  startingReligionPoints?: number;
+  startingGold?: number;
+  startingDucats?: number;
 };
 
 export type BuildingDefinition = {

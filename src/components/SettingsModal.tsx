@@ -15,9 +15,9 @@ export default function SettingsModal({
   onChange,
   onClose,
 }: SettingsModalProps) {
-  const [tab, setTab] = useState<'points' | 'build' | 'log' | 'diplomacy'>(
-    'points',
-  );
+  const [tab, setTab] = useState<
+    'points' | 'build' | 'economy' | 'log' | 'diplomacy'
+  >('points');
   if (!open) return null;
 
   return (
@@ -49,6 +49,17 @@ export default function SettingsModal({
           >
             <Hammer className="w-4 h-4" />
             Строительство
+          </button>
+          <button
+            onClick={() => setTab('economy')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'economy'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Coins className="w-4 h-4" />
+            Экономика
           </button>
           <button
             onClick={() => setTab('log')}
@@ -195,6 +206,162 @@ export default function SettingsModal({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Прирост очков науки за ход
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько очков науки начисляется в конце глобального хода.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.sciencePointsPerTurn ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        sciencePointsPerTurn: Math.max(
+                          0,
+                          Number(event.target.value) || 0,
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Прирост очков культуры за ход
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько очков культуры начисляется в конце глобального хода.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.culturePointsPerTurn ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        culturePointsPerTurn: Math.max(
+                          0,
+                          Number(event.target.value) || 0,
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Прирост очков религии за ход
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько очков религии начисляется в конце глобального хода.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.religionPointsPerTurn ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        religionPointsPerTurn: Math.max(
+                          0,
+                          Number(event.target.value) || 0,
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Стартовые очки науки
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько очков науки получает новая страна при создании.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.startingSciencePoints ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        startingSciencePoints: Math.max(
+                          0,
+                          Number(event.target.value) || 0,
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Стартовые очки культуры
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько очков культуры получает новая страна при создании.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.startingCulturePoints ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        startingCulturePoints: Math.max(
+                          0,
+                          Number(event.target.value) || 0,
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Стартовые очки религии
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько очков религии получает новая страна при создании.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.startingReligionPoints ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        startingReligionPoints: Math.max(
+                          0,
+                          Number(event.target.value) || 0,
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
                 <div className="text-white/40 text-xs">
                   Очки начисляются в конце глобального хода.
                 </div>
@@ -224,6 +391,106 @@ export default function SettingsModal({
                         demolitionCostPercent: Math.min(
                           100,
                           Math.max(0, Number(event.target.value) || 0),
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+              </>
+            )}
+
+            {tab === 'economy' && (
+              <>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Прирост золота за ход
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько золота начисляется в конце глобального хода.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.goldPerTurn ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        goldPerTurn: Math.max(0, Number(event.target.value) || 0),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Прирост дукатов за ход
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько дукатов начисляется в конце глобального хода.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.ducatsPerTurn ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        ducatsPerTurn: Math.max(0, Number(event.target.value) || 0),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Стартовое золото
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько золота получает новая страна при создании.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.startingGold ?? 0}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        startingGold: Math.max(0, Number(event.target.value) || 0),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Стартовые дукаты
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Сколько дукатов получает новая страна при создании.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={settings.startingDucats ?? 100000}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        startingDucats: Math.max(
+                          0,
+                          Number(event.target.value) || 0,
                         ),
                       })
                     }

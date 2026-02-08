@@ -1,4 +1,15 @@
-﻿import { Menu, RotateCcw, SkipForward, Globe2, Hammer } from 'lucide-react';
+﻿import {
+  Menu,
+  RotateCcw,
+  SkipForward,
+  Globe2,
+  Hammer,
+  Atom,
+  Feather,
+  Cross,
+  Coins,
+  Gem,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { Country } from '../types';
 
@@ -8,6 +19,11 @@ type TopBarProps = {
   activeCountryId?: string;
   colonizationGainPerTurn: number;
   constructionGainPerTurn: number;
+  scienceGainPerTurn: number;
+  cultureGainPerTurn: number;
+  religionGainPerTurn: number;
+  goldGainPerTurn: number;
+  ducatsGainPerTurn: number;
   onSelectCountry: (id: string) => void;
   onEndTurn: () => void;
   onOpenHotseat: () => void;
@@ -23,6 +39,11 @@ export default function TopBar({
   activeCountryId,
   colonizationGainPerTurn,
   constructionGainPerTurn,
+  scienceGainPerTurn,
+  cultureGainPerTurn,
+  religionGainPerTurn,
+  goldGainPerTurn,
+  ducatsGainPerTurn,
   onSelectCountry,
   onEndTurn,
   onOpenHotseat,
@@ -170,10 +191,10 @@ export default function TopBar({
             onMouseLeave={hideTooltip}
           >
             <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Globe2 className="w-4 h-4 text-white/80" />
+              <Globe2 className="w-4 h-4 text-emerald-300" />
             </div>
           </div>
-          <span className="text-white font-bold text-sm">
+          <span className="text-emerald-100 font-bold text-sm">
             {activeCountry?.colonizationPoints ?? 0}
           </span>
           {colonizationGainPerTurn > 0 && (
@@ -191,15 +212,120 @@ export default function TopBar({
             onMouseLeave={hideTooltip}
           >
             <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Hammer className="w-4 h-4 text-white/80" />
+              <Hammer className="w-4 h-4 text-amber-300" />
             </div>
           </div>
-          <span className="text-white font-bold text-sm">
+          <span className="text-amber-100 font-bold text-sm">
             {activeCountry?.constructionPoints ?? 0}
           </span>
           {constructionGainPerTurn > 0 && (
             <span className="text-emerald-400 text-xs font-semibold">
               +{constructionGainPerTurn}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+          <div
+            className="relative group"
+            onMouseEnter={(event) => showTooltip('Очки науки', event)}
+            onMouseMove={moveTooltip}
+            onMouseLeave={hideTooltip}
+          >
+            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
+              <Atom className="w-4 h-4 text-sky-300" />
+            </div>
+          </div>
+          <span className="text-sky-100 font-bold text-sm">
+            {activeCountry?.sciencePoints ?? 0}
+          </span>
+          {scienceGainPerTurn > 0 && (
+            <span className="text-emerald-400 text-xs font-semibold">
+              +{scienceGainPerTurn}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+          <div
+            className="relative group"
+            onMouseEnter={(event) => showTooltip('Очки культуры', event)}
+            onMouseMove={moveTooltip}
+            onMouseLeave={hideTooltip}
+          >
+            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
+              <Feather className="w-4 h-4 text-rose-300" />
+            </div>
+          </div>
+          <span className="text-rose-100 font-bold text-sm">
+            {activeCountry?.culturePoints ?? 0}
+          </span>
+          {cultureGainPerTurn > 0 && (
+            <span className="text-emerald-400 text-xs font-semibold">
+              +{cultureGainPerTurn}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+          <div
+            className="relative group"
+            onMouseEnter={(event) => showTooltip('Очки религии', event)}
+            onMouseMove={moveTooltip}
+            onMouseLeave={hideTooltip}
+          >
+            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
+              <Cross className="w-4 h-4 text-violet-300" />
+            </div>
+          </div>
+          <span className="text-violet-100 font-bold text-sm">
+            {activeCountry?.religionPoints ?? 0}
+          </span>
+          {religionGainPerTurn > 0 && (
+            <span className="text-emerald-400 text-xs font-semibold">
+              +{religionGainPerTurn}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+          <div
+            className="relative group"
+            onMouseEnter={(event) => showTooltip('Золото', event)}
+            onMouseMove={moveTooltip}
+            onMouseLeave={hideTooltip}
+          >
+            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
+              <Coins className="w-4 h-4 text-yellow-300" />
+            </div>
+          </div>
+          <span className="text-yellow-100 font-bold text-sm">
+            {activeCountry?.gold ?? 0}
+          </span>
+          {goldGainPerTurn > 0 && (
+            <span className="text-emerald-400 text-xs font-semibold">
+              +{goldGainPerTurn}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+          <div
+            className="relative group"
+            onMouseEnter={(event) => showTooltip('Дукаты', event)}
+            onMouseMove={moveTooltip}
+            onMouseLeave={hideTooltip}
+          >
+            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
+              <Gem className="w-4 h-4 text-cyan-300" />
+            </div>
+          </div>
+          <span className="text-cyan-100 font-bold text-sm">
+            {activeCountry?.ducats ?? 0}
+          </span>
+          {ducatsGainPerTurn > 0 && (
+            <span className="text-emerald-400 text-xs font-semibold">
+              +{ducatsGainPerTurn}
             </span>
           )}
         </div>
