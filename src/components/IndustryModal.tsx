@@ -1,5 +1,6 @@
 import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { expandDiplomacyAgreements } from '../diplomacyUtils';
 import type {
   BuildingDefinition,
   Country,
@@ -374,7 +375,8 @@ const isBuildingActiveForProvince = (
   const hostId = province.ownerCountryId;
   const ownerCountryId = getOwnerCountryId(owner, companies);
   if (hostId && ownerCountryId && hostId !== ownerCountryId) {
-    const agreements = diplomacyAgreements.filter(
+    const directionalAgreements = expandDiplomacyAgreements(diplomacyAgreements);
+    const agreements = directionalAgreements.filter(
       (agreement) =>
         agreement.hostCountryId === hostId &&
         agreement.guestCountryId === ownerCountryId,
@@ -761,7 +763,8 @@ const getInactiveReasons = (
   const hostId = province.ownerCountryId;
   const ownerCountryId = getOwnerCountryId(owner, companies);
   if (hostId && ownerCountryId && hostId !== ownerCountryId) {
-    const agreements = diplomacyAgreements.filter(
+    const directionalAgreements = expandDiplomacyAgreements(diplomacyAgreements);
+    const agreements = directionalAgreements.filter(
       (agreement) =>
         agreement.hostCountryId === hostId &&
         agreement.guestCountryId === ownerCountryId,
@@ -922,7 +925,7 @@ export default function IndustryModal({
   } | null>(null);
   const activeDiplomacyAgreements = useMemo(
     () =>
-      diplomacyAgreements.filter((agreement) => {
+      expandDiplomacyAgreements(diplomacyAgreements).filter((agreement) => {
         if (!agreement.durationTurns || agreement.durationTurns <= 0) return true;
         if (!agreement.startTurn) return true;
         return turn - agreement.startTurn < agreement.durationTurns;

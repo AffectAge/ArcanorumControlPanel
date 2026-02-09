@@ -1,5 +1,6 @@
 import { X, Hammer, Ban } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { expandDiplomacyAgreements } from '../diplomacyUtils';
 import type {
   BuildingDefinition,
   Company,
@@ -54,6 +55,10 @@ export default function ConstructionModal({
   const availableCompanies = useMemo(
     () => companies.filter((company) => company.countryId === activeCountryId),
     [companies, activeCountryId],
+  );
+  const directionalAgreements = useMemo(
+    () => expandDiplomacyAgreements(diplomacyAgreements),
+    [diplomacyAgreements],
   );
   const normalizeTraitCriteria = (
     criteria: TraitCriteria | undefined,
@@ -158,7 +163,7 @@ export default function ConstructionModal({
       activeCountryId &&
         province.ownerCountryId &&
         (province.ownerCountryId === activeCountryId ||
-          diplomacyAgreements.some(
+          directionalAgreements.some(
             (agreement) =>
               agreement.hostCountryId === province.ownerCountryId &&
               agreement.guestCountryId === activeCountryId &&
@@ -175,7 +180,7 @@ export default function ConstructionModal({
     const ownerCountryId = getOwnerCountryId(target);
     if (!hostId || !ownerCountryId) return false;
     if (hostId === ownerCountryId) return true;
-    const agreements = diplomacyAgreements.filter(
+    const agreements = directionalAgreements.filter(
       (agreement) =>
         agreement.hostCountryId === hostId &&
         agreement.guestCountryId === ownerCountryId &&
@@ -302,7 +307,7 @@ export default function ConstructionModal({
     const ownerCountry = getOwnerCountryId(target);
     if (!hostId || !ownerCountry) return 'Нет владельца провинции';
     if (hostId === ownerCountry) return null;
-    const agreements = diplomacyAgreements.filter(
+    const agreements = directionalAgreements.filter(
       (agreement) =>
         agreement.hostCountryId === hostId &&
         agreement.guestCountryId === ownerCountry &&

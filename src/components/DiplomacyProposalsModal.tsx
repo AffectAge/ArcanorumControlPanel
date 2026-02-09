@@ -56,43 +56,67 @@ export default function DiplomacyProposalsModal({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {proposals.map((proposal) => {
-                const agreement = proposal.agreement;
-                const industryNames = agreement.industries?.length
-                  ? agreement.industries
-                      .map(
-                        (id) => industries.find((item) => item.id === id)?.name ?? id,
-                      )
-                      .join(', ')
-                  : 'Все отрасли';
-                const perProvince = agreement.limits?.perProvince ?? 0;
-                const perCountry = agreement.limits?.perCountry ?? 0;
-                const global = agreement.limits?.global ?? 0;
                 const limitLabel = (value: number) => (value && value > 0 ? value : '∞');
-                const durationLabel =
-                  agreement.durationTurns && agreement.durationTurns > 0
-                    ? `${agreement.durationTurns} ход.`
-                    : 'Бессрочно';
-                const allowedBuildingsLabel =
-                  agreement.buildingIds && agreement.buildingIds.length > 0
-                    ? agreement.buildingIds
-                        .map((id) => buildings.find((b) => b.id === id)?.name ?? id)
-                        .join(', ')
-                    : 'Все здания';
-                const allowedProvincesLabel =
-                  agreement.provinceIds && agreement.provinceIds.length > 0
-                    ? agreement.provinceIds.join(', ')
-                    : 'Все провинции';
-                const allowState = agreement.allowState ?? agreement.kind === 'state';
-                const allowCompanies =
-                  agreement.allowCompanies ?? agreement.kind === 'company';
-                const companyLabel =
-                  agreement.companyIds && agreement.companyIds.length > 0
-                    ? agreement.companyIds
+                const renderAgreementDetails = (
+                  agreement: DiplomacyProposal['agreement'],
+                ) => {
+                  const industryNames = agreement.industries?.length
+                    ? agreement.industries
                         .map(
-                          (id) => companies.find((item) => item.id === id)?.name ?? id,
+                          (id) => industries.find((item) => item.id === id)?.name ?? id,
                         )
                         .join(', ')
-                    : 'Все компании';
+                    : 'Все отрасли';
+                  const perProvince = agreement.limits?.perProvince ?? 0;
+                  const perCountry = agreement.limits?.perCountry ?? 0;
+                  const global = agreement.limits?.global ?? 0;
+                  const allowedBuildingsLabel =
+                    agreement.buildingIds && agreement.buildingIds.length > 0
+                      ? agreement.buildingIds
+                          .map((id) => buildings.find((b) => b.id === id)?.name ?? id)
+                          .join(', ')
+                      : 'Все здания';
+                  const allowedProvincesLabel =
+                    agreement.provinceIds && agreement.provinceIds.length > 0
+                      ? agreement.provinceIds.join(', ')
+                      : 'Все провинции';
+                  const allowState = agreement.allowState ?? agreement.kind === 'state';
+                  const allowCompanies =
+                    agreement.allowCompanies ?? agreement.kind === 'company';
+                  const companyLabel =
+                    agreement.companyIds && agreement.companyIds.length > 0
+                      ? agreement.companyIds
+                          .map(
+                            (id) => companies.find((item) => item.id === id)?.name ?? id,
+                          )
+                          .join(', ')
+                      : 'Все компании';
+                  return (
+                    <>
+                      <div className="text-white/50 text-xs">
+                        Разрешено:{' '}
+                        {allowState ? 'Государство' : ''}
+                        {allowState && allowCompanies ? ' + ' : ''}
+                        {allowCompanies ? 'Компании' : ''}
+                      </div>
+                      {allowCompanies && (
+                        <div className="text-white/50 text-xs">Компании: {companyLabel}</div>
+                      )}
+                      <div className="text-white/50 text-xs">Здания: {allowedBuildingsLabel}</div>
+                      <div className="text-white/50 text-xs">Провинции: {allowedProvincesLabel}</div>
+                      <div className="text-white/50 text-xs">Отрасли: {industryNames}</div>
+                      <div className="text-white/50 text-xs">
+                        Лимиты: Пров. {limitLabel(perProvince)} / Гос. {limitLabel(perCountry)} /
+                        Мир {limitLabel(global)}
+                      </div>
+                    </>
+                  );
+                };
+                const durationLabel =
+                  proposal.agreement.durationTurns &&
+                  proposal.agreement.durationTurns > 0
+                    ? `${proposal.agreement.durationTurns} ход.`
+                    : 'Бессрочно';
                 return (
                   <div
                     key={proposal.id}
@@ -102,26 +126,32 @@ export default function DiplomacyProposalsModal({
                       {findCountryName(countries, proposal.fromCountryId)} →{' '}
                       {findCountryName(countries, proposal.toCountryId)}
                     </div>
-                    <div className="text-white/50 text-xs">
-                      Разрешено:{' '}
-                      {allowState ? 'Государство' : ''}
-                      {allowState && allowCompanies ? ' + ' : ''}
-                      {allowCompanies ? 'Компании' : ''}
+                    <div className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-2.5 space-y-1">
+                      <div className="text-amber-200/90 text-xs font-semibold">
+                        Они получат
+                      </div>
+                      {renderAgreementDetails(proposal.agreement)}
                     </div>
-                    {allowCompanies && (
-                      <div className="text-white/50 text-xs">Компании: {companyLabel}</div>
-                    )}
-                    <div className="text-white/50 text-xs">Здания: {allowedBuildingsLabel}</div>
-                    <div className="text-white/50 text-xs">Провинции: {allowedProvincesLabel}</div>
-                    <div className="text-white/50 text-xs">Отрасли: {industryNames}</div>
-                    <div className="text-white/50 text-xs">
-                      Лимиты: Пров. {limitLabel(perProvince)} / Гос. {limitLabel(perCountry)} / Мир{' '}
-                      {limitLabel(global)}
+                    <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/5 p-2.5 space-y-1">
+                      <div className="text-emerald-200/90 text-xs font-semibold">
+                        Вы получите
+                      </div>
+                      {proposal.counterAgreement
+                        ? renderAgreementDetails(proposal.counterAgreement)
+                        : proposal.reciprocal
+                          ? (
+                            <div className="text-white/50 text-xs">
+                              Зеркально к их условиям (старый формат взаимного
+                              соглашения).
+                            </div>
+                            )
+                          : (
+                            <div className="text-white/50 text-xs">
+                              Отдельные условия для вашей стороны не заданы.
+                            </div>
+                            )}
                     </div>
-                    <div className="text-white/50 text-xs">Срок: {durationLabel}</div>
-                    {proposal.reciprocal && (
-                      <div className="text-emerald-300/80 text-xs">Взаимное соглашение</div>
-                    )}
+                    <div className="text-white/50 text-xs">Срок договора: {durationLabel}</div>
                     <div className="flex items-center gap-2 pt-2">
                       <button
                         onClick={() => onAccept(proposal.id)}

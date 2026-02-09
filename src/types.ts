@@ -199,6 +199,20 @@ export type DiplomacyAgreement = {
     perCountry?: number;
     global?: number;
   };
+  counterTerms?: {
+    kind?: 'company' | 'state';
+    allowState?: boolean;
+    allowCompanies?: boolean;
+    companyIds?: string[];
+    buildingIds?: string[];
+    provinceIds?: string[];
+    industries?: string[];
+    limits?: {
+      perProvince?: number;
+      perCountry?: number;
+      global?: number;
+    };
+  };
   startTurn?: number;
   durationTurns?: number;
 };
@@ -208,7 +222,8 @@ export type DiplomacyProposal = {
   fromCountryId: string;
   toCountryId: string;
   agreement: Omit<DiplomacyAgreement, 'id'>;
-  reciprocal: boolean;
+  counterAgreement?: Omit<DiplomacyAgreement, 'id'>;
+  reciprocal?: boolean;
   createdTurn: number;
 };
 

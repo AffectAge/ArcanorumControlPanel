@@ -21,6 +21,7 @@ import {
   createDefaultLog,
   createDefaultFilters,
 } from './eventLog';
+import { resolveAgreementTerms } from './diplomacyUtils';
 import type {
   Country,
   GameState,
@@ -1713,24 +1714,12 @@ function App() {
     });
   };
 
-  const applyDiplomacyAgreement = (
-    payload: Omit<DiplomacyAgreement, 'id'>,
-    reciprocal: boolean,
-  ) => {
+  const applyDiplomacyAgreement = (payload: Omit<DiplomacyAgreement, 'id'>) => {
     setDiplomacyAgreements((prev) => {
       const next = [
         ...prev,
         { ...payload, id: createId(), startTurn: turn },
       ];
-      if (reciprocal && payload.hostCountryId !== payload.guestCountryId) {
-        next.push({
-          ...payload,
-          id: createId(),
-          hostCountryId: payload.guestCountryId,
-          guestCountryId: payload.hostCountryId,
-          startTurn: turn,
-        });
-      }
       return next;
     });
   };
@@ -1764,7 +1753,33 @@ function App() {
   const acceptDiplomacyProposal = (proposalId: string) => {
     const proposal = diplomacyProposals.find((entry) => entry.id === proposalId);
     if (!proposal) return;
-    applyDiplomacyAgreement(proposal.agreement, proposal.reciprocal);
+    const mergedAgreement: Omit<DiplomacyAgreement, 'id'> = {
+      ...proposal.agreement,
+      counterTerms: proposal.counterAgreement
+        ? {
+            kind: proposal.counterAgreement.kind,
+            allowState: proposal.counterAgreement.allowState,
+            allowCompanies: proposal.counterAgreement.allowCompanies,
+            companyIds: proposal.counterAgreement.companyIds,
+            buildingIds: proposal.counterAgreement.buildingIds,
+            provinceIds: proposal.counterAgreement.provinceIds,
+            industries: proposal.counterAgreement.industries,
+            limits: proposal.counterAgreement.limits,
+          }
+        : proposal.reciprocal
+          ? {
+              kind: proposal.agreement.kind,
+              allowState: proposal.agreement.allowState,
+              allowCompanies: proposal.agreement.allowCompanies,
+              companyIds: proposal.agreement.companyIds,
+              buildingIds: proposal.agreement.buildingIds,
+              provinceIds: proposal.agreement.provinceIds,
+              industries: proposal.agreement.industries,
+              limits: proposal.agreement.limits,
+            }
+          : undefined,
+    };
+    applyDiplomacyAgreement(mergedAgreement);
     setDiplomacyProposals((prev) =>
       prev.filter((entry) => entry.id !== proposalId),
     );
@@ -1920,41 +1935,59 @@ function App() {
         if (!hostId || !ownerCountryId) return false;
         if (hostId === ownerCountryId) return true;
         const matches = diplomacyAgreements.filter(
-          (agreement) =>
-            agreement.hostCountryId === hostId &&
-            agreement.guestCountryId === ownerCountryId &&
-            isAgreementActive(agreement),
+          (agreement) => isAgreementActive(agreement),
         );
-        if (matches.length === 0) return false;
+        const matchesWithTerms = matches
+          .map((agreement) => ({
+            agreement,
+            terms: resolveAgreementTerms(agreement, hostId, ownerCountryId),
+          }))
+          .filter((entry) => entry.terms != null);
+        if (matchesWithTerms.length === 0) return false;
 
-        const industryAllowed = (agreement: DiplomacyAgreement, id: string) => {
-          if (!agreement.industries || agreement.industries.length === 0) {
+        const industryAllowed = (
+          agreement: DiplomacyAgreement,
+          id: string,
+          terms: ReturnType<typeof resolveAgreementTerms>,
+        ) => {
+          if (!terms?.industries || terms.industries.length === 0) {
             return true;
           }
           const industryId =
             buildings.find((item) => item.id === id)?.industryId ?? undefined;
-          return Boolean(industryId && agreement.industries.includes(industryId));
+          return Boolean(industryId && terms.industries.includes(industryId));
         };
-        const buildingAllowed = (agreement: DiplomacyAgreement, id: string) => {
-          if (!agreement.buildingIds || agreement.buildingIds.length === 0) {
+        const buildingAllowed = (
+          agreement: DiplomacyAgreement,
+          id: string,
+          terms: ReturnType<typeof resolveAgreementTerms>,
+        ) => {
+          if (!terms?.buildingIds || terms.buildingIds.length === 0) {
             return true;
           }
-          return agreement.buildingIds.includes(id);
+          return terms.buildingIds.includes(id);
         };
-        const provinceAllowed = (agreement: DiplomacyAgreement, provId: string) => {
-          if (!agreement.provinceIds || agreement.provinceIds.length === 0) {
+        const provinceAllowed = (
+          agreement: DiplomacyAgreement,
+          provId: string,
+          terms: ReturnType<typeof resolveAgreementTerms>,
+        ) => {
+          if (!terms?.provinceIds || terms.provinceIds.length === 0) {
             return true;
           }
-          return agreement.provinceIds.includes(provId);
+          return terms.provinceIds.includes(provId);
         };
-        const ownerAllowed = (agreement: DiplomacyAgreement) => {
-          const allowsState = agreement.allowState ?? agreement.kind === 'state';
+        const ownerAllowed = (
+          agreement: DiplomacyAgreement,
+          terms: ReturnType<typeof resolveAgreementTerms>,
+        ) => {
+          const allowsState = terms?.allowState ?? terms?.kind === 'state';
           const allowsCompanies =
-            agreement.allowCompanies ?? agreement.kind === 'company';
+            terms?.allowCompanies ?? terms?.kind === 'company';
           if (owner.type === 'state') return allowsState;
           if (!allowsCompanies) return false;
-          if (agreement.companyIds && agreement.companyIds.length > 0) {
-            return agreement.companyIds.includes(owner.companyId);
+          if (terms?.companyIds && terms.companyIds.length > 0) {
+            return terms.companyIds.includes(owner.companyId);
           }
           return true;
         };
@@ -1965,19 +1998,25 @@ function App() {
           provinceId: string,
         ) =>
           agreementsToUse.find((agreement) => {
-            const allowsState = agreement.allowState ?? agreement.kind === 'state';
+            const terms = resolveAgreementTerms(
+              agreement,
+              hostId,
+              ownerCountryId,
+            );
+            if (!terms) return false;
+            const allowsState = terms.allowState ?? terms.kind === 'state';
             const allowsCompanies =
-              agreement.allowCompanies ?? agreement.kind === 'company';
+              terms.allowCompanies ?? terms.kind === 'company';
             if (target.type === 'state') {
               if (!allowsState) return false;
             } else {
               if (!allowsCompanies) return false;
-              if (agreement.companyIds && agreement.companyIds.length > 0) {
-                if (!agreement.companyIds.includes(target.companyId)) return false;
+              if (terms.companyIds && terms.companyIds.length > 0) {
+                if (!terms.companyIds.includes(target.companyId)) return false;
               }
             }
-            if (!provinceAllowed(agreement, provinceId)) return false;
-            if (!buildingAllowed(agreement, buildingId)) return false;
+            if (!provinceAllowed(agreement, provinceId, terms)) return false;
+            if (!buildingAllowed(agreement, buildingId, terms)) return false;
             return true;
           });
 
@@ -1996,8 +2035,10 @@ function App() {
               if (!match) return false;
               const entryCountryId = getOwnerCountryId(entry.owner);
               if (entryCountryId !== ownerCountryId) return false;
-              if (!provinceAllowed(match, prov.id)) return false;
-              return industryAllowed(match, entry.buildingId);
+              const terms = resolveAgreementTerms(match, hostId, ownerCountryId);
+              if (!terms) return false;
+              if (!provinceAllowed(match, prov.id, terms)) return false;
+              return industryAllowed(match, entry.buildingId, terms);
             }).length;
             const inProgress = Object.entries(prov.constructionProgress ?? {}).reduce(
               (sumProgress, [entryBuildingId, entries]) => {
@@ -2011,8 +2052,14 @@ function App() {
                   if (!match) return false;
                   const entryCountryId = getOwnerCountryId(entry.owner);
                   if (entryCountryId !== ownerCountryId) return false;
-                  if (!provinceAllowed(match, prov.id)) return false;
-                  return industryAllowed(match, entryBuildingId);
+                  const terms = resolveAgreementTerms(
+                    match,
+                    hostId,
+                    ownerCountryId,
+                  );
+                  if (!terms) return false;
+                  if (!provinceAllowed(match, prov.id, terms)) return false;
+                  return industryAllowed(match, entryBuildingId, terms);
                 });
                 return sumProgress + filtered.length;
               },
@@ -2021,12 +2068,13 @@ function App() {
             return sum + built + inProgress;
           }, 0);
 
-        return matches.some((agreement) => {
-          if (!ownerAllowed(agreement)) return false;
-          if (!provinceAllowed(agreement, provinceId)) return false;
-          if (!buildingAllowed(agreement, buildingId)) return false;
-          if (!industryAllowed(agreement, buildingId)) return false;
-          const limits = agreement.limits ?? {};
+        return matchesWithTerms.some(({ agreement, terms }) => {
+          if (!terms) return false;
+          if (!ownerAllowed(agreement, terms)) return false;
+          if (!provinceAllowed(agreement, provinceId, terms)) return false;
+          if (!buildingAllowed(agreement, buildingId, terms)) return false;
+          if (!industryAllowed(agreement, buildingId, terms)) return false;
+          const limits = terms.limits ?? {};
           const perProvince = limits.perProvince ?? 0;
           const perCountry = limits.perCountry ?? 0;
           const global = limits.global ?? 0;
