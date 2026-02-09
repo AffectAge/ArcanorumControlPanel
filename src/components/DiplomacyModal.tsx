@@ -6,6 +6,11 @@ import {
   Handshake,
   Landmark,
   Briefcase,
+  Factory,
+  MapPin,
+  Layers,
+  Gauge,
+  BarChart3,
   Clock,
   Hourglass,
 } from 'lucide-react';
@@ -62,6 +67,7 @@ export default function DiplomacyModal({
     },
   ];
   const [activeTreatyType, setActiveTreatyType] = useState(treatyTypes[0].id);
+  const [agreementTitle, setAgreementTitle] = useState('');
   const [allowState, setAllowState] = useState(true);
   const [allowCompanies, setAllowCompanies] = useState(true);
   const [allCompanies, setAllCompanies] = useState(true);
@@ -372,6 +378,7 @@ export default function DiplomacyModal({
       fromCountryId: guestId,
       toCountryId: hostId,
       agreement: {
+        title: agreementTitle.trim() || undefined,
         hostCountryId: hostId,
         guestCountryId: guestId,
         allowState,
@@ -447,6 +454,7 @@ export default function DiplomacyModal({
       },
     });
     setSelectedIndustries(new Set());
+    setAgreementTitle('');
     setLimitProvince(0);
     setLimitCountry(0);
     setLimitGlobal(0);
@@ -577,6 +585,16 @@ export default function DiplomacyModal({
               <div className="space-y-4">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
                 <div className="text-white/80 text-sm font-semibold">Новое соглашение</div>
+                <label className="flex flex-col gap-1 text-white/70 text-sm">
+                  Название соглашения
+                  <input
+                    type="text"
+                    value={agreementTitle}
+                    onChange={(event) => setAgreementTitle(event.target.value)}
+                    placeholder="Например: Пакт развития промышленности"
+                    className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs placeholder:text-white/35 focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label className="flex flex-col gap-1 text-white/70 text-sm">
                     Вторая сторона
@@ -1243,6 +1261,7 @@ export default function DiplomacyModal({
                         : { perProvince: 0, perCountry: 0, global: 0 };
                     const hostTermsLabel = resolveTerms(hostGetsTerms);
                     const guestTermsLabel = resolveTerms(guestGetsTerms);
+                    const agreementTitleLabel = agreement.title?.trim();
                     const statusLabel =
                       item.type === 'proposal' ? 'Ожидаем ответа' : 'Действует';
                     const statusStyle =
@@ -1256,6 +1275,11 @@ export default function DiplomacyModal({
                       >
                         <div className="space-y-2 flex-1">
                           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 text-xs">
+                            {agreementTitleLabel && (
+                              <div className="xl:col-span-2 rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-amber-100 text-sm font-semibold text-center">
+                                {agreementTitleLabel}
+                              </div>
+                            )}
                             <div className="space-y-2">
                               <div className="rounded-lg border border-sky-400/40 bg-sky-500/15 p-2">
                                 <div className="flex flex-col items-center gap-1 text-center">
@@ -1279,7 +1303,7 @@ export default function DiplomacyModal({
                                 <div className="text-sky-200/90 font-semibold text-center">
                                   Получает по договору
                                 </div>
-                              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                              <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
                                 {hostTermsLabel.allowsState && (
                                   <span className="px-2 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-200 inline-flex items-center gap-1">
                                     <Landmark className="w-3.5 h-3.5" />
@@ -1293,13 +1317,65 @@ export default function DiplomacyModal({
                                   </span>
                                 )}
                               </div>
-                              <div className="text-white/55">Компании: {hostTermsLabel.companiesLabel}</div>
-                              <div className="text-white/55">Здания: {hostTermsLabel.buildingsLabel}</div>
-                              <div className="text-white/55">Провинции: {hostTermsLabel.provincesLabel}</div>
-                              <div className="text-white/55">Отрасли: {hostTermsLabel.industriesLabel}</div>
-                              <div className="text-white/55">Лимиты: {hostTermsLabel.limitsLabel}</div>
-                              <div className="text-white/55">
-                                Использовано: Пров. {hostUsage.perProvince} / Гос.{' '}
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <Briefcase className="w-3.5 h-3.5" />
+                                  Компании:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Какие компании могут строить по договору.
+                                  </span>
+                                </span>{' '}
+                                {hostTermsLabel.companiesLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <Factory className="w-3.5 h-3.5" />
+                                  Здания:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Список типов зданий, доступных по договору.
+                                  </span>
+                                </span>{' '}
+                                {hostTermsLabel.buildingsLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  Провинции:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    В каких провинциях действуют эти условия.
+                                  </span>
+                                </span>{' '}
+                                {hostTermsLabel.provincesLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <Layers className="w-3.5 h-3.5" />
+                                  Отрасли:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Ограничение по отраслям разрешенных зданий.
+                                  </span>
+                                </span>{' '}
+                                {hostTermsLabel.industriesLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <Gauge className="w-3.5 h-3.5" />
+                                  Лимиты:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Максимум построек по провинции, стране и миру.
+                                  </span>
+                                </span>{' '}
+                                {hostTermsLabel.limitsLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <BarChart3 className="w-3.5 h-3.5" />
+                                  Использовано:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Сколько слотов лимита уже занято.
+                                  </span>
+                                </span>{' '}
+                                Пров. {hostUsage.perProvince} / Гос.{' '}
                                 {hostUsage.perCountry} / Мир {hostUsage.global}
                               </div>
                             </div>
@@ -1327,7 +1403,7 @@ export default function DiplomacyModal({
                                 <div className="text-emerald-200/90 font-semibold text-center">
                                   Получает по договору
                                 </div>
-                              <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                              <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
                                 {guestTermsLabel.allowsState && (
                                   <span className="px-2 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-200 inline-flex items-center gap-1">
                                     <Landmark className="w-3.5 h-3.5" />
@@ -1341,13 +1417,65 @@ export default function DiplomacyModal({
                                   </span>
                                 )}
                               </div>
-                              <div className="text-white/55">Компании: {guestTermsLabel.companiesLabel}</div>
-                              <div className="text-white/55">Здания: {guestTermsLabel.buildingsLabel}</div>
-                              <div className="text-white/55">Провинции: {guestTermsLabel.provincesLabel}</div>
-                              <div className="text-white/55">Отрасли: {guestTermsLabel.industriesLabel}</div>
-                              <div className="text-white/55">Лимиты: {guestTermsLabel.limitsLabel}</div>
-                              <div className="text-white/55">
-                                Использовано: Пров. {guestUsage.perProvince} / Гос.{' '}
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <Briefcase className="w-3.5 h-3.5" />
+                                  Компании:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Какие компании могут строить по договору.
+                                  </span>
+                                </span>{' '}
+                                {guestTermsLabel.companiesLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <Factory className="w-3.5 h-3.5" />
+                                  Здания:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Список типов зданий, доступных по договору.
+                                  </span>
+                                </span>{' '}
+                                {guestTermsLabel.buildingsLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  Провинции:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    В каких провинциях действуют эти условия.
+                                  </span>
+                                </span>{' '}
+                                {guestTermsLabel.provincesLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <Layers className="w-3.5 h-3.5" />
+                                  Отрасли:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Ограничение по отраслям разрешенных зданий.
+                                  </span>
+                                </span>{' '}
+                                {guestTermsLabel.industriesLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <Gauge className="w-3.5 h-3.5" />
+                                  Лимиты:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Максимум построек по провинции, стране и миру.
+                                  </span>
+                                </span>{' '}
+                                {guestTermsLabel.limitsLabel}
+                              </div>
+                              <div className="text-white/55 text-center">
+                                <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                  <BarChart3 className="w-3.5 h-3.5" />
+                                  Использовано:
+                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Сколько слотов лимита уже занято.
+                                  </span>
+                                </span>{' '}
+                                Пров. {guestUsage.perProvince} / Гос.{' '}
                                 {guestUsage.perCountry} / Мир {guestUsage.global}
                               </div>
                             </div>

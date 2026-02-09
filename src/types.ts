@@ -185,6 +185,7 @@ export type Company = {
 
 export type DiplomacyAgreement = {
   id: string;
+  title?: string;
   hostCountryId: string;
   guestCountryId: string;
   kind?: 'company' | 'state';
