@@ -499,7 +499,9 @@ export default function DiplomacyModal({
       agreement.guestCountryId === activeCountryId,
   );
   const visibleProposals = proposals.filter(
-    (proposal) => activeCountryId && proposal.fromCountryId === activeCountryId,
+    (proposal) =>
+      activeCountryId &&
+      proposal.fromCountryId === activeCountryId,
   );
 
   const items = [

@@ -122,10 +122,21 @@ export default function DiplomacyProposalsModal({
                     key={proposal.id}
                     className="rounded-xl border border-white/10 bg-black/30 p-4 flex flex-col gap-3"
                   >
+                    {proposal.kind === 'renewal' && (
+                      <div className="rounded-lg border border-sky-400/35 bg-sky-500/10 px-2.5 py-1.5 text-sky-200 text-xs font-semibold">
+                        Запрос продления договора
+                      </div>
+                    )}
                     <div className="text-white/80 text-sm font-semibold">
-                      {findCountryName(countries, proposal.fromCountryId)} →{' '}
-                      {findCountryName(countries, proposal.toCountryId)}
+                      {proposal.kind === 'renewal'
+                        ? `${findCountryName(countries, proposal.agreement.hostCountryId)} ↔ ${findCountryName(countries, proposal.agreement.guestCountryId)}`
+                        : `${findCountryName(countries, proposal.fromCountryId)} → ${findCountryName(countries, proposal.toCountryId)}`}
                     </div>
+                    {proposal.kind === 'renewal' && (
+                      <div className="text-white/50 text-xs">
+                        Нужно подтверждение обеих сторон.
+                      </div>
+                    )}
                     <div className="rounded-lg border border-amber-400/30 bg-amber-500/5 p-2.5 space-y-1">
                       <div className="text-amber-200/90 text-xs font-semibold">
                         Они получат

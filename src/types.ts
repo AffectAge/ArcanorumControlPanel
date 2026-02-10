@@ -220,11 +220,15 @@ export type DiplomacyAgreement = {
 
 export type DiplomacyProposal = {
   id: string;
+  kind?: 'new' | 'renewal';
   fromCountryId: string;
   toCountryId: string;
   agreement: Omit<DiplomacyAgreement, 'id'>;
   counterAgreement?: Omit<DiplomacyAgreement, 'id'>;
   reciprocal?: boolean;
+  targetCountryIds?: string[];
+  approvals?: string[];
+  sourceAgreementId?: string;
   createdTurn: number;
 };
 

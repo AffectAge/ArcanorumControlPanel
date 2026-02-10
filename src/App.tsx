@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Handshake } from 'lucide-react';
 import TopBar from './components/TopBar';
 import LeftToolbar from './components/LeftToolbar';
@@ -216,18 +216,18 @@ const defaultClimateColors = ['#38bdf8', '#60a5fa', '#fbbf24', '#f97316'];
 const defaultReligionColors = ['#facc15', '#fb7185', '#a855f7', '#60a5fa'];
 
 const initialMapLayers: MapLayer[] = [
-  { id: 'political', name: 'Политическая', visible: true },
-  { id: 'cultural', name: 'Культурная', visible: false },
-  { id: 'landscape', name: 'Ландшафт', visible: false },
-  { id: 'continent', name: 'Континент', visible: false },
-  { id: 'region', name: 'Регион', visible: false },
-  { id: 'climate', name: 'Климат', visible: false },
-  { id: 'religion', name: 'Религии', visible: false },
-  { id: 'resources', name: 'Ресурсы', visible: false },
-  { id: 'fertility', name: 'Плодородность', visible: false },
-  { id: 'radiation', name: 'Радиация', visible: false },
-  { id: 'pollution', name: 'Загрязнения', visible: false },
-  { id: 'colonization', name: 'Колонизация', visible: false },
+  { id: 'political', name: 'РџРѕР»РёС‚РёС‡РµСЃРєР°СЏ', visible: true },
+  { id: 'cultural', name: 'РљСѓР»СЊС‚СѓСЂРЅР°СЏ', visible: false },
+  { id: 'landscape', name: 'Р›Р°РЅРґС€Р°С„С‚', visible: false },
+  { id: 'continent', name: 'РљРѕРЅС‚РёРЅРµРЅС‚', visible: false },
+  { id: 'region', name: 'Р РµРіРёРѕРЅ', visible: false },
+  { id: 'climate', name: 'РљР»РёРјР°С‚', visible: false },
+  { id: 'religion', name: 'Р РµР»РёРіРёРё', visible: false },
+  { id: 'resources', name: 'Р РµСЃСѓСЂСЃС‹', visible: false },
+  { id: 'fertility', name: 'РџР»РѕРґРѕСЂРѕРґРЅРѕСЃС‚СЊ', visible: false },
+  { id: 'radiation', name: 'Р Р°РґРёР°С†РёСЏ', visible: false },
+  { id: 'pollution', name: 'Р—Р°РіСЂСЏР·РЅРµРЅРёСЏ', visible: false },
+  { id: 'colonization', name: 'РљРѕР»РѕРЅРёР·Р°С†РёСЏ', visible: false },
 ];
 
 function App() {
@@ -273,22 +273,22 @@ function App() {
   const [industryOpen, setIndustryOpen] = useState(false);
   const [diplomacyOpen, setDiplomacyOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>([
-    { id: createId(), name: 'Умеренный', color: '#38bdf8' },
-    { id: createId(), name: 'Засушливый', color: '#f59e0b' },
+    { id: createId(), name: 'РЈРјРµСЂРµРЅРЅС‹Р№', color: '#38bdf8' },
+    { id: createId(), name: 'Р—Р°СЃСѓС€Р»РёРІС‹Р№', color: '#f59e0b' },
   ]);
   const [religions, setReligions] = useState<Trait[]>([
-    { id: createId(), name: 'Солнечный культ', color: '#facc15' },
-    { id: createId(), name: 'Лунный культ', color: '#a855f7' },
+    { id: createId(), name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ РєСѓР»СЊС‚', color: '#facc15' },
+    { id: createId(), name: 'Р›СѓРЅРЅС‹Р№ РєСѓР»СЊС‚', color: '#a855f7' },
   ]);
   const [landscapes, setLandscapes] = useState<Trait[]>([
-    { id: createId(), name: 'Равнина', color: '#22c55e' },
-    { id: createId(), name: 'Горы', color: '#10b981' },
+    { id: createId(), name: 'Р Р°РІРЅРёРЅР°', color: '#22c55e' },
+    { id: createId(), name: 'Р“РѕСЂС‹', color: '#10b981' },
   ]);
   const [continents, setContinents] = useState<Trait[]>([]);
   const [regions, setRegions] = useState<Trait[]>([]);
   const [cultures, setCultures] = useState<Trait[]>([
-    { id: createId(), name: 'Северяне', color: '#fb7185' },
-    { id: createId(), name: 'Южане', color: '#f97316' },
+    { id: createId(), name: 'РЎРµРІРµСЂСЏРЅРµ', color: '#fb7185' },
+    { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
   ]);
   const [resources, setResources] = useState<Trait[]>([]);
   const [buildings, setBuildings] = useState<BuildingDefinition[]>([]);
@@ -308,7 +308,14 @@ function App() {
   const pendingDiplomacyProposals = useMemo(
     () =>
       diplomacyProposals.filter(
-        (proposal) => proposal.toCountryId === activeCountryId,
+        (proposal) =>
+          proposal.toCountryId === activeCountryId ||
+          (proposal.kind === 'renewal' &&
+            Boolean(
+              activeCountryId &&
+                proposal.targetCountryIds?.includes(activeCountryId) &&
+                !proposal.approvals?.includes(activeCountryId),
+            )),
       ),
     [diplomacyProposals, activeCountryId],
   );
@@ -501,7 +508,7 @@ function App() {
           province.colonizationProgress = {};
           addEvent({
             category: 'colonization',
-            message: `${country.name} завершила колонизацию провинции ${provinceId}.`,
+            message: `${country.name} Р·Р°РІРµСЂС€РёР»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
             countryId,
             priority: 'high',
           });
@@ -568,7 +575,7 @@ function App() {
             builtChanged = true;
             addEvent({
               category: 'economy',
-              message: `Строительство завершено: ${buildingName} x${completed} в провинции ${province.id}.`,
+              message: `РЎС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ Р·Р°РІРµСЂС€РµРЅРѕ: ${buildingName} x${completed} РІ РїСЂРѕРІРёРЅС†РёРё ${province.id}.`,
               countryId,
               priority: 'medium',
             });
@@ -612,7 +619,7 @@ function App() {
       setTurn((prev) => prev + 1);
       addEvent({
         category: 'system',
-        message: `Начался глобальный ход ${turn + 1}`,
+        message: `РќР°С‡Р°Р»СЃСЏ РіР»РѕР±Р°Р»СЊРЅС‹Р№ С…РѕРґ ${turn + 1}`,
         priority: 'low',
       });
       countries.forEach((country) => {
@@ -709,7 +716,7 @@ function App() {
                 ?.name ?? proposal.toCountryId;
             addEvent({
               category: 'diplomacy',
-              message: `${toName} отклонила предложение договора от ${fromName} (истек срок).`,
+              message: `${toName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName} (РёСЃС‚РµРє СЃСЂРѕРє).`,
               countryId: proposal.toCountryId,
               priority: 'low',
             });
@@ -719,46 +726,68 @@ function App() {
           (proposal) => nextTurn - proposal.createdTurn < expiry,
         );
       });
-      setDiplomacyAgreements((prev) => {
-        const [active, expired] = prev.reduce<
-          [DiplomacyAgreement[], DiplomacyAgreement[]]
-        >(
-          (acc, agreement) => {
-            if (!agreement.durationTurns || agreement.durationTurns <= 0) {
-              acc[0].push(agreement);
-              return acc;
-            }
-            if (!agreement.startTurn) {
-              acc[0].push(agreement);
-              return acc;
-            }
-            if (nextTurn - agreement.startTurn < agreement.durationTurns) {
-              acc[0].push(agreement);
-            } else {
-              acc[1].push(agreement);
-            }
+      const [activeAgreements, expiredAgreements] = diplomacyAgreements.reduce<
+        [DiplomacyAgreement[], DiplomacyAgreement[]]
+      >(
+        (acc, agreement) => {
+          if (!agreement.durationTurns || agreement.durationTurns <= 0) {
+            acc[0].push(agreement);
             return acc;
-          },
-          [[], []],
-        );
-        if (expired.length > 0) {
-          expired.forEach((agreement) => {
-            const hostName =
-              countries.find((c) => c.id === agreement.hostCountryId)?.name ??
-              agreement.hostCountryId;
-            const guestName =
-              countries.find((c) => c.id === agreement.guestCountryId)?.name ??
-              agreement.guestCountryId;
-            addEvent({
-              category: 'diplomacy',
-              message: `Договор ${hostName} → ${guestName} истёк.`,
-              countryId: agreement.hostCountryId,
-              priority: 'low',
+          }
+          if (!agreement.startTurn) {
+            acc[0].push(agreement);
+            return acc;
+          }
+          if (nextTurn - agreement.startTurn < agreement.durationTurns) {
+            acc[0].push(agreement);
+          } else {
+            acc[1].push(agreement);
+          }
+          return acc;
+        },
+        [[], []],
+      );
+      const renewalProposals: DiplomacyProposal[] = [];
+      if (expiredAgreements.length > 0) {
+        expiredAgreements.forEach((agreement) => {
+          if (agreement.durationTurns && agreement.durationTurns > 0) {
+            const { id: _ignoredAgreementId, ...agreementPayload } = agreement;
+            renewalProposals.push({
+              id: createId(),
+              kind: 'renewal',
+              fromCountryId: agreement.hostCountryId,
+              toCountryId: agreement.guestCountryId,
+              agreement: {
+                ...agreementPayload,
+                startTurn: undefined,
+              },
+              targetCountryIds: [
+                agreement.hostCountryId,
+                agreement.guestCountryId,
+              ],
+              approvals: [],
+              sourceAgreementId: agreement.id,
+              createdTurn: nextTurn,
             });
+          }
+          const hostName =
+            countries.find((c) => c.id === agreement.hostCountryId)?.name ??
+            agreement.hostCountryId;
+          const guestName =
+            countries.find((c) => c.id === agreement.guestCountryId)?.name ??
+            agreement.guestCountryId;
+          addEvent({
+            category: 'diplomacy',
+            message: `Срок договора ${hostName} ↔ ${guestName} истек. Отправлен запрос продления обеим сторонам.`,
+            countryId: agreement.hostCountryId,
+            priority: 'low',
           });
-        }
-        return active;
-      });
+        });
+      }
+      setDiplomacyAgreements(activeAgreements);
+      if (renewalProposals.length > 0) {
+        setDiplomacyProposals((prev) => [...prev, ...renewalProposals]);
+      }
     }
   };
 
@@ -934,7 +963,7 @@ function App() {
       const now = new Date().toISOString();
       return {
         id: typeof entry.id === 'string' ? entry.id : createId(),
-        name: typeof entry.name === 'string' ? entry.name : 'Импорт',
+        name: typeof entry.name === 'string' ? entry.name : 'РРјРїРѕСЂС‚',
         createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : now,
         updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : now,
         data: entry.data,
@@ -957,7 +986,7 @@ function App() {
     }
 
     if (incoming.length === 0) {
-      throw new Error('Файл не содержит корректных сохранений.');
+      throw new Error('Р¤Р°Р№Р» РЅРµ СЃРѕРґРµСЂР¶РёС‚ РєРѕСЂСЂРµРєС‚РЅС‹С… СЃРѕС…СЂР°РЅРµРЅРёР№.');
     }
 
     const existingIds = new Set(saves.map((save) => save.id));
@@ -978,22 +1007,22 @@ function App() {
     setSelectedProvinceId(undefined);
     setProvinces({});
     setClimates([
-      { id: createId(), name: 'Умеренный', color: '#38bdf8' },
-      { id: createId(), name: 'Засушливый', color: '#f59e0b' },
+      { id: createId(), name: 'РЈРјРµСЂРµРЅРЅС‹Р№', color: '#38bdf8' },
+      { id: createId(), name: 'Р—Р°СЃСѓС€Р»РёРІС‹Р№', color: '#f59e0b' },
     ]);
     setReligions([
-      { id: createId(), name: 'Солнечный культ', color: '#facc15' },
-      { id: createId(), name: 'Лунный культ', color: '#a855f7' },
+      { id: createId(), name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ РєСѓР»СЊС‚', color: '#facc15' },
+      { id: createId(), name: 'Р›СѓРЅРЅС‹Р№ РєСѓР»СЊС‚', color: '#a855f7' },
     ]);
     setLandscapes([
-      { id: createId(), name: 'Равнина', color: '#22c55e' },
-      { id: createId(), name: 'Горы', color: '#10b981' },
+      { id: createId(), name: 'Р Р°РІРЅРёРЅР°', color: '#22c55e' },
+      { id: createId(), name: 'Р“РѕСЂС‹', color: '#10b981' },
     ]);
     setContinents([]);
     setRegions([]);
     setCultures([
-      { id: createId(), name: 'Северяне', color: '#fb7185' },
-      { id: createId(), name: 'Южане', color: '#f97316' },
+      { id: createId(), name: 'РЎРµРІРµСЂСЏРЅРµ', color: '#fb7185' },
+      { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
     ]);
     setResources([]);
     setBuildings([]);
@@ -1281,11 +1310,11 @@ function App() {
     });
     legends.colonization = [
       ...colonizationLegend,
-      { label: 'Запрещено к колонизации', color: '#f87171' },
-      { label: 'Наши провинции', color: COLONIZATION_OWN_COLOR },
-      { label: 'Наши колонии', color: COLONIZATION_OWN_COLOR },
-      { label: 'Чужие провинции', color: COLONIZATION_OTHER_COLOR },
-      { label: 'Чужие колонии', color: COLONIZATION_OTHER_COLOR },
+      { label: 'Р—Р°РїСЂРµС‰РµРЅРѕ Рє РєРѕР»РѕРЅРёР·Р°С†РёРё', color: '#f87171' },
+      { label: 'РќР°С€Рё РїСЂРѕРІРёРЅС†РёРё', color: COLONIZATION_OWN_COLOR },
+      { label: 'РќР°С€Рё РєРѕР»РѕРЅРёРё', color: COLONIZATION_OWN_COLOR },
+      { label: 'Р§СѓР¶РёРµ РїСЂРѕРІРёРЅС†РёРё', color: COLONIZATION_OTHER_COLOR },
+      { label: 'Р§СѓР¶РёРµ РєРѕР»РѕРЅРёРё', color: COLONIZATION_OTHER_COLOR },
     ];
     legends.climate = climates.map((item) => ({
       label: item.name,
@@ -1320,7 +1349,7 @@ function App() {
       color: item.color,
     }));
     if (countries.length > 5) {
-      legends.political.push({ label: 'Другие страны', color: '#94a3b8' });
+      legends.political.push({ label: 'Р”СЂСѓРіРёРµ СЃС‚СЂР°РЅС‹', color: '#94a3b8' });
     }
     const envSteps = [0, 20, 40, 60, 80, 100];
     legends.radiation = envSteps.slice(0, -1).map((from, index) => {
@@ -1520,7 +1549,7 @@ function App() {
     if (activeLimit > 0 && activeCount >= activeLimit) {
       addEvent({
         category: 'colonization',
-        message: `${country?.name ?? 'Страна'} достигла лимита активных колонизаций (${activeLimit}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РґРѕСЃС‚РёРіР»Р° Р»РёРјРёС‚Р° Р°РєС‚РёРІРЅС‹С… РєРѕР»РѕРЅРёР·Р°С†РёР№ (${activeLimit}).`,
         countryId,
         priority: 'low',
       });
@@ -1536,7 +1565,7 @@ function App() {
         progress[countryId] = 0;
         addEvent({
           category: 'colonization',
-          message: `${country?.name ?? 'Страна'} начала колонизацию провинции ${provinceId}.`,
+          message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РЅР°С‡Р°Р»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
           countryId,
           priority: 'medium',
         });
@@ -1561,7 +1590,7 @@ function App() {
       delete progress[countryId];
       addEvent({
         category: 'colonization',
-        message: `${country?.name ?? 'Страна'} отменила колонизацию провинции ${provinceId}.`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
         countryId,
         priority: 'low',
       });
@@ -1731,6 +1760,7 @@ function App() {
       ...prev,
       {
         ...payload,
+        kind: payload.kind ?? 'new',
         id: createId(),
         createdTurn: turn,
       },
@@ -1743,7 +1773,7 @@ function App() {
       payload.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${fromName} отправила предложение договора стране ${toName}.`,
+      message: `${fromName} РѕС‚РїСЂР°РІРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° СЃС‚СЂР°РЅРµ ${toName}.`,
       countryId: payload.fromCountryId,
       priority: 'low',
     });
@@ -1753,6 +1783,56 @@ function App() {
   const acceptDiplomacyProposal = (proposalId: string) => {
     const proposal = diplomacyProposals.find((entry) => entry.id === proposalId);
     if (!proposal) return;
+    if (proposal.kind === 'renewal') {
+      const voterId = activeCountryId;
+      if (!voterId) return;
+      let shouldRenew = false;
+      let renewedAgreement: Omit<DiplomacyAgreement, 'id'> | null = null;
+      setDiplomacyProposals((prev) =>
+        prev.flatMap((entry) => {
+          if (entry.id !== proposalId) return [entry];
+          const targets =
+            entry.targetCountryIds && entry.targetCountryIds.length > 0
+              ? entry.targetCountryIds
+              : [entry.toCountryId];
+          const approvals = Array.from(new Set([...(entry.approvals ?? []), voterId]));
+          const approvedByAll = targets.every((id) => approvals.includes(id));
+          if (approvedByAll) {
+            shouldRenew = true;
+            renewedAgreement = {
+              ...entry.agreement,
+              startTurn: undefined,
+            };
+            return [];
+          }
+          return [{ ...entry, approvals }];
+        }),
+      );
+      const voterName =
+        countries.find((country) => country.id === voterId)?.name ?? voterId;
+      const hostName =
+        countries.find((country) => country.id === proposal.agreement.hostCountryId)
+          ?.name ?? proposal.agreement.hostCountryId;
+      const guestName =
+        countries.find((country) => country.id === proposal.agreement.guestCountryId)
+          ?.name ?? proposal.agreement.guestCountryId;
+      addEvent({
+        category: 'diplomacy',
+        message: `${voterName} РїРѕРґС‚РІРµСЂРґРёР»Р° РїСЂРѕРґР»РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° ${hostName} в†” ${guestName}.`,
+        countryId: voterId,
+        priority: 'low',
+      });
+      if (shouldRenew && renewedAgreement) {
+        applyDiplomacyAgreement(renewedAgreement);
+        addEvent({
+          category: 'diplomacy',
+          message: `Р”РѕРіРѕРІРѕСЂ ${hostName} в†” ${guestName} РїСЂРѕРґР»РµРЅ.`,
+          countryId: renewedAgreement.hostCountryId,
+          priority: 'low',
+        });
+      }
+      return;
+    }
     const mergedAgreement: Omit<DiplomacyAgreement, 'id'> = {
       ...proposal.agreement,
       counterTerms: proposal.counterAgreement
@@ -1791,7 +1871,7 @@ function App() {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${toName} приняла предложение договора от ${fromName}.`,
+      message: `${toName} РїСЂРёРЅСЏР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName}.`,
       countryId: proposal.toCountryId,
       priority: 'low',
     });
@@ -1803,6 +1883,24 @@ function App() {
     );
     const proposal = diplomacyProposals.find((entry) => entry.id === proposalId);
     if (!proposal) return;
+    if (proposal.kind === 'renewal') {
+      const deciderId = activeCountryId ?? proposal.toCountryId;
+      const deciderName =
+        countries.find((country) => country.id === deciderId)?.name ?? deciderId;
+      const hostName =
+        countries.find((country) => country.id === proposal.agreement.hostCountryId)
+          ?.name ?? proposal.agreement.hostCountryId;
+      const guestName =
+        countries.find((country) => country.id === proposal.agreement.guestCountryId)
+          ?.name ?? proposal.agreement.guestCountryId;
+      addEvent({
+        category: 'diplomacy',
+        message: `${deciderName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРѕРґР»РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° ${hostName} в†” ${guestName}.`,
+        countryId: deciderId,
+        priority: 'low',
+      });
+      return;
+    }
     const fromName =
       countries.find((country) => country.id === proposal.fromCountryId)?.name ??
       proposal.fromCountryId;
@@ -1811,7 +1909,7 @@ function App() {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${toName} отклонила предложение договора от ${fromName}.`,
+      message: `${toName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName}.`,
       countryId: proposal.toCountryId,
       priority: 'low',
     });
@@ -1831,7 +1929,7 @@ function App() {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${fromName} отозвала предложение договора для ${toName}.`,
+      message: `${fromName} РѕС‚РѕР·РІР°Р»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РґР»СЏ ${toName}.`,
       countryId: proposal.fromCountryId,
       priority: 'low',
     });
@@ -1849,7 +1947,7 @@ function App() {
         agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `Договор ${hostName} → ${guestName} отменён.`,
+        message: `Р”РѕРіРѕРІРѕСЂ ${hostName} в†’ ${guestName} РѕС‚РјРµРЅС‘РЅ.`,
         countryId: agreement.hostCountryId,
         priority: 'low',
       });
@@ -1912,9 +2010,9 @@ function App() {
     const ownerLabel =
       owner.type === 'state'
         ? countries.find((item) => item.id === owner.countryId)?.name ??
-          'государство'
+          'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
         : companies.find((item) => item.id === owner.companyId)?.name ??
-          'компания';
+          'РєРѕРјРїР°РЅРёСЏ';
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId == null) return prev;
@@ -2456,7 +2554,7 @@ function App() {
       progress[buildingId] = entries;
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'Страна'} начала строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РЅР°С‡Р°Р»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -2487,9 +2585,9 @@ function App() {
       const ownerLabel =
         removed?.owner.type === 'state'
           ? countries.find((item) => item.id === removed?.owner.countryId)?.name ??
-            'государство'
+            'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
           : companies.find((item) => item.id === removed?.owner.companyId)?.name ??
-            'компания';
+            'РєРѕРјРїР°РЅРёСЏ';
       if (entries.length > 0) {
         progress[buildingId] = entries;
       } else {
@@ -2497,7 +2595,7 @@ function App() {
       }
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -2763,7 +2861,7 @@ function App() {
           className="absolute left-1/2 -translate-x-1/2 top-[88px] h-9 px-4 rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-200 text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400/20 hover:border-emerald-300/60 transition-colors z-40"
         >
           <Handshake className="w-4 h-4" />
-          Договоры ({pendingDiplomacyProposals.length})
+          Р”РѕРіРѕРІРѕСЂС‹ ({pendingDiplomacyProposals.length})
         </button>
       )}
       <LeftToolbar />
@@ -2772,17 +2870,17 @@ function App() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="w-[360px] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-white/10 text-white text-base font-semibold">
-              Предложение отправлено
+              РџСЂРµРґР»РѕР¶РµРЅРёРµ РѕС‚РїСЂР°РІР»РµРЅРѕ
             </div>
             <div className="px-5 py-4 text-white/70 text-sm">
-              Предложение направлено стране {diplomacySentNotice.toCountryName}.
+              РџСЂРµРґР»РѕР¶РµРЅРёРµ РЅР°РїСЂР°РІР»РµРЅРѕ СЃС‚СЂР°РЅРµ {diplomacySentNotice.toCountryName}.
             </div>
             <div className="px-5 py-4 border-t border-white/10 flex justify-end">
               <button
                 onClick={() => setDiplomacySentNotice({ open: false, toCountryName: '' })}
                 className="h-9 px-4 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm"
               >
-                Ок
+                РћРє
               </button>
             </div>
           </div>
@@ -3096,12 +3194,12 @@ function App() {
             const ownerLabel =
               removed?.owner.type === 'state'
                 ? countries.find((item) => item.id === removed?.owner.countryId)
-                    ?.name ?? 'государство'
+                    ?.name ?? 'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
                 : companies.find((item) => item.id === removed?.owner.companyId)
-                    ?.name ?? 'компания';
+                    ?.name ?? 'РєРѕРјРїР°РЅРёСЏ';
             addEvent({
               category: 'economy',
-              message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+              message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
               countryId: province.ownerCountryId,
               priority: 'low',
             });
@@ -3124,7 +3222,7 @@ function App() {
           if (available < demolishCost) {
             addEvent({
               category: 'economy',
-              message: `Недостаточно очков строительства для сноса здания в провинции ${provinceId}.`,
+              message: `РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РѕС‡РєРѕРІ СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР° РґР»СЏ СЃРЅРѕСЃР° Р·РґР°РЅРёСЏ РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
               countryId: country?.id,
               priority: 'low',
             });
@@ -3157,7 +3255,7 @@ function App() {
             const buildingName = building?.name ?? buildingId;
             addEvent({
               category: 'economy',
-              message: `${country?.name ?? 'Страна'} снесла ${buildingName} в провинции ${provinceId} (стоимость: ${demolishCost}).`,
+              message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} СЃРЅРµСЃР»Р° ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (СЃС‚РѕРёРјРѕСЃС‚СЊ: ${demolishCost}).`,
               countryId: province.ownerCountryId,
               priority: 'low',
             });
@@ -3293,3 +3391,4 @@ function App() {
 }
 
 export default App;
+
