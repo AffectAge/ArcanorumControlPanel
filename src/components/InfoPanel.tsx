@@ -34,6 +34,11 @@ interface InfoPanelProps {
   onClose: () => void;
   colonizationCost?: number;
   colonizationAllowed?: boolean;
+  routeConstructionProgress?: {
+    routeName: string;
+    progressPoints: number;
+    requiredPoints: number;
+  }[];
 }
 
 export default function InfoPanel({
@@ -55,6 +60,7 @@ export default function InfoPanel({
   onClose,
   colonizationCost,
   colonizationAllowed,
+  routeConstructionProgress = [],
 }: InfoPanelProps) {
   return (
     <div className="fixed left-4 bottom-4 z-40 w-72 rounded-xl bg-black/45 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden animate-fadeIn">
@@ -197,6 +203,34 @@ export default function InfoPanel({
                 : 'Колонизация запрещена'}
             </span>
           </div>
+          {routeConstructionProgress.length > 0 && (
+            <div className="mt-2">
+              <div className="text-white/70 text-xs font-semibold flex items-center gap-2">
+                <Factory className="w-3.5 h-3.5 text-white/60" />
+                Строительство маршрутов
+              </div>
+              <div className="mt-1 space-y-1">
+                {routeConstructionProgress.map((entry) => {
+                  const safeRequired = Math.max(1, entry.requiredPoints);
+                  const percent = Math.min(
+                    100,
+                    Math.round((entry.progressPoints / safeRequired) * 100),
+                  );
+                  return (
+                    <div
+                      key={entry.routeName}
+                      className="rounded-md border border-white/10 bg-black/25 px-2 py-1"
+                    >
+                      <div className="text-white/75 text-xs">{entry.routeName}</div>
+                      <div className="text-white/50 text-[11px]">
+                        {Math.floor(entry.progressPoints)} / {entry.requiredPoints} ({percent}%)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -55,6 +55,7 @@ export default function LogisticsModal({
 
   const visibleRoutes = routes.filter((route) => {
     if (!activeCountryId) return true;
+    if (route.ownerCountryId === activeCountryId) return true;
     return route.provinceIds.some(
       (provinceId) => provinces[provinceId]?.ownerCountryId === activeCountryId,
     );
@@ -73,6 +74,28 @@ export default function LogisticsModal({
       }
     }
     return index <= cutoff ? 'open' : 'closed';
+  };
+
+  const resolveRouteActivity = (route: LogisticsRoute) => {
+    const totalSegments = Math.max(0, route.provinceIds.length - 1);
+    let cutoff = Number.POSITIVE_INFINITY;
+    for (let i = 1; i < route.provinceIds.length; i += 1) {
+      const provinceId = route.provinceIds[i];
+      const ownerId = provinces[provinceId]?.ownerCountryId;
+      if (!ownerId) continue;
+      const status = route.countryStatuses?.[ownerId] ?? 'open';
+      if (status === 'closed') {
+        cutoff = Math.min(cutoff, i - 1);
+        break;
+      }
+    }
+    const activeSegments =
+      cutoff === Number.POSITIVE_INFINITY
+        ? totalSegments
+        : Math.max(0, Math.min(totalSegments, cutoff));
+    if (activeSegments <= 0) return 'inactive';
+    if (activeSegments < totalSegments) return 'partial';
+    return 'active';
   };
 
   const resolveRouteCountries = (route: LogisticsRoute) => {
@@ -195,6 +218,24 @@ export default function LogisticsModal({
                     const type = routeTypes.find((item) => item.id === route.routeTypeId);
                     const owner = countries.find((item) => item.id === route.ownerCountryId);
                     const routeCountries = resolveRouteCountries(route);
+                    const requiredPoints = Math.max(
+                      0,
+                      route.constructionRequiredPoints ?? 0,
+                    );
+                    const progressPoints = Math.max(
+                      0,
+                      route.constructionProgressPoints ?? requiredPoints,
+                    );
+                    const isUnderConstruction =
+                      requiredPoints > 0 && progressPoints < requiredPoints;
+                    const activityStatus = resolveRouteActivity(route);
+                    const progressPercent =
+                      requiredPoints > 0
+                        ? Math.min(
+                            100,
+                            Math.round((progressPoints / requiredPoints) * 100),
+                          )
+                        : 100;
                     const statusForActive =
                       activeCountryId && route.countryStatuses?.[activeCountryId]
                         ? route.countryStatuses[activeCountryId]
@@ -230,6 +271,42 @@ export default function LogisticsModal({
                           </div>
                         </div>
 
+                        <div className="mt-2 rounded-md border border-white/10 bg-black/25 px-2 py-1.5">
+                          {isUnderConstruction ? (
+                            <>
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-amber-200/90">Строится</span>
+                                <span className="text-white/60">
+                                  {Math.floor(progressPoints)} / {requiredPoints}
+                                </span>
+                              </div>
+                              <div className="mt-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                <div
+                                  className="h-full bg-amber-400/80"
+                                  style={{ width: `${progressPercent}%` }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-[11px]">
+                              <span
+                                className={`w-full inline-flex items-center justify-center px-2 py-1 rounded-md border ${
+                                  activityStatus === 'active'
+                                    ? 'text-emerald-200 border-emerald-400/40 bg-emerald-500/15'
+                                    : activityStatus === 'partial'
+                                      ? 'text-amber-200 border-amber-400/40 bg-amber-500/15'
+                                      : 'text-rose-200 border-rose-400/40 bg-rose-500/15'
+                                }`}
+                              >
+                                {activityStatus === 'active'
+                                  ? 'Активен'
+                                  : activityStatus === 'partial'
+                                    ? 'Частично активен'
+                                    : 'Неактивен'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                         <div className="mt-2">
                           <label className="text-[11px] text-white/60">
                             Статус для {activeCountryName}

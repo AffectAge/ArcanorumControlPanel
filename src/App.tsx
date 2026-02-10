@@ -620,6 +620,17 @@ function App() {
         if (!edge.routeId) return edge;
         const route = routeById.get(edge.routeId);
         if (!route || route.provinceIds.length < 2) return edge;
+        const requiredPoints = Math.max(0, route.constructionRequiredPoints ?? 0);
+        const progressPoints = Math.max(
+          0,
+          route.constructionProgressPoints ?? requiredPoints,
+        );
+        if (requiredPoints > 0 && progressPoints < requiredPoints) {
+          const isActive = false;
+          if ((edge.active ?? true) === isActive) return edge;
+          changed = true;
+          return { ...edge, active: isActive };
+        }
 
         const fromProvinceId = edge.fromNodeId.startsWith('province:')
           ? edge.fromNodeId.slice('province:'.length)
@@ -785,15 +796,28 @@ function App() {
     const available = country?.constructionPoints ?? 0;
     if (!country || available <= 0) return;
 
-    let tasksCount = 0;
+    let buildingTasksCount = 0;
     Object.values(provinces).forEach((province) => {
       if (province.ownerCountryId !== countryId) return;
       const progress = province.constructionProgress ?? {};
       Object.values(progress).forEach((entries) => {
-        tasksCount += entries.length;
+        buildingTasksCount += entries.length;
       });
     });
 
+    const routeTaskIds = logistics.routes
+      .filter((route) => {
+        if (route.ownerCountryId !== countryId) return false;
+        const required = Math.max(0, route.constructionRequiredPoints ?? 0);
+        const progress = Math.max(
+          0,
+          route.constructionProgressPoints ?? required,
+        );
+        return required > 0 && progress < required;
+      })
+      .map((route) => route.id);
+
+    const tasksCount = buildingTasksCount + routeTaskIds.length;
     if (tasksCount === 0) return;
 
     const share = available / tasksCount;
@@ -850,6 +874,49 @@ function App() {
         }
       });
       return next;
+    });
+
+    const completedRoutes: { id: string; name: string }[] = [];
+    if (routeTaskIds.length > 0) {
+      setLogistics((prev) => {
+        const routeTaskSet = new Set(routeTaskIds);
+        let changed = false;
+        const nextRoutes = prev.routes.map((route) => {
+          if (!routeTaskSet.has(route.id)) return route;
+          const required = Math.max(0, route.constructionRequiredPoints ?? 0);
+          const current = Math.max(
+            0,
+            route.constructionProgressPoints ?? 0,
+          );
+          const updated = Math.min(required, current + share);
+          if (updated >= required && current < required) {
+            completedRoutes.push({ id: route.id, name: route.name });
+          }
+          if (updated === current) return route;
+          changed = true;
+          return {
+            ...route,
+            constructionProgressPoints: updated,
+          };
+        });
+        const completedRouteIds = new Set(completedRoutes.map((item) => item.id));
+        const nextEdges = prev.edges.map((edge) => {
+          if (!edge.routeId || !completedRouteIds.has(edge.routeId)) return edge;
+          if (edge.active === true) return edge;
+          changed = true;
+          return { ...edge, active: true };
+        });
+        return changed ? { ...prev, routes: nextRoutes, edges: nextEdges } : prev;
+      });
+    }
+
+    completedRoutes.forEach((route) => {
+      addEvent({
+        category: 'economy',
+        message: `Строительство маршрута завершено: ${route.name}.`,
+        countryId,
+        priority: 'medium',
+      });
     });
 
     setCountries((prev) =>
@@ -1179,7 +1246,21 @@ function App() {
                 allowAllLandscapes: item.allowAllLandscapes ?? true,
               }))
             : base.routeTypes,
-        routes: loaded.routes ?? [],
+        routes: (loaded.routes ?? []).map((route) => {
+          const required = Math.max(
+            0,
+            route.constructionRequiredPoints ?? 0,
+          );
+          const progress =
+            route.constructionProgressPoints == null
+              ? required
+              : Math.max(0, route.constructionProgressPoints);
+          return {
+            ...route,
+            constructionRequiredPoints: required,
+            constructionProgressPoints: Math.min(progress, required),
+          };
+        }),
       };
     });
     setGameSettings(
@@ -1727,6 +1808,144 @@ function App() {
     0,
     (logisticsRouteProvinceIds.length - 1) * logisticsDraftSegmentCost,
   );
+  const selectedProvinceRouteConstructionProgress = useMemo(() => {
+    if (!selectedProvinceId) return [];
+    return logistics.routes
+      .filter((route) => route.provinceIds.includes(selectedProvinceId))
+      .map((route) => {
+        const required = Math.max(0, route.constructionRequiredPoints ?? 0);
+        const progress = Math.max(
+          0,
+          route.constructionProgressPoints ?? required,
+        );
+        return {
+          routeName: route.name,
+          progressPoints: progress,
+          requiredPoints: required,
+        };
+      })
+      .filter((entry) => entry.requiredPoints > 0 && entry.progressPoints < entry.requiredPoints);
+  }, [selectedProvinceId, logistics.routes]);
+
+  const isAgreementActive = (agreement: DiplomacyAgreement) => {
+    if (!agreement.durationTurns || agreement.durationTurns <= 0) return true;
+    if (!agreement.startTurn) return true;
+    return turn - agreement.startTurn < agreement.durationTurns;
+  };
+
+  const hasRouteBuildAccessByAgreement = (
+    hostCountryId: string,
+    guestCountryId: string,
+    provinceId: string,
+    routeTypeId?: string,
+  ) =>
+    diplomacyAgreements.some((agreement) => {
+      if (!isAgreementActive(agreement)) return false;
+      const terms = resolveAgreementTerms(agreement, hostCountryId, guestCountryId);
+      if (!terms) return false;
+      const category = terms.agreementCategory ?? 'construction';
+      if (category !== 'logistics') return false;
+      const allowsState = terms.allowState ?? terms.kind === 'state';
+      if (!allowsState) return false;
+      if (terms.routeTypeIds && terms.routeTypeIds.length > 0) {
+        if (!routeTypeId || !terms.routeTypeIds.includes(routeTypeId)) return false;
+      }
+      if (terms.provinceIds && terms.provinceIds.length > 0) {
+        return terms.provinceIds.includes(provinceId);
+      }
+      return true;
+    });
+
+  const countRouteUsageOnHost = (
+    hostCountryId: string,
+    guestCountryId: string,
+    routeTypeId: string,
+    candidateProvinceIds?: string[],
+  ) => {
+    let routes = 0;
+    let segments = 0;
+    logistics.routes.forEach((route) => {
+      if (route.ownerCountryId !== guestCountryId) return;
+      if (route.routeTypeId !== routeTypeId) return;
+      let routeSegmentsOnHost = 0;
+      for (let i = 1; i < route.provinceIds.length; i += 1) {
+        const provinceId = route.provinceIds[i];
+        if (provinces[provinceId]?.ownerCountryId === hostCountryId) {
+          routeSegmentsOnHost += 1;
+        }
+      }
+      if (routeSegmentsOnHost > 0) {
+        routes += 1;
+        segments += routeSegmentsOnHost;
+      }
+    });
+    if (candidateProvinceIds && candidateProvinceIds.length > 1) {
+      let candidateSegmentsOnHost = 0;
+      for (let i = 1; i < candidateProvinceIds.length; i += 1) {
+        const provinceId = candidateProvinceIds[i];
+        if (provinces[provinceId]?.ownerCountryId === hostCountryId) {
+          candidateSegmentsOnHost += 1;
+        }
+      }
+      if (candidateSegmentsOnHost > 0) {
+        routes += 1;
+        segments += candidateSegmentsOnHost;
+      }
+    }
+    return { routes, segments };
+  };
+
+  const hasRouteBuildAccessByAgreementForPath = (
+    hostCountryId: string,
+    guestCountryId: string,
+    routeTypeId: string,
+    provinceIds: string[],
+  ) => {
+    const hostPathProvinceIds = provinceIds.filter(
+      (provinceId) => provinces[provinceId]?.ownerCountryId === hostCountryId,
+    );
+    if (hostPathProvinceIds.length === 0) return true;
+    return diplomacyAgreements.some((agreement) => {
+      if (!isAgreementActive(agreement)) return false;
+      const terms = resolveAgreementTerms(agreement, hostCountryId, guestCountryId);
+      if (!terms) return false;
+      const category = terms.agreementCategory ?? 'construction';
+      if (category !== 'logistics') return false;
+      const allowsState = terms.allowState ?? terms.kind === 'state';
+      if (!allowsState) return false;
+      if (terms.routeTypeIds && terms.routeTypeIds.length > 0) {
+        if (!terms.routeTypeIds.includes(routeTypeId)) return false;
+      }
+      if (terms.provinceIds && terms.provinceIds.length > 0) {
+        const allPathProvincesCovered = hostPathProvinceIds.every((provinceId) =>
+          terms.provinceIds?.includes(provinceId),
+        );
+        if (!allPathProvincesCovered) return false;
+      }
+      const perTypeLimits = terms.logisticsRouteLimits?.[routeTypeId];
+      if (perTypeLimits) {
+        const usage = countRouteUsageOnHost(
+          hostCountryId,
+          guestCountryId,
+          routeTypeId,
+          provinceIds,
+        );
+        if (
+          (perTypeLimits.maxRoutes ?? 0) > 0 &&
+          usage.routes > (perTypeLimits.maxRoutes ?? 0)
+        ) {
+          return false;
+        }
+        if (
+          (perTypeLimits.maxSegments ?? 0) > 0 &&
+          usage.segments > (perTypeLimits.maxSegments ?? 0)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  };
 
   const toggleLayer = (id: string) => {
     setMapLayers((prev) => {
@@ -2175,22 +2394,28 @@ function App() {
       ...proposal.agreement,
       counterTerms: proposal.counterAgreement
         ? {
+            agreementCategory: proposal.counterAgreement.agreementCategory,
             kind: proposal.counterAgreement.kind,
             allowState: proposal.counterAgreement.allowState,
             allowCompanies: proposal.counterAgreement.allowCompanies,
             companyIds: proposal.counterAgreement.companyIds,
             buildingIds: proposal.counterAgreement.buildingIds,
+            routeTypeIds: proposal.counterAgreement.routeTypeIds,
+            logisticsRouteLimits: proposal.counterAgreement.logisticsRouteLimits,
             provinceIds: proposal.counterAgreement.provinceIds,
             industries: proposal.counterAgreement.industries,
             limits: proposal.counterAgreement.limits,
           }
         : proposal.reciprocal
           ? {
+              agreementCategory: proposal.agreement.agreementCategory,
               kind: proposal.agreement.kind,
               allowState: proposal.agreement.allowState,
               allowCompanies: proposal.agreement.allowCompanies,
               companyIds: proposal.agreement.companyIds,
               buildingIds: proposal.agreement.buildingIds,
+              routeTypeIds: proposal.agreement.routeTypeIds,
+              logisticsRouteLimits: proposal.agreement.logisticsRouteLimits,
               provinceIds: proposal.agreement.provinceIds,
               industries: proposal.agreement.industries,
               limits: proposal.agreement.limits,
@@ -2378,7 +2603,12 @@ function App() {
             agreement,
             terms: resolveAgreementTerms(agreement, hostId, ownerCountryId),
           }))
-          .filter((entry) => entry.terms != null);
+          .filter(
+            (entry) =>
+              entry.terms != null &&
+              (entry.terms.agreementCategory ?? 'construction') ===
+                'construction',
+          );
         if (matchesWithTerms.length === 0) return false;
 
         const industryAllowed = (
@@ -3173,6 +3403,27 @@ function App() {
                   setRoutePlannerHint('Провинция не найдена в данных карты.');
                   return prev;
                 }
+                if (!activeCountryId) {
+                  setRoutePlannerHint('???????? ???????? ?????? ??? ????????????? ????????.');
+                  return prev;
+                }
+                const provinceOwnerId = province.ownerCountryId;
+                if (!provinceOwnerId) {
+                  setRoutePlannerHint('??????? ????? ??????? ?????? ? ?????????? ??????????.');
+                  return prev;
+                }
+                if (
+                  provinceOwnerId !== activeCountryId &&
+                  !hasRouteBuildAccessByAgreement(
+                    provinceOwnerId,
+                    activeCountryId,
+                    province.id,
+                    logisticsRouteDraft?.routeTypeId,
+                  )
+                ) {
+                  setRoutePlannerHint('??? ???????????????? ????? ????????????? ???????? ? ???? ?????????.');
+                  return prev;
+                }
                 const requiredBuildingIds = routeType?.requiredBuildingIds ?? [];
                 if (requiredBuildingIds.length > 0) {
                   const builtIds = new Set(
@@ -3335,37 +3586,35 @@ function App() {
                 Math.floor(draftRouteType?.constructionCostPerSegment ?? 0),
               );
               const totalCost = segmentCount * segmentCost;
-              const activeCountry = countries.find(
-                (country) => country.id === activeCountryId,
+              const foreignHostCountryIds = Array.from(
+                new Set(
+                  logisticsRouteProvinceIds
+                    .map((provinceId) => provinces[provinceId]?.ownerCountryId)
+                    .filter(
+                      (ownerId): ownerId is string =>
+                        Boolean(ownerId) && ownerId !== activeCountryId,
+                    ),
+                ),
               );
-              const availablePoints = activeCountry?.constructionPoints ?? 0;
-              if (availablePoints < totalCost) {
+              const blockedHostId = foreignHostCountryIds.find(
+                (hostCountryId) =>
+                  !hasRouteBuildAccessByAgreementForPath(
+                    hostCountryId,
+                    activeCountryId,
+                    logisticsRouteDraft.routeTypeId,
+                    logisticsRouteProvinceIds,
+                  ),
+              );
+              if (blockedHostId) {
+                const blockedCountryName =
+                  countries.find((item) => item.id === blockedHostId)?.name ??
+                  blockedHostId;
                 setRoutePlannerHint(
-                  `Недостаточно очков строительства: нужно ${totalCost}, доступно ${availablePoints}.`,
+                  `Превышены лимиты или нет прав логистического договора для страны ${blockedCountryName}.`,
                 );
                 return;
               }
-              if (totalCost > 0) {
-                setCountries((prev) =>
-                  prev.map((country) =>
-                    country.id === activeCountryId
-                      ? {
-                          ...country,
-                          constructionPoints: Math.max(
-                            0,
-                            (country.constructionPoints ?? 0) - totalCost,
-                          ),
-                        }
-                      : country,
-                  ),
-                );
-                addEvent({
-                  category: 'economy',
-                  message: `${activeCountry?.name ?? activeCountryId} построила маршрут "${logisticsRouteDraft.name}" за ${totalCost} очков строительства.`,
-                  countryId: activeCountryId,
-                  priority: 'low',
-                });
-              }
+              const startsUnderConstruction = totalCost > 0;
               const routeId = createId();
               setLogistics((prev) => ({
                 ...prev,
@@ -3378,6 +3627,8 @@ function App() {
                     provinceIds: logisticsRouteProvinceIds,
                     ownerCountryId: activeCountryId,
                     countryStatuses: {},
+                    constructionRequiredPoints: totalCost,
+                    constructionProgressPoints: startsUnderConstruction ? 0 : totalCost,
                   },
                 ],
               }));
@@ -3400,6 +3651,14 @@ function App() {
                   active: true,
                   bidirectional: true,
                   ownerCountryId: activeCountryId,
+                });
+              }
+              if (startsUnderConstruction) {
+                addEvent({
+                  category: 'economy',
+                  message: `?????? ????????????? ???????? "${logisticsRouteDraft.name}" (${totalCost} ?????).`,
+                  countryId: activeCountryId,
+                  priority: 'low',
                 });
               }
               setLogisticsRouteProvinceIds([]);
@@ -3555,6 +3814,7 @@ function App() {
               ? provinces[selectedProvinceId]?.colonizationCost
               : undefined
           }
+          routeConstructionProgress={selectedProvinceRouteConstructionProgress}
         />
       )}
 
@@ -3877,6 +4137,7 @@ function App() {
         provinces={provinces}
         buildings={buildings}
         companies={companies}
+        routeTypes={logistics.routeTypes}
         agreements={diplomacyAgreements}
         proposals={diplomacyProposals}
         turn={turn}
@@ -3893,6 +4154,7 @@ function App() {
         industries={industries}
         buildings={buildings}
         companies={companies}
+        routeTypes={logistics.routeTypes}
         onAccept={(id) => {
           acceptDiplomacyProposal(id);
           setDiplomacyInboxOpen(false);

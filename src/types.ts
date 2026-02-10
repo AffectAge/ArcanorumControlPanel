@@ -124,6 +124,8 @@ export type LogisticsRoute = {
   provinceIds: string[];
   ownerCountryId?: string;
   countryStatuses?: Record<string, 'open' | 'closed'>;
+  constructionRequiredPoints?: number;
+  constructionProgressPoints?: number;
 };
 
 export type LogisticsState = {
@@ -248,11 +250,20 @@ export type DiplomacyAgreement = {
   title?: string;
   hostCountryId: string;
   guestCountryId: string;
+  agreementCategory?: 'construction' | 'logistics';
   kind?: 'company' | 'state';
   allowState?: boolean;
   allowCompanies?: boolean;
   companyIds?: string[];
   buildingIds?: string[];
+  routeTypeIds?: string[];
+  logisticsRouteLimits?: Record<
+    string,
+    {
+      maxRoutes?: number;
+      maxSegments?: number;
+    }
+  >;
   provinceIds?: string[];
   industries?: string[];
   limits?: {
@@ -261,11 +272,20 @@ export type DiplomacyAgreement = {
     global?: number;
   };
   counterTerms?: {
+    agreementCategory?: 'construction' | 'logistics';
     kind?: 'company' | 'state';
     allowState?: boolean;
     allowCompanies?: boolean;
     companyIds?: string[];
     buildingIds?: string[];
+    routeTypeIds?: string[];
+    logisticsRouteLimits?: Record<
+      string,
+      {
+        maxRoutes?: number;
+        maxSegments?: number;
+      }
+    >;
     provinceIds?: string[];
     industries?: string[];
     limits?: {

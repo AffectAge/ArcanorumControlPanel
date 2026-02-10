@@ -1,5 +1,12 @@
 ﻿import { Handshake, X, Check, XCircle } from 'lucide-react';
-import type { Country, DiplomacyProposal, Industry, Company, BuildingDefinition } from '../types';
+import type {
+  Country,
+  DiplomacyProposal,
+  Industry,
+  Company,
+  BuildingDefinition,
+  LogisticsRouteType,
+} from '../types';
 
 type DiplomacyProposalsModalProps = {
   open: boolean;
@@ -8,6 +15,7 @@ type DiplomacyProposalsModalProps = {
   industries: Industry[];
   buildings: BuildingDefinition[];
   companies: Company[];
+  routeTypes: LogisticsRouteType[];
   onAccept: (id: string) => void;
   onDecline: (id: string) => void;
   onClose: () => void;
@@ -23,6 +31,7 @@ export default function DiplomacyProposalsModal({
   industries,
   buildings,
   companies,
+  routeTypes,
   onAccept,
   onDecline,
   onClose,
@@ -60,6 +69,8 @@ export default function DiplomacyProposalsModal({
                 const renderAgreementDetails = (
                   agreement: DiplomacyProposal['agreement'],
                 ) => {
+                  const isLogistics =
+                    (agreement.agreementCategory ?? 'construction') === 'logistics';
                   const industryNames = agreement.industries?.length
                     ? agreement.industries
                         .map(
@@ -80,6 +91,30 @@ export default function DiplomacyProposalsModal({
                     agreement.provinceIds && agreement.provinceIds.length > 0
                       ? agreement.provinceIds.join(', ')
                       : 'Все провинции';
+                  const routeTypesLabel =
+                    agreement.routeTypeIds && agreement.routeTypeIds.length > 0
+                      ? agreement.routeTypeIds
+                          .map(
+                            (id) => routeTypes.find((item) => item.id === id)?.name ?? id,
+                          )
+                          .join(', ')
+                      : 'Все типы маршрутов';
+                  const routeLimitsLabel =
+                    agreement.logisticsRouteLimits &&
+                    Object.keys(agreement.logisticsRouteLimits).length > 0
+                      ? Object.entries(agreement.logisticsRouteLimits)
+                          .map(([typeId, value]) => {
+                            const typeName =
+                              routeTypes.find((item) => item.id === typeId)?.name ??
+                              typeId;
+                            const routesLabel =
+                              (value.maxRoutes ?? 0) > 0 ? value.maxRoutes : '∞';
+                            const segmentsLabel =
+                              (value.maxSegments ?? 0) > 0 ? value.maxSegments : '∞';
+                            return `${typeName}: маршруты ${routesLabel}, графы ${segmentsLabel}`;
+                          })
+                          .join('; ')
+                      : 'Без лимитов по типам';
                   const allowState = agreement.allowState ?? agreement.kind === 'state';
                   const allowCompanies =
                     agreement.allowCompanies ?? agreement.kind === 'company';
@@ -99,16 +134,33 @@ export default function DiplomacyProposalsModal({
                         {allowState && allowCompanies ? ' + ' : ''}
                         {allowCompanies ? 'Компании' : ''}
                       </div>
-                      {allowCompanies && (
-                        <div className="text-white/50 text-xs">Компании: {companyLabel}</div>
-                      )}
-                      <div className="text-white/50 text-xs">Здания: {allowedBuildingsLabel}</div>
                       <div className="text-white/50 text-xs">Провинции: {allowedProvincesLabel}</div>
-                      <div className="text-white/50 text-xs">Отрасли: {industryNames}</div>
-                      <div className="text-white/50 text-xs">
-                        Лимиты: Пров. {limitLabel(perProvince)} / Гос. {limitLabel(perCountry)} /
-                        Мир {limitLabel(global)}
-                      </div>
+                      {isLogistics ? (
+                        <>
+                          <div className="text-white/50 text-xs">
+                            Типы маршрутов: {routeTypesLabel}
+                          </div>
+                          <div className="text-white/50 text-xs">
+                            Лимиты типов: {routeLimitsLabel}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {allowCompanies && (
+                            <div className="text-white/50 text-xs">
+                              Компании: {companyLabel}
+                            </div>
+                          )}
+                          <div className="text-white/50 text-xs">
+                            Здания: {allowedBuildingsLabel}
+                          </div>
+                          <div className="text-white/50 text-xs">Отрасли: {industryNames}</div>
+                          <div className="text-white/50 text-xs">
+                            Лимиты: Пров. {limitLabel(perProvince)} / Гос.{' '}
+                            {limitLabel(perCountry)} / Мир {limitLabel(global)}
+                          </div>
+                        </>
+                      )}
                     </>
                   );
                 };
