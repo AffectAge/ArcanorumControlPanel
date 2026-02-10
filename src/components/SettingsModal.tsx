@@ -10,6 +10,7 @@ import {
   Atom,
   Feather,
   Cross,
+  Map,
 } from 'lucide-react';
 import type { GameSettings } from '../types';
 
@@ -17,6 +18,8 @@ type SettingsModalProps = {
   open: boolean;
   settings: GameSettings;
   onChange: (next: GameSettings) => void;
+  onRecomputeAdjacency?: () => void;
+  adjacencyNeedsComputation?: boolean;
   onClose: () => void;
 };
 
@@ -24,6 +27,8 @@ export default function SettingsModal({
   open,
   settings,
   onChange,
+  onRecomputeAdjacency,
+  adjacencyNeedsComputation = false,
   onClose,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<
@@ -35,6 +40,7 @@ export default function SettingsModal({
     | 'economy'
     | 'log'
     | 'diplomacy'
+    | 'map'
   >('colonization');
   if (!open) return null;
 
@@ -133,6 +139,17 @@ export default function SettingsModal({
           >
             <Handshake className="w-4 h-4" />
             Дипломатия
+          </button>
+          <button
+            onClick={() => setTab('map')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'map'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Map className="w-4 h-4" />
+            Карта
           </button>
         </div>
 
@@ -660,6 +677,35 @@ export default function SettingsModal({
                   />
                 </label>
               </>
+            )}
+
+            {tab === 'map' && (
+              <div className="rounded-xl border border-white/10 bg-black/25 p-4 space-y-3">
+                <div className="text-white/85 text-sm font-medium">
+                  Соседи провинций
+                </div>
+                <div className="text-white/60 text-sm leading-relaxed">
+                  Ручной запуск пересчета пригодится после замены карты или
+                  изменений геометрии провинций.
+                </div>
+                <div
+                  className={`text-xs ${
+                    adjacencyNeedsComputation
+                      ? 'text-amber-200/90'
+                      : 'text-emerald-200/90'
+                  }`}
+                >
+                  {adjacencyNeedsComputation
+                    ? 'Обнаружены провинции без соседей: рекомендуется пересчет.'
+                    : 'Данные соседей уже рассчитаны.'}
+                </div>
+                <button
+                  onClick={onRecomputeAdjacency}
+                  className="h-10 px-4 rounded-lg border border-cyan-400/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25 transition-colors text-sm"
+                >
+                  Запустить пересчет соседей
+                </button>
+              </div>
             )}
           </div>
         </div>

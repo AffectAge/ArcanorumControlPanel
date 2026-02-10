@@ -32,6 +32,7 @@ export type GameState = {
   companies?: Company[];
   diplomacy?: DiplomacyAgreement[];
   diplomacyProposals?: DiplomacyProposal[];
+  logistics?: LogisticsState;
   settings?: GameSettings;
   eventLog?: EventLogState;
 };
@@ -55,6 +56,7 @@ export type MapLayerPaint = Record<string, Record<string, string>>;
 
 export type ProvinceData = {
   id: string;
+  adjacentProvinceIds?: string[];
   ownerCountryId?: string;
   climateId?: string;
   religionId?: string;
@@ -71,6 +73,58 @@ export type ProvinceData = {
   colonizationDisabled?: boolean;
   buildingsBuilt?: BuiltBuilding[];
   constructionProgress?: Record<string, ConstructionEntry[]>;
+};
+
+export type LogisticsRouteType = {
+  id: string;
+  name: string;
+  color: string;
+  lineWidth: number;
+  dashPattern?: string;
+};
+
+export type LogisticsNodeType =
+  | 'province'
+  | 'country_market'
+  | 'world_market'
+  | 'port'
+  | 'hub'
+  | 'border';
+
+export type LogisticsNode = {
+  id: string;
+  type: LogisticsNodeType;
+  provinceId?: string;
+  countryId?: string;
+  name?: string;
+};
+
+export type LogisticsEdge = {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  routeId?: string;
+  routeTypeId?: string;
+  active?: boolean;
+  bidirectional?: boolean;
+  ownerCountryId?: string;
+  requiresTransitAgreement?: boolean;
+};
+
+export type LogisticsRoute = {
+  id: string;
+  name: string;
+  routeTypeId: string;
+  provinceIds: string[];
+  ownerCountryId?: string;
+  countryStatuses?: Record<string, 'open' | 'closed'>;
+};
+
+export type LogisticsState = {
+  nodes: LogisticsNode[];
+  edges: LogisticsEdge[];
+  routeTypes: LogisticsRouteType[];
+  routes: LogisticsRoute[];
 };
 
 export type ProvinceRecord = Record<string, ProvinceData>;
