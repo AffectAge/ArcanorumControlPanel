@@ -104,10 +104,30 @@ type AdminPanelProps = {
     color: string,
     lineWidth: number,
     dashPattern?: string,
+    constructionCostPerSegment?: number,
+    allowProvinceSkipping?: boolean,
+    requiredBuildingIds?: string[],
+    landscape?: TraitCriteria,
+    requiredBuildingsMode?: 'all' | 'any',
+    allowAllLandscapes?: boolean,
   ) => void;
   onUpdateRouteType: (
     id: string,
-    patch: Partial<Pick<LogisticsRouteType, 'name' | 'color' | 'lineWidth' | 'dashPattern'>>,
+    patch: Partial<
+      Pick<
+        LogisticsRouteType,
+        | 'name'
+        | 'color'
+        | 'lineWidth'
+        | 'dashPattern'
+        | 'constructionCostPerSegment'
+        | 'allowProvinceSkipping'
+        | 'requiredBuildingIds'
+        | 'requiredBuildingsMode'
+        | 'landscape'
+        | 'allowAllLandscapes'
+      >
+    >,
   ) => void;
   onDeleteRouteType: (id: string) => void;
   onUpdateCompanyIcon: (id: string, iconDataUrl?: string) => void;
@@ -290,6 +310,19 @@ export default function AdminPanel({
   const [routeTypeColor, setRouteTypeColor] = useState('#38bdf8');
   const [routeTypeWidth, setRouteTypeWidth] = useState<number | ''>(1.2);
   const [routeTypeDash, setRouteTypeDash] = useState('');
+  const [routeTypeCostPerSegment, setRouteTypeCostPerSegment] = useState<
+    number | ''
+  >(0);
+  const [routeTypeAllowSkip, setRouteTypeAllowSkip] = useState(false);
+  const [routeTypeRequiredBuildingIds, setRouteTypeRequiredBuildingIds] = useState<
+    string[]
+  >([]);
+  const [routeTypeRequiredBuildingsMode, setRouteTypeRequiredBuildingsMode] =
+    useState<'all' | 'any'>('all');
+  const [routeTypeLandscapeAny, setRouteTypeLandscapeAny] = useState<string[]>([]);
+  const [routeTypeLandscapeNone, setRouteTypeLandscapeNone] = useState<string[]>([]);
+  const [routeTypeAllowAllLandscapes, setRouteTypeAllowAllLandscapes] =
+    useState(true);
 
   const provinceIds = useMemo(() => Object.keys(provinces).sort(), [provinces]);
   const activeProvince = selectedProvince ? provinces[selectedProvince] : undefined;
@@ -367,10 +400,28 @@ export default function AdminPanel({
       routeTypeColor,
       routeTypeWidth === '' ? 1.2 : Math.max(0.4, Number(routeTypeWidth) || 1.2),
       routeTypeDash.trim() || undefined,
+      routeTypeCostPerSegment === ''
+        ? 0
+        : Math.max(0, Math.floor(Number(routeTypeCostPerSegment) || 0)),
+      routeTypeAllowSkip,
+      routeTypeRequiredBuildingIds,
+      {
+        anyOf: routeTypeLandscapeAny,
+        noneOf: routeTypeLandscapeNone,
+      },
+      routeTypeRequiredBuildingsMode,
+      routeTypeAllowAllLandscapes,
     );
     setRouteTypeName('');
     setRouteTypeDash('');
     setRouteTypeWidth(1.2);
+    setRouteTypeCostPerSegment(0);
+    setRouteTypeAllowSkip(false);
+    setRouteTypeRequiredBuildingIds([]);
+    setRouteTypeRequiredBuildingsMode('all');
+    setRouteTypeLandscapeAny([]);
+    setRouteTypeLandscapeNone([]);
+    setRouteTypeAllowAllLandscapes(true);
   };
 
 
@@ -2797,7 +2848,7 @@ export default function AdminPanel({
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Название
                   <input
@@ -2841,6 +2892,149 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цена за участок
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={routeTypeCostPerSegment}
+                    onChange={(event) =>
+                      setRouteTypeCostPerSegment(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Math.floor(Number(event.target.value) || 0)),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/75 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={routeTypeAllowSkip}
+                    onChange={(event) => setRouteTypeAllowSkip(event.target.checked)}
+                    className="w-4 h-4 accent-emerald-500"
+                  />
+                  Можно перескакивать через провинции
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Нужные здания
+                  <label className="flex items-center gap-2 text-white/70 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={routeTypeRequiredBuildingsMode === 'any'}
+                      onChange={(event) =>
+                        setRouteTypeRequiredBuildingsMode(
+                          event.target.checked ? 'any' : 'all',
+                        )
+                      }
+                      className="w-3.5 h-3.5 accent-emerald-500"
+                    />
+                    Любое здание
+                  </label>
+                  <div className="min-h-[96px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                    {buildings.length > 0 ? (
+                      buildings.map((building) => (
+                        <label
+                          key={building.id}
+                          className="flex items-center gap-2 text-white/75 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={routeTypeRequiredBuildingIds.includes(building.id)}
+                            onChange={(event) =>
+                              setRouteTypeRequiredBuildingIds((prev) =>
+                                event.target.checked
+                                  ? Array.from(new Set([...prev, building.id]))
+                                  : prev.filter((id) => id !== building.id),
+                              )
+                            }
+                            className="w-3.5 h-3.5 accent-emerald-500"
+                          />
+                          <span>{building.name}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="text-white/45 text-xs">Нет зданий</div>
+                    )}
+                  </div>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Ландшафт: разрешён
+                    <label className="flex items-center gap-2 text-white/70 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={routeTypeAllowAllLandscapes}
+                        onChange={(event) =>
+                          setRouteTypeAllowAllLandscapes(event.target.checked)
+                        }
+                        className="w-3.5 h-3.5 accent-emerald-500"
+                      />
+                      Все ландшафты
+                    </label>
+                    <div className="min-h-[96px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                      {landscapes.length > 0 ? (
+                        landscapes.map((landscape) => (
+                          <label
+                            key={landscape.id}
+                            className="flex items-center gap-2 text-white/75 text-xs"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={routeTypeLandscapeAny.includes(landscape.id)}
+                              disabled={routeTypeAllowAllLandscapes}
+                              onChange={(event) =>
+                                setRouteTypeLandscapeAny((prev) =>
+                                  event.target.checked
+                                    ? Array.from(new Set([...prev, landscape.id]))
+                                    : prev.filter((id) => id !== landscape.id),
+                                )
+                              }
+                              className="w-3.5 h-3.5 accent-emerald-500"
+                            />
+                            <span>{landscape.name}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="text-white/45 text-xs">Нет ландшафтов</div>
+                      )}
+                    </div>
+                  </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Ландшафт: запрещён
+                    <div className="min-h-[96px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                      {landscapes.length > 0 ? (
+                        landscapes.map((landscape) => (
+                          <label
+                            key={landscape.id}
+                            className="flex items-center gap-2 text-white/75 text-xs"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={routeTypeLandscapeNone.includes(landscape.id)}
+                              disabled={routeTypeAllowAllLandscapes}
+                              onChange={(event) =>
+                                setRouteTypeLandscapeNone((prev) =>
+                                  event.target.checked
+                                    ? Array.from(new Set([...prev, landscape.id]))
+                                    : prev.filter((id) => id !== landscape.id),
+                                )
+                              }
+                              className="w-3.5 h-3.5 accent-emerald-500"
+                            />
+                            <span>{landscape.name}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="text-white/45 text-xs">Нет ландшафтов</div>
+                      )}
+                    </div>
+                  </label>
+                </div>
               </div>
 
               <button
@@ -2855,51 +3049,230 @@ export default function AdminPanel({
                 {routeTypes.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                    className="px-3 py-3 rounded-lg bg-white/5 border border-white/10 space-y-3"
                   >
-                    <input
-                      type="color"
-                      value={item.color}
-                      onChange={(event) =>
-                        onUpdateRouteType(item.id, { color: event.target.value })
-                      }
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
-                    />
-                    <input
-                      value={item.name}
-                      onChange={(event) =>
-                        onUpdateRouteType(item.id, { name: event.target.value })
-                      }
-                      className="h-9 flex-1 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm focus:outline-none focus:border-emerald-400/60"
-                    />
-                    <input
-                      type="number"
-                      step={0.1}
-                      min={0.4}
-                      value={item.lineWidth}
-                      onChange={(event) =>
-                        onUpdateRouteType(item.id, {
-                          lineWidth: Math.max(0.4, Number(event.target.value) || 0.4),
-                        })
-                      }
-                      className="w-20 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
-                    />
-                    <input
-                      value={item.dashPattern ?? ''}
-                      onChange={(event) =>
-                        onUpdateRouteType(item.id, {
-                          dashPattern: event.target.value,
-                        })
-                      }
-                      placeholder="dash"
-                      className="w-28 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
-                    />
-                    <button
-                      onClick={() => onDeleteRouteType(item.id)}
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                    >
-                      <Trash2 className="w-4 h-4 text-white/60" />
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={item.color}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, { color: event.target.value })
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <input
+                        value={item.name}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, { name: event.target.value })
+                        }
+                        className="h-9 flex-1 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                      <input
+                        type="number"
+                        step={0.1}
+                        min={0.4}
+                        value={item.lineWidth}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, {
+                            lineWidth: Math.max(0.4, Number(event.target.value) || 0.4),
+                          })
+                        }
+                        className="w-20 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                      <input
+                        value={item.dashPattern ?? ''}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, {
+                            dashPattern: event.target.value,
+                          })
+                        }
+                        placeholder="dash"
+                        className="w-28 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={item.constructionCostPerSegment ?? 0}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, {
+                            constructionCostPerSegment: Math.max(
+                              0,
+                              Math.floor(Number(event.target.value) || 0),
+                            ),
+                          })
+                        }
+                        title="Цена за участок"
+                        className="w-24 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                      <button
+                        onClick={() => onDeleteRouteType(item.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/75 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={item.allowProvinceSkipping ?? false}
+                          onChange={(event) =>
+                            onUpdateRouteType(item.id, {
+                              allowProvinceSkipping: event.target.checked,
+                            })
+                          }
+                          className="w-4 h-4 accent-emerald-500"
+                        />
+                        Можно перескакивать
+                      </label>
+                      <label className="flex flex-col gap-2 text-white/70 text-sm">
+                        Нужные здания
+                        <label className="flex items-center gap-2 text-white/70 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={(item.requiredBuildingsMode ?? 'all') === 'any'}
+                            onChange={(event) =>
+                              onUpdateRouteType(item.id, {
+                                requiredBuildingsMode: event.target.checked
+                                  ? 'any'
+                                  : 'all',
+                              })
+                            }
+                            className="w-3.5 h-3.5 accent-emerald-500"
+                          />
+                          Любое здание
+                        </label>
+                        <div className="min-h-[84px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                          {buildings.length > 0 ? (
+                            buildings.map((building) => (
+                              <label
+                                key={building.id}
+                                className="flex items-center gap-2 text-white/75 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={(item.requiredBuildingIds ?? []).includes(
+                                    building.id,
+                                  )}
+                                  onChange={(event) => {
+                                    const current = item.requiredBuildingIds ?? [];
+                                    onUpdateRouteType(item.id, {
+                                      requiredBuildingIds: event.target.checked
+                                        ? Array.from(new Set([...current, building.id]))
+                                        : current.filter((id) => id !== building.id),
+                                    });
+                                  }}
+                                  className="w-3.5 h-3.5 accent-emerald-500"
+                                />
+                                <span>{building.name}</span>
+                              </label>
+                            ))
+                          ) : (
+                            <div className="text-white/45 text-xs">Нет зданий</div>
+                          )}
+                        </div>
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="flex flex-col gap-2 text-white/70 text-sm">
+                          Ландшафт: разрешён
+                          <label className="flex items-center gap-2 text-white/70 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={item.allowAllLandscapes ?? true}
+                              onChange={(event) =>
+                                onUpdateRouteType(item.id, {
+                                  allowAllLandscapes: event.target.checked,
+                                })
+                              }
+                              className="w-3.5 h-3.5 accent-emerald-500"
+                            />
+                            Все ландшафты
+                          </label>
+                          <div className="min-h-[84px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                            {landscapes.length > 0 ? (
+                              landscapes.map((landscape) => (
+                                <label
+                                  key={landscape.id}
+                                  className="flex items-center gap-2 text-white/75 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(item.landscape?.anyOf ?? []).includes(
+                                      landscape.id,
+                                    )}
+                                    disabled={item.allowAllLandscapes ?? true}
+                                    onChange={(event) => {
+                                      const anyOf = item.landscape?.anyOf ?? [];
+                                      onUpdateRouteType(item.id, {
+                                        landscape: {
+                                          anyOf: event.target.checked
+                                            ? Array.from(
+                                                new Set([...anyOf, landscape.id]),
+                                              )
+                                            : anyOf.filter(
+                                                (id) => id !== landscape.id,
+                                              ),
+                                          noneOf: item.landscape?.noneOf ?? [],
+                                        },
+                                      });
+                                    }}
+                                    className="w-3.5 h-3.5 accent-emerald-500"
+                                  />
+                                  <span>{landscape.name}</span>
+                                </label>
+                              ))
+                            ) : (
+                              <div className="text-white/45 text-xs">
+                                Нет ландшафтов
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                        <label className="flex flex-col gap-2 text-white/70 text-sm">
+                          Ландшафт: запрещён
+                          <div className="min-h-[84px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                            {landscapes.length > 0 ? (
+                              landscapes.map((landscape) => (
+                                <label
+                                  key={landscape.id}
+                                  className="flex items-center gap-2 text-white/75 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(item.landscape?.noneOf ?? []).includes(
+                                      landscape.id,
+                                    )}
+                                    disabled={item.allowAllLandscapes ?? true}
+                                    onChange={(event) => {
+                                      const noneOf = item.landscape?.noneOf ?? [];
+                                      onUpdateRouteType(item.id, {
+                                        landscape: {
+                                          anyOf: item.landscape?.anyOf ?? [],
+                                          noneOf: event.target.checked
+                                            ? Array.from(
+                                                new Set([...noneOf, landscape.id]),
+                                              )
+                                            : noneOf.filter(
+                                                (id) => id !== landscape.id,
+                                              ),
+                                        },
+                                      });
+                                    }}
+                                    className="w-3.5 h-3.5 accent-emerald-500"
+                                  />
+                                  <span>{landscape.name}</span>
+                                </label>
+                              ))
+                            ) : (
+                              <div className="text-white/45 text-xs">
+                                Нет ландшафтов
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

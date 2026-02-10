@@ -81,6 +81,12 @@ export type LogisticsRouteType = {
   color: string;
   lineWidth: number;
   dashPattern?: string;
+  constructionCostPerSegment?: number;
+  allowProvinceSkipping?: boolean;
+  requiredBuildingIds?: string[];
+  requiredBuildingsMode?: 'all' | 'any';
+  landscape?: TraitCriteria;
+  allowAllLandscapes?: boolean;
 };
 
 export type LogisticsNodeType =

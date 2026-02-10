@@ -224,18 +224,18 @@ const defaultClimateColors = ['#38bdf8', '#60a5fa', '#fbbf24', '#f97316'];
 const defaultReligionColors = ['#facc15', '#fb7185', '#a855f7', '#60a5fa'];
 
 const initialMapLayers: MapLayer[] = [
-  { id: 'political', name: 'Политическая', visible: true },
-  { id: 'cultural', name: 'Культурная', visible: false },
-  { id: 'landscape', name: 'Ландшафт', visible: false },
-  { id: 'continent', name: 'Континент', visible: false },
-  { id: 'region', name: 'Регион', visible: false },
-  { id: 'climate', name: 'Климат', visible: false },
-  { id: 'religion', name: 'Религии', visible: false },
-  { id: 'resources', name: 'Ресурсы', visible: false },
-  { id: 'fertility', name: 'Плодородность', visible: false },
-  { id: 'radiation', name: 'Радиация', visible: false },
-  { id: 'pollution', name: 'Загрязнения', visible: false },
-  { id: 'colonization', name: 'Колонизация', visible: false },
+  { id: 'political', name: 'РџРѕР»РёС‚РёС‡РµСЃРєР°СЏ', visible: true },
+  { id: 'cultural', name: 'РљСѓР»СЊС‚СѓСЂРЅР°СЏ', visible: false },
+  { id: 'landscape', name: 'Р›Р°РЅРґС€Р°С„С‚', visible: false },
+  { id: 'continent', name: 'РљРѕРЅС‚РёРЅРµРЅС‚', visible: false },
+  { id: 'region', name: 'Р РµРіРёРѕРЅ', visible: false },
+  { id: 'climate', name: 'РљР»РёРјР°С‚', visible: false },
+  { id: 'religion', name: 'Р РµР»РёРіРёРё', visible: false },
+  { id: 'resources', name: 'Р РµСЃСѓСЂСЃС‹', visible: false },
+  { id: 'fertility', name: 'РџР»РѕРґРѕСЂРѕРґРЅРѕСЃС‚СЊ', visible: false },
+  { id: 'radiation', name: 'Р Р°РґРёР°С†РёСЏ', visible: false },
+  { id: 'pollution', name: 'Р—Р°РіСЂСЏР·РЅРµРЅРёСЏ', visible: false },
+  { id: 'colonization', name: 'РљРѕР»РѕРЅРёР·Р°С†РёСЏ', visible: false },
 ];
 
 function App() {
@@ -281,22 +281,22 @@ function App() {
   const [industryOpen, setIndustryOpen] = useState(false);
   const [diplomacyOpen, setDiplomacyOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>([
-    { id: createId(), name: 'Умеренный', color: '#38bdf8' },
-    { id: createId(), name: 'Засушливый', color: '#f59e0b' },
+    { id: createId(), name: 'РЈРјРµСЂРµРЅРЅС‹Р№', color: '#38bdf8' },
+    { id: createId(), name: 'Р—Р°СЃСѓС€Р»РёРІС‹Р№', color: '#f59e0b' },
   ]);
   const [religions, setReligions] = useState<Trait[]>([
-    { id: createId(), name: 'Солнечный культ', color: '#facc15' },
-    { id: createId(), name: 'Лунный культ', color: '#a855f7' },
+    { id: createId(), name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ РєСѓР»СЊС‚', color: '#facc15' },
+    { id: createId(), name: 'Р›СѓРЅРЅС‹Р№ РєСѓР»СЊС‚', color: '#a855f7' },
   ]);
   const [landscapes, setLandscapes] = useState<Trait[]>([
-    { id: createId(), name: 'Равнина', color: '#22c55e' },
-    { id: createId(), name: 'Горы', color: '#10b981' },
+    { id: createId(), name: 'Р Р°РІРЅРёРЅР°', color: '#22c55e' },
+    { id: createId(), name: 'Р“РѕСЂС‹', color: '#10b981' },
   ]);
   const [continents, setContinents] = useState<Trait[]>([]);
   const [regions, setRegions] = useState<Trait[]>([]);
   const [cultures, setCultures] = useState<Trait[]>([
-    { id: createId(), name: 'Северяне', color: '#fb7185' },
-    { id: createId(), name: 'Южане', color: '#f97316' },
+    { id: createId(), name: 'РЎРµРІРµСЂСЏРЅРµ', color: '#fb7185' },
+    { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
   ]);
   const [resources, setResources] = useState<Trait[]>([]);
   const [buildings, setBuildings] = useState<BuildingDefinition[]>([]);
@@ -472,6 +472,12 @@ function App() {
     color: string;
     lineWidth: number;
     dashPattern?: string;
+    constructionCostPerSegment?: number;
+    allowProvinceSkipping?: boolean;
+    requiredBuildingIds?: string[];
+    requiredBuildingsMode?: 'all' | 'any';
+    landscape?: { anyOf?: string[]; noneOf?: string[] };
+    allowAllLandscapes?: boolean;
   }) => {
     setLogistics((prev) => ({
       ...prev,
@@ -483,6 +489,20 @@ function App() {
           color: payload.color,
           lineWidth: Math.max(0.4, payload.lineWidth),
           dashPattern: payload.dashPattern?.trim() || undefined,
+          constructionCostPerSegment: Math.max(
+            0,
+            Math.floor(payload.constructionCostPerSegment ?? 0),
+          ),
+          allowProvinceSkipping: Boolean(payload.allowProvinceSkipping),
+          requiredBuildingIds: Array.from(
+            new Set(payload.requiredBuildingIds ?? []),
+          ),
+          requiredBuildingsMode: payload.requiredBuildingsMode ?? 'all',
+          landscape: {
+            anyOf: Array.from(new Set(payload.landscape?.anyOf ?? [])),
+            noneOf: Array.from(new Set(payload.landscape?.noneOf ?? [])),
+          },
+          allowAllLandscapes: payload.allowAllLandscapes ?? true,
         },
       ],
     }));
@@ -490,7 +510,21 @@ function App() {
 
   const updateLogisticsRouteType = (
     id: string,
-    patch: Partial<Pick<LogisticsRouteType, 'name' | 'color' | 'lineWidth' | 'dashPattern'>>,
+    patch: Partial<
+      Pick<
+        LogisticsRouteType,
+        | 'name'
+        | 'color'
+        | 'lineWidth'
+        | 'dashPattern'
+        | 'constructionCostPerSegment'
+        | 'allowProvinceSkipping'
+        | 'requiredBuildingIds'
+        | 'requiredBuildingsMode'
+        | 'landscape'
+        | 'allowAllLandscapes'
+      >
+    >,
   ) => {
     setLogistics((prev) => ({
       ...prev,
@@ -505,6 +539,33 @@ function App() {
                 patch.dashPattern == null
                   ? item.dashPattern
                   : patch.dashPattern.trim() || undefined,
+              constructionCostPerSegment:
+                patch.constructionCostPerSegment == null
+                  ? item.constructionCostPerSegment ?? 0
+                  : Math.max(0, Math.floor(patch.constructionCostPerSegment)),
+              allowProvinceSkipping:
+                patch.allowProvinceSkipping == null
+                  ? item.allowProvinceSkipping ?? false
+                  : patch.allowProvinceSkipping,
+              requiredBuildingIds:
+                patch.requiredBuildingIds == null
+                  ? item.requiredBuildingIds ?? []
+                  : Array.from(new Set(patch.requiredBuildingIds)),
+              requiredBuildingsMode:
+                patch.requiredBuildingsMode == null
+                  ? item.requiredBuildingsMode ?? 'all'
+                  : patch.requiredBuildingsMode,
+              landscape:
+                patch.landscape == null
+                  ? item.landscape ?? { anyOf: [], noneOf: [] }
+                  : {
+                      anyOf: Array.from(new Set(patch.landscape.anyOf ?? [])),
+                      noneOf: Array.from(new Set(patch.landscape.noneOf ?? [])),
+                    },
+              allowAllLandscapes:
+                patch.allowAllLandscapes == null
+                  ? item.allowAllLandscapes ?? true
+                  : patch.allowAllLandscapes,
             }
           : item,
       ),
@@ -700,7 +761,7 @@ function App() {
           province.colonizationProgress = {};
           addEvent({
             category: 'colonization',
-            message: `${country.name} завершила колонизацию провинции ${provinceId}.`,
+            message: `${country.name} Р·Р°РІРµСЂС€РёР»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
             countryId,
             priority: 'high',
           });
@@ -767,7 +828,7 @@ function App() {
             builtChanged = true;
             addEvent({
               category: 'economy',
-              message: `Строительство завершено: ${buildingName} x${completed} в провинции ${province.id}.`,
+              message: `РЎС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ Р·Р°РІРµСЂС€РµРЅРѕ: ${buildingName} x${completed} РІ РїСЂРѕРІРёРЅС†РёРё ${province.id}.`,
               countryId,
               priority: 'medium',
             });
@@ -811,7 +872,7 @@ function App() {
       setTurn((prev) => prev + 1);
       addEvent({
         category: 'system',
-        message: `Начался глобальный ход ${turn + 1}`,
+        message: `РќР°С‡Р°Р»СЃСЏ РіР»РѕР±Р°Р»СЊРЅС‹Р№ С…РѕРґ ${turn + 1}`,
         priority: 'low',
       });
       countries.forEach((country) => {
@@ -908,7 +969,7 @@ function App() {
                 ?.name ?? proposal.toCountryId;
             addEvent({
               category: 'diplomacy',
-              message: `${toName} отклонила предложение договора от ${fromName} (истек срок).`,
+              message: `${toName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName} (РёСЃС‚РµРє СЃСЂРѕРє).`,
               countryId: proposal.toCountryId,
               priority: 'low',
             });
@@ -970,7 +1031,7 @@ function App() {
             agreement.guestCountryId;
           addEvent({
             category: 'diplomacy',
-            message: `���� �������� ${hostName} - ${guestName} �����. ��������� ������ ��������� ����� ��������.`,
+            message: `пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ ${hostName} - ${guestName} пїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.`,
             countryId: agreement.hostCountryId,
             priority: 'low',
           });
@@ -1107,7 +1168,16 @@ function App() {
         ...loaded,
         routeTypes:
           loaded.routeTypes && loaded.routeTypes.length > 0
-            ? loaded.routeTypes
+            ? loaded.routeTypes.map((item) => ({
+                ...item,
+                constructionCostPerSegment:
+                  item.constructionCostPerSegment ?? 0,
+                allowProvinceSkipping: item.allowProvinceSkipping ?? false,
+                requiredBuildingIds: item.requiredBuildingIds ?? [],
+                requiredBuildingsMode: item.requiredBuildingsMode ?? 'all',
+                landscape: item.landscape ?? { anyOf: [], noneOf: [] },
+                allowAllLandscapes: item.allowAllLandscapes ?? true,
+              }))
             : base.routeTypes,
         routes: loaded.routes ?? [],
       };
@@ -1171,7 +1241,7 @@ function App() {
       const now = new Date().toISOString();
       return {
         id: typeof entry.id === 'string' ? entry.id : createId(),
-        name: typeof entry.name === 'string' ? entry.name : 'Импорт',
+        name: typeof entry.name === 'string' ? entry.name : 'РРјРїРѕСЂС‚',
         createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : now,
         updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : now,
         data: entry.data,
@@ -1194,7 +1264,7 @@ function App() {
     }
 
     if (incoming.length === 0) {
-      throw new Error('Файл не содержит корректных сохранений.');
+      throw new Error('Р¤Р°Р№Р» РЅРµ СЃРѕРґРµСЂР¶РёС‚ РєРѕСЂСЂРµРєС‚РЅС‹С… СЃРѕС…СЂР°РЅРµРЅРёР№.');
     }
 
     const existingIds = new Set(saves.map((save) => save.id));
@@ -1215,22 +1285,22 @@ function App() {
     setSelectedProvinceId(undefined);
     setProvinces({});
     setClimates([
-      { id: createId(), name: 'Умеренный', color: '#38bdf8' },
-      { id: createId(), name: 'Засушливый', color: '#f59e0b' },
+      { id: createId(), name: 'РЈРјРµСЂРµРЅРЅС‹Р№', color: '#38bdf8' },
+      { id: createId(), name: 'Р—Р°СЃСѓС€Р»РёРІС‹Р№', color: '#f59e0b' },
     ]);
     setReligions([
-      { id: createId(), name: 'Солнечный культ', color: '#facc15' },
-      { id: createId(), name: 'Лунный культ', color: '#a855f7' },
+      { id: createId(), name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ РєСѓР»СЊС‚', color: '#facc15' },
+      { id: createId(), name: 'Р›СѓРЅРЅС‹Р№ РєСѓР»СЊС‚', color: '#a855f7' },
     ]);
     setLandscapes([
-      { id: createId(), name: 'Равнина', color: '#22c55e' },
-      { id: createId(), name: 'Горы', color: '#10b981' },
+      { id: createId(), name: 'Р Р°РІРЅРёРЅР°', color: '#22c55e' },
+      { id: createId(), name: 'Р“РѕСЂС‹', color: '#10b981' },
     ]);
     setContinents([]);
     setRegions([]);
     setCultures([
-      { id: createId(), name: 'Северяне', color: '#fb7185' },
-      { id: createId(), name: 'Южане', color: '#f97316' },
+      { id: createId(), name: 'РЎРµРІРµСЂСЏРЅРµ', color: '#fb7185' },
+      { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
     ]);
     setResources([]);
     setBuildings([]);
@@ -1567,11 +1637,11 @@ function App() {
     });
     legends.colonization = [
       ...colonizationLegend,
-      { label: 'Запрещено к колонизации', color: '#f87171' },
-      { label: 'Наши провинции', color: COLONIZATION_OWN_COLOR },
-      { label: 'Наши колонии', color: COLONIZATION_OWN_COLOR },
-      { label: 'Чужие провинции', color: COLONIZATION_OTHER_COLOR },
-      { label: 'Чужие колонии', color: COLONIZATION_OTHER_COLOR },
+      { label: 'Р—Р°РїСЂРµС‰РµРЅРѕ Рє РєРѕР»РѕРЅРёР·Р°С†РёРё', color: '#f87171' },
+      { label: 'РќР°С€Рё РїСЂРѕРІРёРЅС†РёРё', color: COLONIZATION_OWN_COLOR },
+      { label: 'РќР°С€Рё РєРѕР»РѕРЅРёРё', color: COLONIZATION_OWN_COLOR },
+      { label: 'Р§СѓР¶РёРµ РїСЂРѕРІРёРЅС†РёРё', color: COLONIZATION_OTHER_COLOR },
+      { label: 'Р§СѓР¶РёРµ РєРѕР»РѕРЅРёРё', color: COLONIZATION_OTHER_COLOR },
     ];
     legends.climate = climates.map((item) => ({
       label: item.name,
@@ -1606,7 +1676,7 @@ function App() {
       color: item.color,
     }));
     if (countries.length > 5) {
-      legends.political.push({ label: 'Другие страны', color: '#94a3b8' });
+      legends.political.push({ label: 'Р”СЂСѓРіРёРµ СЃС‚СЂР°РЅС‹', color: '#94a3b8' });
     }
     const envSteps = [0, 20, 40, 60, 80, 100];
     legends.radiation = envSteps.slice(0, -1).map((from, index) => {
@@ -1646,6 +1716,17 @@ function App() {
   const selectedProvince = selectedProvinceId
     ? provinces[selectedProvinceId]
     : undefined;
+  const logisticsDraftRouteType = logisticsRouteDraft
+    ? logistics.routeTypes.find((item) => item.id === logisticsRouteDraft.routeTypeId)
+    : undefined;
+  const logisticsDraftSegmentCost = Math.max(
+    0,
+    Math.floor(logisticsDraftRouteType?.constructionCostPerSegment ?? 0),
+  );
+  const logisticsDraftTotalCost = Math.max(
+    0,
+    (logisticsRouteProvinceIds.length - 1) * logisticsDraftSegmentCost,
+  );
 
   const toggleLayer = (id: string) => {
     setMapLayers((prev) => {
@@ -1806,7 +1887,7 @@ function App() {
     if (activeLimit > 0 && activeCount >= activeLimit) {
       addEvent({
         category: 'colonization',
-        message: `${country?.name ?? 'Страна'} достигла лимита активных колонизаций (${activeLimit}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РґРѕСЃС‚РёРіР»Р° Р»РёРјРёС‚Р° Р°РєС‚РёРІРЅС‹С… РєРѕР»РѕРЅРёР·Р°С†РёР№ (${activeLimit}).`,
         countryId,
         priority: 'low',
       });
@@ -1822,7 +1903,7 @@ function App() {
         progress[countryId] = 0;
         addEvent({
           category: 'colonization',
-          message: `${country?.name ?? 'Страна'} начала колонизацию провинции ${provinceId}.`,
+          message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РЅР°С‡Р°Р»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
           countryId,
           priority: 'medium',
         });
@@ -1847,7 +1928,7 @@ function App() {
       delete progress[countryId];
       addEvent({
         category: 'colonization',
-        message: `${country?.name ?? 'Страна'} отменила колонизацию провинции ${provinceId}.`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
         countryId,
         priority: 'low',
       });
@@ -2030,7 +2111,7 @@ function App() {
       payload.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${fromName} отправила предложение договора стране ${toName}.`,
+      message: `${fromName} РѕС‚РїСЂР°РІРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° СЃС‚СЂР°РЅРµ ${toName}.`,
       countryId: payload.fromCountryId,
       priority: 'low',
     });
@@ -2075,7 +2156,7 @@ function App() {
           ?.name ?? proposal.agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `${voterName} подтвердила продление договора ${hostName} ↔ ${guestName}.`,
+        message: `${voterName} РїРѕРґС‚РІРµСЂРґРёР»Р° РїСЂРѕРґР»РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° ${hostName} в†” ${guestName}.`,
         countryId: voterId,
         priority: 'low',
       });
@@ -2083,7 +2164,7 @@ function App() {
         applyDiplomacyAgreement(renewedAgreement);
         addEvent({
           category: 'diplomacy',
-          message: `Договор ${hostName} ↔ ${guestName} продлен.`,
+          message: `Р”РѕРіРѕРІРѕСЂ ${hostName} в†” ${guestName} РїСЂРѕРґР»РµРЅ.`,
           countryId: renewedAgreement.hostCountryId,
           priority: 'low',
         });
@@ -2128,7 +2209,7 @@ function App() {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${toName} приняла предложение договора от ${fromName}.`,
+      message: `${toName} РїСЂРёРЅСЏР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName}.`,
       countryId: proposal.toCountryId,
       priority: 'low',
     });
@@ -2152,7 +2233,7 @@ function App() {
           ?.name ?? proposal.agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `${deciderName} отклонила продление договора ${hostName} ↔ ${guestName}.`,
+        message: `${deciderName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРѕРґР»РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° ${hostName} в†” ${guestName}.`,
         countryId: deciderId,
         priority: 'low',
       });
@@ -2166,7 +2247,7 @@ function App() {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${toName} отклонила предложение договора от ${fromName}.`,
+      message: `${toName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName}.`,
       countryId: proposal.toCountryId,
       priority: 'low',
     });
@@ -2186,7 +2267,7 @@ function App() {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${fromName} отозвала предложение договора для ${toName}.`,
+      message: `${fromName} РѕС‚РѕР·РІР°Р»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РґР»СЏ ${toName}.`,
       countryId: proposal.fromCountryId,
       priority: 'low',
     });
@@ -2204,7 +2285,7 @@ function App() {
         agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `Договор ${hostName} → ${guestName} отменён.`,
+        message: `Р”РѕРіРѕРІРѕСЂ ${hostName} в†’ ${guestName} РѕС‚РјРµРЅС‘РЅ.`,
         countryId: agreement.hostCountryId,
         priority: 'low',
       });
@@ -2267,9 +2348,9 @@ function App() {
     const ownerLabel =
       owner.type === 'state'
         ? countries.find((item) => item.id === owner.countryId)?.name ??
-          'государство'
+          'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
         : companies.find((item) => item.id === owner.companyId)?.name ??
-          'компания';
+          'РєРѕРјРїР°РЅРёСЏ';
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId == null) return prev;
@@ -2811,7 +2892,7 @@ function App() {
       progress[buildingId] = entries;
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'Страна'} начала строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РЅР°С‡Р°Р»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -2842,9 +2923,9 @@ function App() {
       const ownerLabel =
         removed?.owner.type === 'state'
           ? countries.find((item) => item.id === removed?.owner.countryId)?.name ??
-            'государство'
+            'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
           : companies.find((item) => item.id === removed?.owner.companyId)?.name ??
-            'компания';
+            'РєРѕРјРїР°РЅРёСЏ';
       if (entries.length > 0) {
         progress[buildingId] = entries;
       } else {
@@ -2852,7 +2933,7 @@ function App() {
       }
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -3084,18 +3165,80 @@ function App() {
             if (logisticsRoutePlannerActive) {
               setLogisticsRouteProvinceIds((prev) => {
                 if (prev[prev.length - 1] === id) return prev;
+                const routeType = logistics.routeTypes.find(
+                  (item) => item.id === logisticsRouteDraft?.routeTypeId,
+                );
+                const province = provinces[id];
+                if (!province) {
+                  setRoutePlannerHint('Провинция не найдена в данных карты.');
+                  return prev;
+                }
+                const requiredBuildingIds = routeType?.requiredBuildingIds ?? [];
+                if (requiredBuildingIds.length > 0) {
+                  const builtIds = new Set(
+                    (province.buildingsBuilt ?? []).map((entry) => entry.buildingId),
+                  );
+                  const mode = routeType?.requiredBuildingsMode ?? 'all';
+                  if (mode === 'all') {
+                    const missing = requiredBuildingIds.filter(
+                      (buildingId) => !builtIds.has(buildingId),
+                    );
+                    if (missing.length > 0) {
+                      const missingName = buildings.find(
+                        (item) => item.id === missing[0],
+                      )?.name;
+                      setRoutePlannerHint(
+                        `??? ???? ????????? ?? ??????? ??????: ${missingName ?? missing[0]}.`,
+                      );
+                      return prev;
+                    }
+                  } else {
+                    const hasAnyRequired = requiredBuildingIds.some((buildingId) =>
+                      builtIds.has(buildingId),
+                    );
+                    if (!hasAnyRequired) {
+                      setRoutePlannerHint(
+                        '??? ???? ????????? ????????? ????? ?? ????????? ??????.',
+                      );
+                      return prev;
+                    }
+                  }
+                }
+                const landscapeAny = routeType?.landscape?.anyOf ?? [];
+                const landscapeNone = routeType?.landscape?.noneOf ?? [];
+                const provinceLandscapeId = province.landscapeId;
+                if (!(routeType?.allowAllLandscapes ?? true)) {
+                  if (
+                    landscapeAny.length > 0 &&
+                    (!provinceLandscapeId || !landscapeAny.includes(provinceLandscapeId))
+                  ) {
+                    setRoutePlannerHint(
+                      '???????? ????????? ?? ???????? ??? ????? ???? ????????.',
+                    );
+                    return prev;
+                  }
+                  if (
+                    provinceLandscapeId &&
+                    landscapeNone.includes(provinceLandscapeId)
+                  ) {
+                    setRoutePlannerHint(
+                      '???? ??? ???????? ???????? ?? ????????? ?????????.',
+                    );
+                    return prev;
+                  }
+                }
                 if (prev.includes(id)) {
                   setRoutePlannerHint(
-                    '��������� ��� ���� � ���� ��������. �������� ������ ��������.',
+                    'Провинция уже есть в этом маршруте. Выберите другую соседнюю.',
                   );
                   return prev;
                 }
                 const lastId = prev[prev.length - 1];
-                if (lastId) {
+                if (lastId && !(routeType?.allowProvinceSkipping ?? false)) {
                   const neighbors = provinces[lastId]?.adjacentProvinceIds ?? [];
                   if (!neighbors.includes(id)) {
                     setRoutePlannerHint(
-                      '������ ����������� ����� ���������: �������� ��������.',
+                      'Нельзя перескочить через провинцию: выберите соседнюю.',
                     );
                     return prev;
                   }
@@ -3150,7 +3293,7 @@ function App() {
           className="absolute left-1/2 -translate-x-1/2 top-[88px] h-9 px-4 rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-200 text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400/20 hover:border-emerald-300/60 transition-colors z-40"
         >
           <Handshake className="w-4 h-4" />
-          Договоры ({pendingDiplomacyProposals.length})
+          ???????? ({pendingDiplomacyProposals.length})
         </button>
       )}
       <LeftToolbar />
@@ -3158,11 +3301,14 @@ function App() {
         <div className="absolute left-1/2 -translate-x-1/2 bottom-24 z-40 rounded-xl border border-cyan-400/40 bg-[#08131f]/90 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-900/30">
           <div className="px-2">
             <div className="text-cyan-100/90 text-xs">
-              ��������� ��������: {logisticsRouteProvinceIds.length} �����
+              ????????? ????????: {logisticsRouteProvinceIds.length} ?????
             </div>
             <div className="text-cyan-100/70 text-[11px] leading-tight">
-              �������� ��������� �� ����� �� �������. ������� �������, �����
-              ���������, ��� �������, ����� ��������� ��� ���������.
+              ???????? ????????? ?? ????? ?? ???????. ??????? ????????, ?????
+              ?????????, ??? ????????, ????? ????????? ??? ?????????.
+            </div>
+            <div className="text-cyan-100/75 text-[11px] leading-tight mt-1">
+              Стоимость: {logisticsDraftTotalCost} (участков: {Math.max(0, logisticsRouteProvinceIds.length - 1)} x {logisticsDraftSegmentCost})
             </div>
             {routePlannerHint && (
               <div className="text-amber-200/90 text-[11px] leading-tight mt-1">
@@ -3172,46 +3318,89 @@ function App() {
           </div>
           <button
             onClick={() => {
-              if (
-                logisticsRouteDraft &&
-                logisticsRouteProvinceIds.length > 1
-              ) {
-                const routeId = createId();
-                setLogistics((prev) => ({
-                  ...prev,
-                  routes: [
-                    ...prev.routes,
-                    {
-                      id: routeId,
-                      name: logisticsRouteDraft.name,
-                      routeTypeId: logisticsRouteDraft.routeTypeId,
-                      provinceIds: logisticsRouteProvinceIds,
-                      ownerCountryId: activeCountryId,
-                      countryStatuses: {},
-                    },
-                  ],
-                }));
-                for (let i = 0; i < logisticsRouteProvinceIds.length - 1; i += 1) {
-                  const fromProvinceId = logisticsRouteProvinceIds[i];
-                  const toProvinceId = logisticsRouteProvinceIds[i + 1];
-                  if (
-                    !fromProvinceId ||
-                    !toProvinceId ||
-                    fromProvinceId === toProvinceId
-                  ) {
-                    continue;
-                  }
-                  addLogisticsEdge({
-                    id: createId(),
-                    routeId,
-                    fromNodeId: `province:${fromProvinceId}`,
-                    toNodeId: `province:${toProvinceId}`,
+              if (!logisticsRouteDraft || logisticsRouteProvinceIds.length < 2) {
+                setRoutePlannerHint('Для строительства нужно выбрать минимум 2 провинции.');
+                return;
+              }
+              if (!activeCountryId) {
+                setRoutePlannerHint('Выберите активную страну для строительства.');
+                return;
+              }
+              const draftRouteType = logistics.routeTypes.find(
+                (item) => item.id === logisticsRouteDraft.routeTypeId,
+              );
+              const segmentCount = Math.max(0, logisticsRouteProvinceIds.length - 1);
+              const segmentCost = Math.max(
+                0,
+                Math.floor(draftRouteType?.constructionCostPerSegment ?? 0),
+              );
+              const totalCost = segmentCount * segmentCost;
+              const activeCountry = countries.find(
+                (country) => country.id === activeCountryId,
+              );
+              const availablePoints = activeCountry?.constructionPoints ?? 0;
+              if (availablePoints < totalCost) {
+                setRoutePlannerHint(
+                  `Недостаточно очков строительства: нужно ${totalCost}, доступно ${availablePoints}.`,
+                );
+                return;
+              }
+              if (totalCost > 0) {
+                setCountries((prev) =>
+                  prev.map((country) =>
+                    country.id === activeCountryId
+                      ? {
+                          ...country,
+                          constructionPoints: Math.max(
+                            0,
+                            (country.constructionPoints ?? 0) - totalCost,
+                          ),
+                        }
+                      : country,
+                  ),
+                );
+                addEvent({
+                  category: 'economy',
+                  message: `${activeCountry?.name ?? activeCountryId} построила маршрут "${logisticsRouteDraft.name}" за ${totalCost} очков строительства.`,
+                  countryId: activeCountryId,
+                  priority: 'low',
+                });
+              }
+              const routeId = createId();
+              setLogistics((prev) => ({
+                ...prev,
+                routes: [
+                  ...prev.routes,
+                  {
+                    id: routeId,
+                    name: logisticsRouteDraft.name,
                     routeTypeId: logisticsRouteDraft.routeTypeId,
-                    active: true,
-                    bidirectional: true,
+                    provinceIds: logisticsRouteProvinceIds,
                     ownerCountryId: activeCountryId,
-                  });
+                    countryStatuses: {},
+                  },
+                ],
+              }));
+              for (let i = 0; i < logisticsRouteProvinceIds.length - 1; i += 1) {
+                const fromProvinceId = logisticsRouteProvinceIds[i];
+                const toProvinceId = logisticsRouteProvinceIds[i + 1];
+                if (
+                  !fromProvinceId ||
+                  !toProvinceId ||
+                  fromProvinceId === toProvinceId
+                ) {
+                  continue;
                 }
+                addLogisticsEdge({
+                  id: createId(),
+                  routeId,
+                  fromNodeId: `province:${fromProvinceId}`,
+                  toNodeId: `province:${toProvinceId}`,
+                  routeTypeId: logisticsRouteDraft.routeTypeId,
+                  active: true,
+                  bidirectional: true,
+                  ownerCountryId: activeCountryId,
+                });
               }
               setLogisticsRouteProvinceIds([]);
               setLogisticsRouteDraft(null);
@@ -3221,7 +3410,7 @@ function App() {
             }}
             className="h-8 px-3 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm"
           >
-            ������
+            ??????
           </button>
           <button
             onClick={() => {
@@ -3233,7 +3422,7 @@ function App() {
             }}
             className="h-8 px-3 rounded-lg border border-white/15 bg-black/30 text-white/80 text-sm"
           >
-            ������
+            ??????
           </button>
         </div>
       )}
@@ -3242,17 +3431,17 @@ function App() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="w-[360px] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-white/10 text-white text-base font-semibold">
-              Предложение отправлено
+              РџСЂРµРґР»РѕР¶РµРЅРёРµ РѕС‚РїСЂР°РІР»РµРЅРѕ
             </div>
             <div className="px-5 py-4 text-white/70 text-sm">
-              Предложение направлено стране {diplomacySentNotice.toCountryName}.
+              РџСЂРµРґР»РѕР¶РµРЅРёРµ РЅР°РїСЂР°РІР»РµРЅРѕ СЃС‚СЂР°РЅРµ {diplomacySentNotice.toCountryName}.
             </div>
             <div className="px-5 py-4 border-t border-white/10 flex justify-end">
               <button
                 onClick={() => setDiplomacySentNotice({ open: false, toCountryName: '' })}
                 className="h-9 px-4 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm"
               >
-                Ок
+                РћРє
               </button>
             </div>
           </div>
@@ -3605,12 +3794,12 @@ function App() {
             const ownerLabel =
               removed?.owner.type === 'state'
                 ? countries.find((item) => item.id === removed?.owner.countryId)
-                    ?.name ?? 'государство'
+                    ?.name ?? 'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
                 : companies.find((item) => item.id === removed?.owner.companyId)
-                    ?.name ?? 'компания';
+                    ?.name ?? 'РєРѕРјРїР°РЅРёСЏ';
             addEvent({
               category: 'economy',
-              message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+              message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
               countryId: province.ownerCountryId,
               priority: 'low',
             });
@@ -3633,7 +3822,7 @@ function App() {
           if (available < demolishCost) {
             addEvent({
               category: 'economy',
-              message: `Недостаточно очков строительства для сноса здания в провинции ${provinceId}.`,
+              message: `РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РѕС‡РєРѕРІ СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР° РґР»СЏ СЃРЅРѕСЃР° Р·РґР°РЅРёСЏ РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
               countryId: country?.id,
               priority: 'low',
             });
@@ -3666,7 +3855,7 @@ function App() {
             const buildingName = building?.name ?? buildingId;
             addEvent({
               category: 'economy',
-              message: `${country?.name ?? 'Страна'} снесла ${buildingName} в провинции ${provinceId} (стоимость: ${demolishCost}).`,
+              message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} СЃРЅРµСЃР»Р° ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (СЃС‚РѕРёРјРѕСЃС‚СЊ: ${demolishCost}).`,
               countryId: province.ownerCountryId,
               priority: 'low',
             });
@@ -3754,8 +3943,30 @@ function App() {
         onAddResource={addResource}
         onAddBuilding={addBuilding}
         onAddIndustry={addIndustry}
-        onAddRouteType={(name, color, lineWidth, dashPattern) =>
-          addLogisticsRouteType({ name, color, lineWidth, dashPattern })
+        onAddRouteType={(
+          name,
+          color,
+          lineWidth,
+          dashPattern,
+          constructionCostPerSegment,
+          allowProvinceSkipping,
+          requiredBuildingIds,
+          landscape,
+          requiredBuildingsMode,
+          allowAllLandscapes,
+        ) =>
+          addLogisticsRouteType({
+            name,
+            color,
+            lineWidth,
+            dashPattern,
+            constructionCostPerSegment,
+            allowProvinceSkipping,
+            requiredBuildingIds,
+            landscape,
+            requiredBuildingsMode,
+            allowAllLandscapes,
+          })
         }
         onUpdateRouteType={updateLogisticsRouteType}
         onDeleteRouteType={deleteLogisticsRouteType}

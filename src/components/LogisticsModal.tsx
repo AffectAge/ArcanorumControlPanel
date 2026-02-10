@@ -49,9 +49,9 @@ export default function LogisticsModal({
   if (!open) return null;
 
   const canStartRouteBuild = Boolean(routeTypeId && routeName.trim());
-  const activeCountryName =
-    countries.find((country) => country.id === activeCountryId)?.name ??
-    'Не выбрана';
+  const activeCountry = countries.find((country) => country.id === activeCountryId);
+  const activeCountryName = activeCountry?.name ?? 'Не выбрана';
+  const selectedRouteType = routeTypes.find((item) => item.id === routeTypeId);
 
   const visibleRoutes = routes.filter((route) => {
     if (!activeCountryId) return true;
@@ -59,6 +59,44 @@ export default function LogisticsModal({
       (provinceId) => provinces[provinceId]?.ownerCountryId === activeCountryId,
     );
   });
+
+  const resolveProvinceStatus = (route: LogisticsRoute, index: number) => {
+    let cutoff = Number.POSITIVE_INFINITY;
+    for (let i = 1; i < route.provinceIds.length; i += 1) {
+      const provinceId = route.provinceIds[i];
+      const ownerId = provinces[provinceId]?.ownerCountryId;
+      if (!ownerId) continue;
+      const status = route.countryStatuses?.[ownerId] ?? 'open';
+      if (status === 'closed') {
+        cutoff = Math.min(cutoff, i - 1);
+        break;
+      }
+    }
+    return index <= cutoff ? 'open' : 'closed';
+  };
+
+  const resolveRouteCountries = (route: LogisticsRoute) => {
+    const seen = new Set<string>();
+    const result: {
+      id: string;
+      name: string;
+      flagDataUrl?: string;
+      status: 'open' | 'closed';
+    }[] = [];
+    route.provinceIds.forEach((provinceId) => {
+      const countryId = provinces[provinceId]?.ownerCountryId;
+      if (!countryId || seen.has(countryId)) return;
+      seen.add(countryId);
+      const country = countries.find((item) => item.id === countryId);
+      result.push({
+        id: countryId,
+        name: country?.name ?? countryId,
+        flagDataUrl: country?.flagDataUrl,
+        status: route.countryStatuses?.[countryId] ?? 'open',
+      });
+    });
+    return result;
+  };
 
   return (
     <div className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -87,6 +125,9 @@ export default function LogisticsModal({
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <div className="text-white/80 text-sm">
                   Активная страна: <span className="text-white font-semibold">{activeCountryName}</span>
+                </div>
+                <div className="text-white/60 text-xs mt-1">
+                  Очки строительства: {activeCountry?.constructionPoints ?? 0}
                 </div>
               </div>
 
@@ -119,6 +160,9 @@ export default function LogisticsModal({
 
                 <div className="rounded-lg border border-cyan-400/30 bg-cyan-500/5 p-3 space-y-2">
                   <div className="text-xs text-cyan-100/80">
+                    Цена типа: {Math.max(0, Math.floor(selectedRouteType?.constructionCostPerSegment ?? 0))} очков за 1 участок.
+                  </div>
+                  <div className="text-xs text-cyan-100/80">
                     Нажмите кнопку ниже: окно закроется, затем кликайте провинции на карте.
                     Первая выбранная провинция станет начальной автоматически.
                   </div>
@@ -150,6 +194,7 @@ export default function LogisticsModal({
                   visibleRoutes.map((route) => {
                     const type = routeTypes.find((item) => item.id === route.routeTypeId);
                     const owner = countries.find((item) => item.id === route.ownerCountryId);
+                    const routeCountries = resolveRouteCountries(route);
                     const statusForActive =
                       activeCountryId && route.countryStatuses?.[activeCountryId]
                         ? route.countryStatuses[activeCountryId]
@@ -211,8 +256,55 @@ export default function LogisticsModal({
                           </select>
                         </div>
 
-                        <div className="mt-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[11px] text-white/55 leading-relaxed break-all">
-                          {route.provinceIds.join(' → ')}
+                        {routeCountries.length > 0 && (
+                          <div className="mt-2 rounded-md border border-white/10 bg-black/25 px-2 py-1.5">
+                            <div className="text-[11px] text-white/60 mb-1">
+                              Статусы по странам
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {routeCountries.map((country) => (
+                                <span
+                                  key={`${route.id}:country:${country.id}`}
+                                  className={`px-2 py-0.5 rounded-md text-[10px] border inline-flex items-center gap-1.5 ${
+                                    country.status === 'open'
+                                      ? 'text-emerald-200 border-emerald-400/40 bg-emerald-500/15'
+                                      : 'text-rose-200 border-rose-400/40 bg-rose-500/15'
+                                  }`}
+                                >
+                                  {country.flagDataUrl ? (
+                                    <img
+                                      src={country.flagDataUrl}
+                                      alt={`${country.name} flag`}
+                                      className="w-3.5 h-2.5 rounded-[2px] object-cover border border-white/20"
+                                    />
+                                  ) : null}
+                                  {country.name}: {country.status === 'open' ? 'Открыт' : 'Закрыт'}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="mt-2 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-[11px] leading-relaxed break-all">
+                          {route.provinceIds.map((provinceId, index) => {
+                            const provinceState = resolveProvinceStatus(route, index);
+                            return (
+                              <span key={`${route.id}:${provinceId}:${index}`}>
+                                {index > 0 && (
+                                  <span className="text-white/40 px-1">→</span>
+                                )}
+                                <span
+                                  className={
+                                    provinceState === 'open'
+                                      ? 'text-emerald-300'
+                                      : 'text-rose-300'
+                                  }
+                                >
+                                  {provinceId}
+                                </span>
+                              </span>
+                            );
+                          })}
                         </div>
                       </div>
                     );
