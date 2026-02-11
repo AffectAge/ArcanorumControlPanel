@@ -44,6 +44,7 @@ interface InfoPanelProps {
     categoryName: string;
     categoryColor?: string;
     status: 'available' | 'unavailable';
+    points: number;
   }[];
 }
 
@@ -241,7 +242,9 @@ export default function InfoPanel({
                             : 'text-rose-200'
                         }
                       >
-                        {entry.status === 'available' ? 'Есть' : 'Нет'}
+                        {entry.status === 'available'
+                          ? `Есть (${entry.points})`
+                          : 'Нет'}
                       </span>
                     </span>
                   </div>

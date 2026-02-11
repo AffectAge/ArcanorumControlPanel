@@ -508,6 +508,7 @@ function App() {
     allowAllLandscapes?: boolean;
     marketAccessCategoryIds?: string[];
     allowAllMarketCategories?: boolean;
+    transportCapacityPerLevelByCategory?: Record<string, number>;
   }) => {
     setLogistics((prev) => ({
       ...prev,
@@ -537,6 +538,9 @@ function App() {
             new Set(payload.marketAccessCategoryIds ?? []),
           ),
           allowAllMarketCategories: payload.allowAllMarketCategories ?? true,
+          transportCapacityPerLevelByCategory: {
+            ...(payload.transportCapacityPerLevelByCategory ?? {}),
+          },
         },
       ],
     }));
@@ -559,6 +563,7 @@ function App() {
         | 'allowAllLandscapes'
         | 'marketAccessCategoryIds'
         | 'allowAllMarketCategories'
+        | 'transportCapacityPerLevelByCategory'
       >
     >,
   ) => {
@@ -610,6 +615,10 @@ function App() {
                 patch.allowAllMarketCategories == null
                   ? item.allowAllMarketCategories ?? true
                   : patch.allowAllMarketCategories,
+              transportCapacityPerLevelByCategory:
+                patch.transportCapacityPerLevelByCategory == null
+                  ? item.transportCapacityPerLevelByCategory ?? {}
+                  : { ...patch.transportCapacityPerLevelByCategory },
             }
           : item,
       ),
@@ -780,6 +789,18 @@ function App() {
             }
           : route,
       ),
+    }));
+  };
+
+  const setRouteLevel = (routeId: string, level: number, actorCountryId?: string) => {
+    const safeLevel = Math.max(1, Math.floor(level || 1));
+    setLogistics((prev) => ({
+      ...prev,
+      routes: prev.routes.map((route) => {
+        if (route.id !== routeId) return route;
+        if (!actorCountryId || route.ownerCountryId !== actorCountryId) return route;
+        return { ...route, level: safeLevel };
+      }),
     }));
   };
 
@@ -1042,6 +1063,84 @@ function App() {
       return changed ? { ...prev, edges: nextEdges } : prev;
     });
   }, [provinces, logistics.routes]);
+
+  useEffect(() => {
+    if (turn <= 0) return;
+    setProvinces((prev) => {
+      const categoryIds = resourceCategories.map((category) => category.id);
+      const routeById = new Map(logistics.routes.map((route) => [route.id, route]));
+      const routeTypeById = new Map(
+        logistics.routeTypes.map((routeType) => [routeType.id, routeType]),
+      );
+      const activeProvincesByRoute = new Map<string, Set<string>>();
+      const parseProvinceNodeId = (nodeId: string) =>
+        nodeId.startsWith('province:') ? nodeId.slice('province:'.length) : undefined;
+
+      logistics.edges.forEach((edge) => {
+        if (!edge.routeId || edge.active === false) return;
+        const fromProvinceId = parseProvinceNodeId(edge.fromNodeId);
+        const toProvinceId = parseProvinceNodeId(edge.toNodeId);
+        if (!fromProvinceId || !toProvinceId) return;
+        if (!prev[fromProvinceId] || !prev[toProvinceId]) return;
+        if (!activeProvincesByRoute.has(edge.routeId)) {
+          activeProvincesByRoute.set(edge.routeId, new Set<string>());
+        }
+        const set = activeProvincesByRoute.get(edge.routeId);
+        set?.add(fromProvinceId);
+        set?.add(toProvinceId);
+      });
+
+      const nextPointsByProvince = new Map<string, Record<string, number>>();
+      activeProvincesByRoute.forEach((provinceIds, routeId) => {
+        const route = routeById.get(routeId);
+        if (!route) return;
+        const routeType = routeTypeById.get(route.routeTypeId);
+        if (!routeType) return;
+        const level = Math.max(1, Math.floor(route.level ?? 1));
+        const perLevel = routeType.transportCapacityPerLevelByCategory ?? {};
+        const allowedCategories =
+          routeType.allowAllMarketCategories ?? true
+            ? categoryIds
+            : (routeType.marketAccessCategoryIds ?? []).filter((id) =>
+                categoryIds.includes(id),
+              );
+        if (allowedCategories.length === 0) return;
+        provinceIds.forEach((provinceId) => {
+          const current = nextPointsByProvince.get(provinceId) ?? {};
+          const next = { ...current };
+          allowedCategories.forEach((categoryId) => {
+            const perLevelValue = Math.max(0, perLevel[categoryId] ?? 0);
+            const gain = perLevelValue * level;
+            if (gain <= 0) return;
+            next[categoryId] = (next[categoryId] ?? 0) + gain;
+          });
+          nextPointsByProvince.set(provinceId, next);
+        });
+      });
+
+      let changed = false;
+      const next: ProvinceRecord = { ...prev };
+      Object.values(prev).forEach((province) => {
+        const expectedRaw = nextPointsByProvince.get(province.id) ?? {};
+        const expected = Object.fromEntries(
+          Object.entries(expectedRaw).filter(([, value]) => value > 0),
+        );
+        const current = province.logisticsPointsByCategory ?? {};
+        const currentKeys = Object.keys(current);
+        const expectedKeys = Object.keys(expected);
+        const same =
+          currentKeys.length === expectedKeys.length &&
+          expectedKeys.every((key) => (current[key] ?? 0) === (expected[key] ?? 0));
+        if (same) return;
+        changed = true;
+        next[province.id] = {
+          ...province,
+          logisticsPointsByCategory: expected,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [turn]);
 
   const pruneLogEntries = (
     entries: EventLogEntry[],
@@ -1750,6 +1849,9 @@ function App() {
                   (categoryId) => validResourceCategoryIds.has(categoryId),
                 ),
                 allowAllMarketCategories: item.allowAllMarketCategories ?? true,
+                transportCapacityPerLevelByCategory: {
+                  ...(item.transportCapacityPerLevelByCategory ?? {}),
+                },
               }))
             : base.routeTypes,
         routes: (loaded.routes ?? []).map((route) => {
@@ -1765,6 +1867,7 @@ function App() {
             ...route,
             constructionRequiredPoints: required,
             constructionProgressPoints: Math.min(progress, required),
+            level: Math.max(1, Math.floor(route.level ?? 1)),
           };
         }),
       };
@@ -2373,11 +2476,12 @@ const layerPaint: MapLayerPaint = useMemo(() => {
   }, [markets, activeCountryId]);
   const selectedProvinceMarketAccessByCategory = useMemo<
     | {
-        categoryId: string;
-        categoryName: string;
-        categoryColor?: string;
-        status: 'available' | 'unavailable';
-      }[]
+      categoryId: string;
+      categoryName: string;
+      categoryColor?: string;
+      status: 'available' | 'unavailable';
+      points: number;
+    }[]
     | undefined
   >(() => {
     if (!selectedProvinceId || !activeCountryId) return undefined;
@@ -2390,6 +2494,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       categoryName: category.name,
       categoryColor: category.color,
       status: 'unavailable' as const,
+      points: 0,
     }));
 
     const capitalId = activeCountryMarket?.capitalProvinceId;
@@ -2449,6 +2554,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       return {
         ...entry,
         status: visited.has(selectedProvinceId) ? 'available' : 'unavailable',
+        points: Math.max(
+          0,
+          provinces[selectedProvinceId]?.logisticsPointsByCategory?.[entry.categoryId] ?? 0,
+        ),
       };
     });
   }, [
@@ -3937,6 +4046,11 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         marketAccessCategoryIds: (item.marketAccessCategoryIds ?? []).filter(
           (categoryId) => categoryId !== id,
         ),
+        transportCapacityPerLevelByCategory: Object.fromEntries(
+          Object.entries(item.transportCapacityPerLevelByCategory ?? {}).filter(
+            ([categoryId]) => categoryId !== id,
+          ),
+        ),
       })),
     }));
   };
@@ -4390,6 +4504,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                     countryStatuses: {},
                     constructionRequiredPoints: totalCost,
                     constructionProgressPoints: startsUnderConstruction ? 0 : totalCost,
+                    level: 1,
                   },
                 ],
               }));
@@ -4632,6 +4747,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         activeCountryId={activeCountryId}
         demolitionCostPercent={gameSettings.demolitionCostPercent ?? 20}
         onSetRouteStatus={setRouteCountryStatus}
+        onSetRouteLevel={setRouteLevel}
         onDemolishRoute={demolishLogisticsRoute}
         onClose={() => {
           setLogisticsOpen(false);
@@ -4999,6 +5115,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           allowAllLandscapes,
           marketAccessCategoryIds,
           allowAllMarketCategories,
+          transportCapacityPerLevelByCategory,
         ) =>
           addLogisticsRouteType({
             name,
@@ -5013,6 +5130,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             allowAllLandscapes,
             marketAccessCategoryIds,
             allowAllMarketCategories,
+            transportCapacityPerLevelByCategory,
           })
         }
         onUpdateRouteType={updateLogisticsRouteType}

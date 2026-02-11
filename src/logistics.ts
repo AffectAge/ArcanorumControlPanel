@@ -42,6 +42,7 @@ export const defaultLogisticsRouteTypes = (): LogisticsRouteType[] => [
     allowAllLandscapes: true,
     marketAccessCategoryIds: [],
     allowAllMarketCategories: true,
+    transportCapacityPerLevelByCategory: {},
   },
   {
     id: 'route-rail',
@@ -57,6 +58,7 @@ export const defaultLogisticsRouteTypes = (): LogisticsRouteType[] => [
     allowAllLandscapes: true,
     marketAccessCategoryIds: [],
     allowAllMarketCategories: true,
+    transportCapacityPerLevelByCategory: {},
   },
   {
     id: 'route-sea',
@@ -72,6 +74,7 @@ export const defaultLogisticsRouteTypes = (): LogisticsRouteType[] => [
     allowAllLandscapes: true,
     marketAccessCategoryIds: [],
     allowAllMarketCategories: true,
+    transportCapacityPerLevelByCategory: {},
   },
   {
     id: 'route-air',
@@ -87,6 +90,7 @@ export const defaultLogisticsRouteTypes = (): LogisticsRouteType[] => [
     allowAllLandscapes: true,
     marketAccessCategoryIds: [],
     allowAllMarketCategories: true,
+    transportCapacityPerLevelByCategory: {},
   },
 ];
 

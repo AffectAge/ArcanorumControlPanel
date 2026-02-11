@@ -75,6 +75,7 @@ export type ProvinceData = {
   colonizationDisabled?: boolean;
   buildingsBuilt?: BuiltBuilding[];
   constructionProgress?: Record<string, ConstructionEntry[]>;
+  logisticsPointsByCategory?: Record<string, number>;
 };
 
 export type LogisticsRouteType = {
@@ -91,6 +92,7 @@ export type LogisticsRouteType = {
   allowAllLandscapes?: boolean;
   marketAccessCategoryIds?: string[];
   allowAllMarketCategories?: boolean;
+  transportCapacityPerLevelByCategory?: Record<string, number>;
 };
 
 export type LogisticsNodeType =
@@ -130,6 +132,7 @@ export type LogisticsRoute = {
   countryStatuses?: Record<string, 'open' | 'closed'>;
   constructionRequiredPoints?: number;
   constructionProgressPoints?: number;
+  level?: number;
 };
 
 export type LogisticsState = {

@@ -121,6 +121,7 @@ type AdminPanelProps = {
     allowAllLandscapes?: boolean,
     marketAccessCategoryIds?: string[],
     allowAllMarketCategories?: boolean,
+    transportCapacityPerLevelByCategory?: Record<string, number>,
   ) => void;
   onUpdateRouteType: (
     id: string,
@@ -139,6 +140,7 @@ type AdminPanelProps = {
         | 'allowAllLandscapes'
         | 'marketAccessCategoryIds'
         | 'allowAllMarketCategories'
+        | 'transportCapacityPerLevelByCategory'
       >
     >,
   ) => void;
@@ -351,6 +353,8 @@ export default function AdminPanel({
     useState<string[]>([]);
   const [routeTypeAllowAllMarketCategories, setRouteTypeAllowAllMarketCategories] =
     useState(true);
+  const [routeTypeTransportCapacityByCategory, setRouteTypeTransportCapacityByCategory] =
+    useState<Record<string, number>>({});
 
   const provinceIds = useMemo(() => Object.keys(provinces).sort(), [provinces]);
   const activeProvince = selectedProvince ? provinces[selectedProvince] : undefined;
@@ -449,6 +453,7 @@ export default function AdminPanel({
       routeTypeAllowAllLandscapes,
       routeTypeMarketAccessCategoryIds,
       routeTypeAllowAllMarketCategories,
+      routeTypeTransportCapacityByCategory,
     );
     setRouteTypeName('');
     setRouteTypeDash('');
@@ -462,6 +467,7 @@ export default function AdminPanel({
     setRouteTypeAllowAllLandscapes(true);
     setRouteTypeMarketAccessCategoryIds([]);
     setRouteTypeAllowAllMarketCategories(true);
+    setRouteTypeTransportCapacityByCategory({});
   };
 
 
@@ -3225,22 +3231,40 @@ export default function AdminPanel({
                     resourceCategories.map((category) => (
                       <label
                         key={category.id}
-                        className="flex items-center gap-2 text-white/75 text-xs"
+                        className="flex items-center gap-2 text-white/75 text-xs justify-between"
                       >
+                        <span className="inline-flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={routeTypeMarketAccessCategoryIds.includes(category.id)}
+                            disabled={routeTypeAllowAllMarketCategories}
+                            onChange={(event) =>
+                              setRouteTypeMarketAccessCategoryIds((prev) =>
+                                event.target.checked
+                                  ? Array.from(new Set([...prev, category.id]))
+                                  : prev.filter((id) => id !== category.id),
+                              )
+                            }
+                            className="w-3.5 h-3.5 accent-emerald-500"
+                          />
+                          <span>{category.name}</span>
+                        </span>
                         <input
-                          type="checkbox"
-                          checked={routeTypeMarketAccessCategoryIds.includes(category.id)}
-                          disabled={routeTypeAllowAllMarketCategories}
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={routeTypeTransportCapacityByCategory[category.id] ?? 0}
                           onChange={(event) =>
-                            setRouteTypeMarketAccessCategoryIds((prev) =>
-                              event.target.checked
-                                ? Array.from(new Set([...prev, category.id]))
-                                : prev.filter((id) => id !== category.id),
-                            )
+                            setRouteTypeTransportCapacityByCategory((prev) => ({
+                              ...prev,
+                              [category.id]: Math.max(
+                                0,
+                                Math.floor(Number(event.target.value) || 0),
+                              ),
+                            }))
                           }
-                          className="w-3.5 h-3.5 accent-emerald-500"
+                          className="w-16 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
                         />
-                        <span>{category.name}</span>
                       </label>
                     ))
                   ) : (
@@ -3505,25 +3529,50 @@ export default function AdminPanel({
                           resourceCategories.map((category) => (
                             <label
                               key={category.id}
-                              className="flex items-center gap-2 text-white/75 text-xs"
+                              className="flex items-center gap-2 text-white/75 text-xs justify-between"
                             >
+                              <span className="inline-flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={(item.marketAccessCategoryIds ?? []).includes(
+                                    category.id,
+                                  )}
+                                  disabled={item.allowAllMarketCategories ?? true}
+                                  onChange={(event) => {
+                                    const current = item.marketAccessCategoryIds ?? [];
+                                    onUpdateRouteType(item.id, {
+                                      marketAccessCategoryIds: event.target.checked
+                                        ? Array.from(new Set([...current, category.id]))
+                                        : current.filter((id) => id !== category.id),
+                                    });
+                                  }}
+                                  className="w-3.5 h-3.5 accent-emerald-500"
+                                />
+                                <span>{category.name}</span>
+                              </span>
                               <input
-                                type="checkbox"
-                                checked={(item.marketAccessCategoryIds ?? []).includes(
-                                  category.id,
-                                )}
-                                disabled={item.allowAllMarketCategories ?? true}
+                                type="number"
+                                min={0}
+                                step={1}
+                                value={
+                                  item.transportCapacityPerLevelByCategory?.[category.id] ??
+                                  0
+                                }
                                 onChange={(event) => {
-                                  const current = item.marketAccessCategoryIds ?? [];
+                                  const current =
+                                    item.transportCapacityPerLevelByCategory ?? {};
                                   onUpdateRouteType(item.id, {
-                                    marketAccessCategoryIds: event.target.checked
-                                      ? Array.from(new Set([...current, category.id]))
-                                      : current.filter((id) => id !== category.id),
+                                    transportCapacityPerLevelByCategory: {
+                                      ...current,
+                                      [category.id]: Math.max(
+                                        0,
+                                        Math.floor(Number(event.target.value) || 0),
+                                      ),
+                                    },
                                   });
                                 }}
-                                className="w-3.5 h-3.5 accent-emerald-500"
+                                className="w-16 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
                               />
-                              <span>{category.name}</span>
                             </label>
                           ))
                         ) : (

@@ -26,6 +26,7 @@ type LogisticsModalProps = {
   }) => void;
   demolitionCostPercent: number;
   onDemolishRoute: (routeId: string) => void;
+  onSetRouteLevel: (routeId: string, level: number, actorCountryId?: string) => void;
 };
 
 export default function LogisticsModal({
@@ -40,6 +41,7 @@ export default function LogisticsModal({
   onStartRouteBuild,
   demolitionCostPercent,
   onDemolishRoute,
+  onSetRouteLevel,
 }: LogisticsModalProps) {
   const [routeName, setRouteName] = useState('');
   const [routeTypeId, setRouteTypeId] = useState('');
@@ -281,6 +283,8 @@ export default function LogisticsModal({
                     const demolition = resolveRouteDemolition(route);
                     const availablePoints = activeCountry?.constructionPoints ?? 0;
                     const canPayDemolition = availablePoints >= demolition.cost;
+                    const routeLevel = Math.max(1, Math.floor(route.level ?? 1));
+                    const canChangeLevel = activeCountryId === route.ownerCountryId;
 
                     return (
                       <div
@@ -347,6 +351,26 @@ export default function LogisticsModal({
                               </span>
                             </div>
                           )}
+                        </div>
+                        <div className="mt-2">
+                          <label className="text-[11px] text-white/60">
+                            Уровень маршрута
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            step={1}
+                            disabled={!canChangeLevel}
+                            value={routeLevel}
+                            onChange={(event) =>
+                              onSetRouteLevel(
+                                route.id,
+                                Math.max(1, Math.floor(Number(event.target.value) || 1)),
+                                activeCountryId,
+                              )
+                            }
+                            className="mt-1 h-8 w-full rounded-md bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50 disabled:opacity-50"
+                          />
                         </div>
                         <div className="mt-2">
                           <label className="text-[11px] text-white/60">
