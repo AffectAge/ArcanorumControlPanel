@@ -69,8 +69,10 @@ export default function DiplomacyProposalsModal({
                 const renderAgreementDetails = (
                   agreement: DiplomacyProposal['agreement'],
                 ) => {
-                  const isLogistics =
-                    (agreement.agreementCategory ?? 'construction') === 'logistics';
+                  const category = agreement.agreementCategory ?? 'construction';
+                  const isLogistics = category === 'logistics';
+                  const isMarket =
+                    category === 'market_invite' || category === 'market';
                   const industryNames = agreement.industries?.length
                     ? agreement.industries
                         .map(
@@ -135,7 +137,11 @@ export default function DiplomacyProposalsModal({
                         {allowCompanies ? 'Компании' : ''}
                       </div>
                       <div className="text-white/50 text-xs">Провинции: {allowedProvincesLabel}</div>
-                      {isLogistics ? (
+                      {isMarket ? (
+                        <div className="text-white/50 text-xs">
+                          Приглашение в рынок страны {agreement.marketLeaderCountryId}
+                        </div>
+                      ) : isLogistics ? (
                         <>
                           <div className="text-white/50 text-xs">
                             Типы маршрутов: {routeTypesLabel}

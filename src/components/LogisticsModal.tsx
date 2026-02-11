@@ -1,5 +1,5 @@
 ﻿import { useEffect, useState } from 'react';
-import { X, Network, Plus } from 'lucide-react';
+import { X, Network, Plus, Trash2 } from 'lucide-react';
 import type {
   Country,
   LogisticsRoute,
@@ -24,6 +24,8 @@ type LogisticsModalProps = {
     name: string;
     routeTypeId: string;
   }) => void;
+  demolitionCostPercent: number;
+  onDemolishRoute: (routeId: string) => void;
 };
 
 export default function LogisticsModal({
@@ -36,6 +38,8 @@ export default function LogisticsModal({
   onClose,
   onSetRouteStatus,
   onStartRouteBuild,
+  demolitionCostPercent,
+  onDemolishRoute,
 }: LogisticsModalProps) {
   const [routeName, setRouteName] = useState('');
   const [routeTypeId, setRouteTypeId] = useState('');
@@ -119,6 +123,40 @@ export default function LogisticsModal({
       });
     });
     return result;
+  };
+
+  const resolveRouteDemolition = (route: LogisticsRoute) => {
+    if (!activeCountryId) {
+      return { canDemolish: false, cost: 0, mode: 'none' as const };
+    }
+    const totalSegments = Math.max(0, route.provinceIds.length - 1);
+    if (totalSegments <= 0) {
+      return { canDemolish: false, cost: 0, mode: 'none' as const };
+    }
+    const routeType = routeTypes.find((item) => item.id === route.routeTypeId);
+    const fallbackCost = Math.max(
+      0,
+      Math.floor(routeType?.constructionCostPerSegment ?? 0) * totalSegments,
+    );
+    const baseCost = Math.max(0, route.constructionRequiredPoints ?? fallbackCost);
+    const isOwner = route.ownerCountryId === activeCountryId;
+    if (isOwner) {
+      const cost = Math.ceil((baseCost * Math.max(0, demolitionCostPercent)) / 100);
+      return { canDemolish: true, cost, mode: 'owner' as const };
+    }
+    let ownSegments = 0;
+    for (let i = 1; i < route.provinceIds.length; i += 1) {
+      if (provinces[route.provinceIds[i]]?.ownerCountryId === activeCountryId) {
+        ownSegments += 1;
+      }
+    }
+    if (ownSegments <= 0) {
+      return { canDemolish: false, cost: 0, mode: 'none' as const };
+    }
+    const basePartCost =
+      totalSegments > 0 ? (baseCost * ownSegments) / totalSegments : 0;
+    const cost = Math.ceil((basePartCost * Math.max(0, demolitionCostPercent)) / 100);
+    return { canDemolish: true, cost, mode: 'territory' as const };
   };
 
   return (
@@ -240,6 +278,9 @@ export default function LogisticsModal({
                       activeCountryId && route.countryStatuses?.[activeCountryId]
                         ? route.countryStatuses[activeCountryId]
                         : 'open';
+                    const demolition = resolveRouteDemolition(route);
+                    const availablePoints = activeCountry?.constructionPoints ?? 0;
+                    const canPayDemolition = availablePoints >= demolition.cost;
 
                     return (
                       <div
@@ -383,6 +424,31 @@ export default function LogisticsModal({
                             );
                           })}
                         </div>
+                        {demolition.canDemolish && (
+                          <div className="mt-2 rounded-md border border-rose-400/30 bg-rose-500/5 px-2 py-2">
+                            <div className="text-[11px] text-rose-100/80">
+                              Снос:{' '}
+                              {demolition.mode === 'owner'
+                                ? 'весь маршрут'
+                                : 'графы на вашей территории'}
+                              . Стоимость: {demolition.cost} очков.
+                            </div>
+                            <button
+                              onClick={() => onDemolishRoute(route.id)}
+                              disabled={!canPayDemolition}
+                              className={`mt-1 h-8 px-3 rounded-lg border text-xs inline-flex items-center gap-2 ${
+                                canPayDemolition
+                                  ? 'bg-rose-500/20 border-rose-400/40 text-rose-200'
+                                  : 'bg-black/30 border-white/10 text-white/40 cursor-not-allowed'
+                              }`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              {demolition.mode === 'owner'
+                                ? 'Снести маршрут'
+                                : 'Снести графы на нашей территории'}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })

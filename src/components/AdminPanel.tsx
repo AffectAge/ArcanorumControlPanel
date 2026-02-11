@@ -28,6 +28,7 @@ import type {
   LogisticsRouteType,
   TraitCriteria,
   RequirementNode,
+  ResourceCategory,
 } from '../types';
 
 type AdminTab =
@@ -38,6 +39,7 @@ type AdminTab =
   | 'continents'
   | 'regions'
   | 'cultures'
+  | 'resourceCategories'
   | 'resources'
   | 'buildings'
   | 'companies'
@@ -55,6 +57,7 @@ type AdminPanelProps = {
   continents: Trait[];
   regions: Trait[];
   cultures: Trait[];
+  resourceCategories: ResourceCategory[];
   resources: Trait[];
   buildings: BuildingDefinition[];
   industries: Industry[];
@@ -84,7 +87,13 @@ type AdminPanelProps = {
   onAddContinent: (name: string, color: string) => void;
   onAddRegion: (name: string, color: string) => void;
   onAddCulture: (name: string, color: string, iconDataUrl?: string) => void;
-  onAddResource: (name: string, color: string, iconDataUrl?: string) => void;
+  onAddResource: (
+    name: string,
+    color: string,
+    iconDataUrl?: string,
+    resourceCategoryId?: string,
+  ) => void;
+  onAddResourceCategory: (name: string, color?: string) => void;
   onAddBuilding: (
     name: string,
     cost: number,
@@ -110,6 +119,8 @@ type AdminPanelProps = {
     landscape?: TraitCriteria,
     requiredBuildingsMode?: 'all' | 'any',
     allowAllLandscapes?: boolean,
+    marketAccessCategoryIds?: string[],
+    allowAllMarketCategories?: boolean,
   ) => void;
   onUpdateRouteType: (
     id: string,
@@ -126,6 +137,8 @@ type AdminPanelProps = {
         | 'requiredBuildingsMode'
         | 'landscape'
         | 'allowAllLandscapes'
+        | 'marketAccessCategoryIds'
+        | 'allowAllMarketCategories'
       >
     >,
   ) => void;
@@ -150,12 +163,15 @@ type AdminPanelProps = {
   onUpdateRegionColor: (id: string, color: string) => void;
   onUpdateCultureColor: (id: string, color: string) => void;
   onUpdateResourceColor: (id: string, color: string) => void;
+  onUpdateResourceCategoryColor: (id: string, color: string) => void;
+  onUpdateResourceCategory: (resourceId: string, categoryId?: string) => void;
   onDeleteClimate: (id: string) => void;
   onDeleteReligion: (id: string) => void;
   onDeleteLandscape: (id: string) => void;
   onDeleteContinent: (id: string) => void;
   onDeleteRegion: (id: string) => void;
   onDeleteCulture: (id: string) => void;
+  onDeleteResourceCategory: (id: string) => void;
   onDeleteResource: (id: string) => void;
   onDeleteBuilding: (id: string) => void;
   onDeleteIndustry: (id: string) => void;
@@ -175,6 +191,7 @@ export default function AdminPanel({
   continents,
   regions,
   cultures,
+  resourceCategories,
   resources,
   buildings,
   industries,
@@ -200,6 +217,7 @@ export default function AdminPanel({
   onAddContinent,
   onAddRegion,
   onAddCulture,
+  onAddResourceCategory,
   onAddResource,
   onAddBuilding,
   onAddIndustry,
@@ -224,12 +242,15 @@ export default function AdminPanel({
   onUpdateRegionColor,
   onUpdateCultureColor,
   onUpdateResourceColor,
+  onUpdateResourceCategoryColor,
+  onUpdateResourceCategory,
   onDeleteClimate,
   onDeleteReligion,
   onDeleteLandscape,
   onDeleteContinent,
   onDeleteRegion,
   onDeleteCulture,
+  onDeleteResourceCategory,
   onDeleteResource,
   onDeleteBuilding,
   onDeleteIndustry,
@@ -252,6 +273,9 @@ export default function AdminPanel({
   const [cultureColor, setCultureColor] = useState('#fb7185');
   const [cultureIcon, setCultureIcon] = useState<string | undefined>(undefined);
   const [resourceName, setResourceName] = useState('');
+  const [resourceCategoryName, setResourceCategoryName] = useState('');
+  const [resourceCategoryColor, setResourceCategoryColor] = useState('#38bdf8');
+  const [resourceCategoryId, setResourceCategoryId] = useState('');
   const [buildingName, setBuildingName] = useState('');
   const [buildingCost, setBuildingCost] = useState(100);
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
@@ -323,6 +347,10 @@ export default function AdminPanel({
   const [routeTypeLandscapeNone, setRouteTypeLandscapeNone] = useState<string[]>([]);
   const [routeTypeAllowAllLandscapes, setRouteTypeAllowAllLandscapes] =
     useState(true);
+  const [routeTypeMarketAccessCategoryIds, setRouteTypeMarketAccessCategoryIds] =
+    useState<string[]>([]);
+  const [routeTypeAllowAllMarketCategories, setRouteTypeAllowAllMarketCategories] =
+    useState(true);
 
   const provinceIds = useMemo(() => Object.keys(provinces).sort(), [provinces]);
   const activeProvince = selectedProvince ? provinces[selectedProvince] : undefined;
@@ -387,9 +415,17 @@ export default function AdminPanel({
   const handleAddResource = () => {
     const name = resourceName.trim();
     if (!name) return;
-    onAddResource(name, resourceColor, resourceIcon);
+    onAddResource(name, resourceColor, resourceIcon, resourceCategoryId || undefined);
     setResourceName('');
     setResourceIcon(undefined);
+    setResourceCategoryId('');
+  };
+
+  const handleAddResourceCategory = () => {
+    const name = resourceCategoryName.trim();
+    if (!name) return;
+    onAddResourceCategory(name, resourceCategoryColor);
+    setResourceCategoryName('');
   };
 
   const handleAddRouteType = () => {
@@ -411,6 +447,8 @@ export default function AdminPanel({
       },
       routeTypeRequiredBuildingsMode,
       routeTypeAllowAllLandscapes,
+      routeTypeMarketAccessCategoryIds,
+      routeTypeAllowAllMarketCategories,
     );
     setRouteTypeName('');
     setRouteTypeDash('');
@@ -422,6 +460,8 @@ export default function AdminPanel({
     setRouteTypeLandscapeAny([]);
     setRouteTypeLandscapeNone([]);
     setRouteTypeAllowAllLandscapes(true);
+    setRouteTypeMarketAccessCategoryIds([]);
+    setRouteTypeAllowAllMarketCategories(true);
   };
 
 
@@ -1171,6 +1211,17 @@ export default function AdminPanel({
           >
             <Package className="w-4 h-4" />
             Р РµСЃСѓСЂСЃС‹
+          </button>
+          <button
+            onClick={() => setTab('resourceCategories')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'resourceCategories'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            Категории товаров
           </button>
           <button
             onClick={() => setTab('buildings')}
@@ -2178,6 +2229,77 @@ export default function AdminPanel({
             </div>
           )}
 
+          {tab === 'resourceCategories' && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Категории товаров</h2>
+                <p className="text-white/60 text-sm">
+                  Создавайте категории ресурсов для рынка и маршрутов.
+                </p>
+              </div>
+
+              <div className="flex gap-3 items-end flex-wrap">
+                <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[220px]">
+                  Название категории
+                  <input
+                    value={resourceCategoryName}
+                    onChange={(event) => setResourceCategoryName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цвет
+                  <input
+                    type="color"
+                    value={resourceCategoryColor}
+                    onChange={(event) => setResourceCategoryColor(event.target.value)}
+                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                  />
+                </label>
+                <button
+                  onClick={handleAddResourceCategory}
+                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {resourceCategories.map((category) => (
+                  <div
+                    key={category.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-4 h-4 rounded-full border border-white/10"
+                        style={{ backgroundColor: category.color ?? '#38bdf8' }}
+                      />
+                      <span className="text-white/80 text-sm">{category.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={category.color ?? '#38bdf8'}
+                        onChange={(event) =>
+                          onUpdateResourceCategoryColor(category.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <button
+                        onClick={() => onDeleteResourceCategory(category.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {tab === 'resources' && (
             <div className="space-y-4">
               <div>
@@ -2233,6 +2355,27 @@ export default function AdminPanel({
                     )}
                   </div>
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[220px]">
+                  Категория
+                  <select
+                    value={resourceCategoryId}
+                    onChange={(event) => setResourceCategoryId(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  >
+                    <option value="" className="bg-[#0b111b] text-white">
+                      Без категории
+                    </option>
+                    {resourceCategories.map((category) => (
+                      <option
+                        key={category.id}
+                        value={category.id}
+                        className="bg-[#0b111b] text-white"
+                      >
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   onClick={handleAddResource}
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
@@ -2262,8 +2405,36 @@ export default function AdminPanel({
                         />
                       )}
                       <span className="text-white/80 text-sm">{resource.name}</span>
+                      <span className="text-white/45 text-xs">
+                        {resourceCategories.find(
+                          (category) => category.id === resource.resourceCategoryId,
+                        )?.name ?? 'Без категории'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
+                      <select
+                        value={resource.resourceCategoryId ?? ''}
+                        onChange={(event) =>
+                          onUpdateResourceCategory(
+                            resource.id,
+                            event.target.value || undefined,
+                          )
+                        }
+                        className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                      >
+                        <option value="" className="bg-[#0b111b] text-white">
+                          Без категории
+                        </option>
+                        {resourceCategories.map((category) => (
+                          <option
+                            key={category.id}
+                            value={category.id}
+                            className="bg-[#0b111b] text-white"
+                          >
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
                       <input
                         type="color"
                         value={resource.color}
@@ -3036,6 +3207,47 @@ export default function AdminPanel({
                   </label>
                 </div>
               </div>
+              <label className="flex flex-col gap-2 text-white/70 text-sm">
+                Доступ к рынку по категориям товаров
+                <label className="flex items-center gap-2 text-white/70 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={routeTypeAllowAllMarketCategories}
+                    onChange={(event) =>
+                      setRouteTypeAllowAllMarketCategories(event.target.checked)
+                    }
+                    className="w-3.5 h-3.5 accent-emerald-500"
+                  />
+                  Все категории
+                </label>
+                <div className="min-h-[96px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                  {resourceCategories.length > 0 ? (
+                    resourceCategories.map((category) => (
+                      <label
+                        key={category.id}
+                        className="flex items-center gap-2 text-white/75 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={routeTypeMarketAccessCategoryIds.includes(category.id)}
+                          disabled={routeTypeAllowAllMarketCategories}
+                          onChange={(event) =>
+                            setRouteTypeMarketAccessCategoryIds((prev) =>
+                              event.target.checked
+                                ? Array.from(new Set([...prev, category.id]))
+                                : prev.filter((id) => id !== category.id),
+                            )
+                          }
+                          className="w-3.5 h-3.5 accent-emerald-500"
+                        />
+                        <span>{category.name}</span>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="text-white/45 text-xs">Нет категорий</div>
+                  )}
+                </div>
+              </label>
 
               <button
                 onClick={handleAddRouteType}
@@ -3273,6 +3485,52 @@ export default function AdminPanel({
                         </label>
                       </div>
                     </div>
+                    <label className="flex flex-col gap-2 text-white/70 text-sm">
+                      Доступ к рынку по категориям товаров
+                      <label className="flex items-center gap-2 text-white/70 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={item.allowAllMarketCategories ?? true}
+                          onChange={(event) =>
+                            onUpdateRouteType(item.id, {
+                              allowAllMarketCategories: event.target.checked,
+                            })
+                          }
+                          className="w-3.5 h-3.5 accent-emerald-500"
+                        />
+                        Все категории
+                      </label>
+                      <div className="min-h-[84px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                        {resourceCategories.length > 0 ? (
+                          resourceCategories.map((category) => (
+                            <label
+                              key={category.id}
+                              className="flex items-center gap-2 text-white/75 text-xs"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={(item.marketAccessCategoryIds ?? []).includes(
+                                  category.id,
+                                )}
+                                disabled={item.allowAllMarketCategories ?? true}
+                                onChange={(event) => {
+                                  const current = item.marketAccessCategoryIds ?? [];
+                                  onUpdateRouteType(item.id, {
+                                    marketAccessCategoryIds: event.target.checked
+                                      ? Array.from(new Set([...current, category.id]))
+                                      : current.filter((id) => id !== category.id),
+                                  });
+                                }}
+                                className="w-3.5 h-3.5 accent-emerald-500"
+                              />
+                              <span>{category.name}</span>
+                            </label>
+                          ))
+                        ) : (
+                          <div className="text-white/45 text-xs">Нет категорий</div>
+                        )}
+                      </div>
+                    </label>
                   </div>
                 ))}
               </div>

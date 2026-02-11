@@ -27,12 +27,14 @@ export type GameState = {
   continents?: Trait[];
   regions?: Trait[];
   resources?: Trait[];
+  resourceCategories?: ResourceCategory[];
   buildings?: BuildingDefinition[];
   industries?: Industry[];
   companies?: Company[];
   diplomacy?: DiplomacyAgreement[];
   diplomacyProposals?: DiplomacyProposal[];
   logistics?: LogisticsState;
+  markets?: Market[];
   settings?: GameSettings;
   eventLog?: EventLogState;
 };
@@ -87,6 +89,8 @@ export type LogisticsRouteType = {
   requiredBuildingsMode?: 'all' | 'any';
   landscape?: TraitCriteria;
   allowAllLandscapes?: boolean;
+  marketAccessCategoryIds?: string[];
+  allowAllMarketCategories?: boolean;
 };
 
 export type LogisticsNodeType =
@@ -135,6 +139,19 @@ export type LogisticsState = {
   routes: LogisticsRoute[];
 };
 
+export type Market = {
+  id: string;
+  name: string;
+  leaderCountryId: string;
+  creatorCountryId: string;
+  color: string;
+  logoDataUrl?: string;
+  memberCountryIds: string[];
+  capitalProvinceId?: string;
+  capitalLostSinceTurn?: number;
+  createdTurn?: number;
+};
+
 export type ProvinceRecord = Record<string, ProvinceData>;
 
 export type Trait = {
@@ -142,6 +159,13 @@ export type Trait = {
   name: string;
   color: string;
   iconDataUrl?: string;
+  resourceCategoryId?: string;
+};
+
+export type ResourceCategory = {
+  id: string;
+  name: string;
+  color?: string;
 };
 
 export type GameSettings = {
@@ -150,6 +174,7 @@ export type GameSettings = {
   constructionPointsPerTurn?: number;
   demolitionCostPercent?: number;
   diplomacyProposalExpireTurns?: number;
+  marketCapitalGraceTurns?: number;
   startingColonizationPoints?: number;
   startingConstructionPoints?: number;
   sciencePointsPerTurn?: number;
@@ -250,7 +275,8 @@ export type DiplomacyAgreement = {
   title?: string;
   hostCountryId: string;
   guestCountryId: string;
-  agreementCategory?: 'construction' | 'logistics';
+  agreementCategory?: 'construction' | 'logistics' | 'market_invite' | 'market';
+  marketLeaderCountryId?: string;
   kind?: 'company' | 'state';
   allowState?: boolean;
   allowCompanies?: boolean;
@@ -272,7 +298,8 @@ export type DiplomacyAgreement = {
     global?: number;
   };
   counterTerms?: {
-    agreementCategory?: 'construction' | 'logistics';
+    agreementCategory?: 'construction' | 'logistics' | 'market_invite' | 'market';
+    marketLeaderCountryId?: string;
     kind?: 'company' | 'state';
     allowState?: boolean;
     allowCompanies?: boolean;

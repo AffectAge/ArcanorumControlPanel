@@ -35,6 +35,12 @@ type MapViewProps = {
   logisticsEdges: LogisticsEdge[];
   logisticsRouteTypes: LogisticsRouteType[];
   logisticsRouteProvinceIds?: string[];
+  marketCapitals?: {
+    provinceId: string;
+    marketId: string;
+    marketName: string;
+    color: string;
+  }[];
   selectedResourceId?: string;
   onSelectResource: (id?: string) => void;
   selectedId?: string;
@@ -54,6 +60,7 @@ const layerTone: Record<string, string> = {
   climate: 'from-blue-400/30 via-orange-300/10 to-transparent',
   religion: 'from-yellow-300/30 via-purple-400/10 to-transparent',
   resources: 'from-emerald-300/25 via-lime-400/10 to-transparent',
+  markets: 'from-sky-300/25 via-cyan-400/10 to-transparent',
   fertility: 'from-lime-300/25 via-emerald-400/10 to-transparent',
   radiation: 'from-lime-300/25 via-red-400/10 to-transparent',
   pollution: 'from-slate-300/25 via-amber-400/10 to-transparent',
@@ -69,6 +76,7 @@ const layerIconMap: Record<string, React.ComponentType<{ className?: string }>> 
   climate: CloudSun,
   religion: Landmark,
   resources: Gem,
+  markets: Globe2,
   fertility: Leaf,
   radiation: CloudSun,
   pollution: Mountain,
@@ -136,6 +144,7 @@ export default function MapView({
   logisticsEdges,
   logisticsRouteTypes,
   logisticsRouteProvinceIds = [],
+  marketCapitals = [],
   selectedResourceId,
   onSelectResource,
   selectedId,
@@ -566,12 +575,59 @@ export default function MapView({
         overlay?.appendChild(previewLine);
       }
     }
+
+    const marketsLayerVisible = activeLayerIds.includes('markets');
+    if (marketsLayerVisible) {
+      marketCapitals.forEach((capital) => {
+        const center = provinceCenters.get(capital.provinceId);
+        if (!center) return;
+
+        const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        ring.setAttribute('cx', `${center.x}`);
+        ring.setAttribute('cy', `${center.y}`);
+        ring.setAttribute('r', '5.8');
+        ring.setAttribute('fill', 'rgba(8, 15, 30, 0.88)');
+        ring.setAttribute('stroke', capital.color);
+        ring.setAttribute('stroke-width', '1.4');
+        overlay?.appendChild(ring);
+
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', `${center.x}`);
+        dot.setAttribute('cy', `${center.y}`);
+        dot.setAttribute('r', '2.2');
+        dot.setAttribute('fill', capital.color);
+        overlay?.appendChild(dot);
+
+        const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        labelBg.setAttribute('x', `${center.x + 7}`);
+        labelBg.setAttribute('y', `${center.y - 12}`);
+        labelBg.setAttribute('rx', '2');
+        labelBg.setAttribute('ry', '2');
+        labelBg.setAttribute('width', `${Math.max(20, capital.marketName.length * 5.4)}`);
+        labelBg.setAttribute('height', '10');
+        labelBg.setAttribute('fill', 'rgba(8, 15, 30, 0.82)');
+        labelBg.setAttribute('stroke', 'rgba(255,255,255,0.12)');
+        labelBg.setAttribute('stroke-width', '0.4');
+        overlay?.appendChild(labelBg);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', `${center.x + 10}`);
+        label.setAttribute('y', `${center.y - 5}`);
+        label.setAttribute('fill', '#dbeafe');
+        label.setAttribute('font-size', '4');
+        label.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+        label.textContent = capital.marketName;
+        overlay?.appendChild(label);
+      });
+    }
   }, [
     svgMarkup,
     logisticsNodes,
     logisticsEdges,
     logisticsRouteProvinceIds,
     logisticsRouteTypes,
+    activeLayerIds,
+    marketCapitals,
   ]);
 
   const resourcesLayerVisible = layers.some(

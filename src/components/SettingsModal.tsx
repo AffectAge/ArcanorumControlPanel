@@ -309,11 +309,11 @@ export default function SettingsModal({
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
                   <span className="flex items-center gap-2">
-                    Стоимость сноса (% от цены здания)
+                    Стоимость сноса (% от стоимости)
                     <span className="relative group text-white/50 text-xs cursor-default">
                       ⓘ
                       <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                        Доля стоимости здания, которую нужно заплатить очками строительства при сносе.
+                        Доля стоимости здания или маршрута, которую нужно заплатить очками строительства при сносе.
                       </span>
                     </span>
                   </span>
@@ -668,6 +668,32 @@ export default function SettingsModal({
                       onChange({
                         ...settings,
                         diplomacyProposalExpireTurns: Math.max(
+                          1,
+                          Number(event.target.value) || 1,
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Ходов без столицы рынка до удаления
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Если столица рынка потеряна, за это число ходов нужно назначить новую.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={settings.marketCapitalGraceTurns ?? 3}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        marketCapitalGraceTurns: Math.max(
                           1,
                           Number(event.target.value) || 1,
                         ),

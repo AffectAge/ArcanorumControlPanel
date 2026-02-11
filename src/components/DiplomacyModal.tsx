@@ -1654,7 +1654,11 @@ export default function DiplomacyModal({
                     const resolveTerms = (
                       terms: {
                         kind?: 'company' | 'state';
-                        agreementCategory?: 'construction' | 'logistics';
+                        agreementCategory?:
+                          | 'construction'
+                          | 'logistics'
+                          | 'market_invite'
+                          | 'market';
                         allowState?: boolean;
                         allowCompanies?: boolean;
                         companyIds?: string[];
@@ -1767,6 +1771,11 @@ export default function DiplomacyModal({
                     const isLogisticsAgreement =
                       hostTermsLabel.category === 'logistics' ||
                       guestTermsLabel.category === 'logistics';
+                    const isMarketInviteAgreement =
+                      hostTermsLabel.category === 'market_invite' ||
+                      guestTermsLabel.category === 'market_invite' ||
+                      hostTermsLabel.category === 'market' ||
+                      guestTermsLabel.category === 'market';
                     const agreementTitleLabel = agreement.title?.trim();
                     const statusLabel =
                       item.type === 'proposal' ? 'Ожидаем ответа' : 'Действует';
@@ -1856,6 +1865,10 @@ export default function DiplomacyModal({
                                     {hostTermsLabel.routeLimitsSummary}
                                   </div>
                                 </>
+                              ) : isMarketInviteAgreement ? (
+                                <div className="text-white/70 text-center">
+                                  Тип договора: приглашение в рынок
+                                </div>
                               ) : (
                                 <>
                                   <div className="text-white/55 text-center">
@@ -1993,6 +2006,10 @@ export default function DiplomacyModal({
                                     {guestTermsLabel.routeLimitsSummary}
                                   </div>
                                 </>
+                              ) : isMarketInviteAgreement ? (
+                                <div className="text-white/70 text-center">
+                                  Тип договора: приглашение в рынок
+                                </div>
                               ) : (
                                 <>
                                   <div className="text-white/55 text-center">

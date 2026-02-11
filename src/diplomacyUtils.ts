@@ -1,7 +1,8 @@
 import type { DiplomacyAgreement } from './types';
 
 export type DiplomacyAgreementTerms = {
-  agreementCategory?: 'construction' | 'logistics';
+  agreementCategory?: 'construction' | 'logistics' | 'market_invite' | 'market';
+  marketLeaderCountryId?: string;
   kind?: 'company' | 'state';
   allowState?: boolean;
   allowCompanies?: boolean;
@@ -35,6 +36,7 @@ export const resolveAgreementTerms = (
   ) {
     return {
       agreementCategory: agreement.agreementCategory,
+      marketLeaderCountryId: agreement.marketLeaderCountryId,
       kind: agreement.kind,
       allowState: agreement.allowState,
       allowCompanies: agreement.allowCompanies,
@@ -72,6 +74,7 @@ export const expandDiplomacyAgreements = (
       guestCountryId: agreement.hostCountryId,
       kind: agreement.counterTerms.kind,
       agreementCategory: agreement.counterTerms.agreementCategory,
+      marketLeaderCountryId: agreement.counterTerms.marketLeaderCountryId,
       allowState: agreement.counterTerms.allowState,
       allowCompanies: agreement.counterTerms.allowCompanies,
       companyIds: agreement.counterTerms.companyIds,

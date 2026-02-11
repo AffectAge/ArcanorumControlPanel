@@ -1,0 +1,654 @@
+import { useEffect, useMemo, useState } from 'react';
+import { BarChart3, Globe2, Plus, Save, Send, Trash2, X } from 'lucide-react';
+import type {
+  Country,
+  DiplomacyProposal,
+  Market,
+  ProvinceRecord,
+  Trait,
+} from '../types';
+
+type MarketsModalProps = {
+  open: boolean;
+  countries: Country[];
+  markets: Market[];
+  provinces: ProvinceRecord;
+  resources: Trait[];
+  proposals: DiplomacyProposal[];
+  activeCountryId?: string;
+  onClose: () => void;
+  onCreateMarket: (payload: {
+    actorCountryId?: string;
+    name: string;
+    leaderCountryId: string;
+    memberCountryIds: string[];
+    color?: string;
+    logoDataUrl?: string;
+    capitalProvinceId?: string;
+  }) => void;
+  onUpdateMarket: (
+    marketId: string,
+    patch: {
+      actorCountryId?: string;
+      name?: string;
+      leaderCountryId?: string;
+      memberCountryIds?: string[];
+      color?: string;
+      logoDataUrl?: string;
+      capitalProvinceId?: string;
+    },
+  ) => void;
+  onDeleteMarket: (marketId: string, actorCountryId?: string) => void;
+  onInviteByTreaty: (targetCountryId: string) => void;
+};
+
+type MarketsTab = 'market' | 'goods';
+
+export default function MarketsModal({
+  open,
+  countries,
+  markets,
+  provinces,
+  resources,
+  proposals,
+  activeCountryId,
+  onClose,
+  onCreateMarket,
+  onUpdateMarket,
+  onDeleteMarket,
+  onInviteByTreaty,
+}: MarketsModalProps) {
+  const [tab, setTab] = useState<MarketsTab>('market');
+  const [newMarketName, setNewMarketName] = useState('');
+  const [marketNameDraft, setMarketNameDraft] = useState('');
+  const [capitalProvinceIdDraft, setCapitalProvinceIdDraft] = useState('');
+  const [marketColorDraft, setMarketColorDraft] = useState('#22c55e');
+  const [marketLogoDraft, setMarketLogoDraft] = useState<string | undefined>(
+    undefined,
+  );
+
+  const activeCountry = countries.find((country) => country.id === activeCountryId);
+  const ownMarket = activeCountryId
+    ? markets.find((market) => market.leaderCountryId === activeCountryId)
+    : undefined;
+  const canEditOwnMarket = Boolean(
+    ownMarket && activeCountryId && ownMarket.creatorCountryId === activeCountryId,
+  );
+
+  const ownCountryProvinceIds = useMemo(() => {
+    if (!activeCountryId) return [] as string[];
+    return Object.values(provinces)
+      .filter((province) => province.ownerCountryId === activeCountryId)
+      .map((province) => province.id)
+      .sort((a, b) => a.localeCompare(b));
+  }, [provinces, activeCountryId]);
+
+  useEffect(() => {
+    if (!open) return;
+    setTab('market');
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (ownMarket) {
+      setMarketNameDraft(ownMarket.name);
+      setCapitalProvinceIdDraft(ownMarket.capitalProvinceId ?? '');
+      setMarketColorDraft(ownMarket.color ?? '#22c55e');
+      setMarketLogoDraft(ownMarket.logoDataUrl);
+      return;
+    }
+    if (!newMarketName && activeCountry) {
+      setNewMarketName(`Рынок ${activeCountry.name}`);
+    }
+    setCapitalProvinceIdDraft((prev) => prev || ownCountryProvinceIds[0] || '');
+    setMarketColorDraft((prev) => prev || activeCountry?.color || '#22c55e');
+  }, [open, ownMarket, activeCountry, newMarketName, ownCountryProvinceIds]);
+
+  const assignedMarketByCountry = useMemo(() => {
+    const map = new Map<string, string>();
+    markets.forEach((market) => {
+      market.memberCountryIds.forEach((countryId) => {
+        map.set(countryId, market.id);
+      });
+    });
+    return map;
+  }, [markets]);
+
+  const pendingInviteCountryIds = useMemo(() => {
+    if (!activeCountryId) return new Set<string>();
+    const result = new Set<string>();
+    proposals.forEach((proposal) => {
+      const agreement = proposal.agreement;
+      const category = agreement.agreementCategory ?? 'construction';
+      if (category !== 'market_invite' && category !== 'market') return;
+      if (proposal.fromCountryId !== activeCountryId) return;
+      if (agreement.marketLeaderCountryId !== activeCountryId) return;
+      result.add(proposal.toCountryId);
+    });
+    return result;
+  }, [proposals, activeCountryId]);
+
+  const inviteCandidates = useMemo(() => {
+    if (!activeCountryId || !ownMarket) return [];
+    const ownMembers = new Set(ownMarket.memberCountryIds);
+    return countries.filter((country) => {
+      if (country.id === activeCountryId) return false;
+      if (ownMembers.has(country.id)) return false;
+      const assignedMarketId = assignedMarketByCountry.get(country.id);
+      return !assignedMarketId;
+    });
+  }, [countries, activeCountryId, ownMarket, assignedMarketByCountry]);
+
+  const canCreateMarket = Boolean(
+    activeCountryId &&
+      ownCountryProvinceIds.length > 0 &&
+      capitalProvinceIdDraft &&
+      capitalProvinceIdDraft.length > 0,
+  );
+
+  const handleLogoUpload = (file: File | undefined) => {
+    if (!file) {
+      setMarketLogoDraft(undefined);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setMarketLogoDraft(String(reader.result ?? ''));
+    reader.readAsDataURL(file);
+  };
+
+  const goodsStats = useMemo(() => {
+    const memberSet = new Set(ownMarket?.memberCountryIds ?? []);
+    const worldSupply = new Map<string, number>();
+    const marketSupply = new Map<string, number>();
+    const supplierCountries = new Map<string, Set<string>>();
+    const totalsByCountry = new Map<string, number>();
+
+    Object.values(provinces).forEach((province) => {
+      const owner = province.ownerCountryId;
+      Object.entries(province.resourceAmounts ?? {}).forEach(([resourceId, amount]) => {
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        worldSupply.set(resourceId, (worldSupply.get(resourceId) ?? 0) + amount);
+        if (!ownMarket || !owner || !memberSet.has(owner)) return;
+        marketSupply.set(resourceId, (marketSupply.get(resourceId) ?? 0) + amount);
+        totalsByCountry.set(owner, (totalsByCountry.get(owner) ?? 0) + amount);
+        const suppliers = supplierCountries.get(resourceId) ?? new Set<string>();
+        suppliers.add(owner);
+        supplierCountries.set(resourceId, suppliers);
+      });
+    });
+
+    const rows = resources.map((resource, index) => {
+      const market = marketSupply.get(resource.id) ?? 0;
+      const world = worldSupply.get(resource.id) ?? 0;
+      const suppliers = supplierCountries.get(resource.id)?.size ?? 0;
+      const marketShare = world > 0 ? (market / world) * 100 : 0;
+      const avgPerSupplier = suppliers > 0 ? market / suppliers : 0;
+      const liquidity =
+        market >= 1000 ? 'Высокая' : market >= 300 ? 'Средняя' : market > 0 ? 'Низкая' : 'Нет';
+      return {
+        index: index + 1,
+        resourceId: resource.id,
+        resourceName: resource.name,
+        resourceColor: resource.color,
+        marketSupply: market,
+        worldSupply: world,
+        suppliers,
+        marketShare,
+        avgPerSupplier,
+        liquidity,
+      };
+    });
+
+    const byCountry = Array.from(totalsByCountry.entries())
+      .map(([countryId, total]) => ({
+        countryId,
+        total,
+        countryName: countries.find((country) => country.id === countryId)?.name ?? countryId,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    return { rows, byCountry };
+  }, [ownMarket, provinces, resources, countries]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[85] bg-black/75 backdrop-blur-sm animate-fadeIn">
+      <div className="absolute inset-4 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl border border-white/10 bg-black/40 flex items-center justify-center">
+              <Globe2 className="w-5 h-5 text-white/70" />
+            </div>
+            <div>
+              <div className="text-white text-lg font-semibold">Рынки</div>
+              <div className="text-white/60 text-sm">
+                Управление только своим рынком
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/70 flex items-center justify-center hover:border-emerald-400/40"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 flex">
+          <div className="w-[360px] border-r border-white/10 p-4 space-y-2">
+            <button
+              onClick={() => setTab('market')}
+              className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                tab === 'market'
+                  ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                  : 'bg-white/5 border-white/10 text-white/70 hover:border-emerald-400/30'
+              }`}
+            >
+              Мой рынок
+            </button>
+            <button
+              onClick={() => setTab('goods')}
+              className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                tab === 'goods'
+                  ? 'bg-sky-500/15 border-sky-400/40 text-white'
+                  : 'bg-white/5 border-white/10 text-white/70 hover:border-sky-400/30'
+              }`}
+            >
+              Товары и торговля
+            </button>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto legend-scroll p-6">
+            {tab === 'market' ? (
+              <div className="max-w-4xl space-y-4">
+                {!activeCountryId ? (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white/60 text-sm">
+                    Выберите активную страну.
+                  </div>
+                ) : !ownMarket ? (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                    <div className="text-white/85 text-sm font-semibold">Создание рынка</div>
+                    <label className="flex flex-col gap-1 text-white/70 text-sm">
+                      Название
+                      <input
+                        type="text"
+                        value={newMarketName}
+                        onChange={(event) => setNewMarketName(event.target.value)}
+                        className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-white/70 text-sm">
+                      Столица рынка
+                      <select
+                        value={capitalProvinceIdDraft}
+                        onChange={(event) => setCapitalProvinceIdDraft(event.target.value)}
+                        className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      >
+                        <option value="" className="bg-[#0b111b] text-white">
+                          Выберите провинцию
+                        </option>
+                        {ownCountryProvinceIds.map((provinceId) => (
+                          <option
+                            key={`market-capital-new:${provinceId}`}
+                            value={provinceId}
+                            className="bg-[#0b111b] text-white"
+                          >
+                            {provinceId}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-1 text-white/70 text-sm">
+                      Цвет рынка
+                      <input
+                        type="color"
+                        value={marketColorDraft}
+                        onChange={(event) => setMarketColorDraft(event.target.value)}
+                        className="h-9 rounded-lg bg-black/40 border border-white/10 p-1"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-white/70 text-sm">
+                      Логотип рынка
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) => handleLogoUpload(event.target.files?.[0])}
+                        className="text-xs text-white/70 file:mr-3 file:h-8 file:px-3 file:rounded-md file:border file:border-white/10 file:bg-black/30 file:text-white/80"
+                      />
+                    </label>
+                    {ownCountryProvinceIds.length === 0 && (
+                      <div className="text-rose-200/90 text-xs">
+                        У страны нет провинций для столицы рынка.
+                      </div>
+                    )}
+                    <button
+                      onClick={() =>
+                        onCreateMarket({
+                          actorCountryId: activeCountryId,
+                          name: newMarketName.trim() || `Рынок ${activeCountry?.name ?? ''}`,
+                          leaderCountryId: activeCountryId,
+                          memberCountryIds: [activeCountryId],
+                          color: marketColorDraft,
+                          logoDataUrl: marketLogoDraft,
+                          capitalProvinceId: capitalProvinceIdDraft || undefined,
+                        })
+                      }
+                      disabled={!canCreateMarket}
+                      className={`h-9 px-3 rounded-lg border text-sm inline-flex items-center gap-2 ${
+                        canCreateMarket
+                          ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200'
+                          : 'border-white/10 bg-black/30 text-white/40 cursor-not-allowed'
+                      }`}
+                    >
+                      <Plus className="w-4 h-4" />
+                      Создать рынок
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                      <div className="text-white/85 text-sm font-semibold">Параметры рынка</div>
+                      {!canEditOwnMarket && (
+                        <div className="text-amber-200/90 text-xs">
+                          Параметры может менять только создатель рынка.
+                        </div>
+                      )}
+                      <label className="flex flex-col gap-1 text-white/70 text-sm">
+                        Название
+                        <input
+                          type="text"
+                          value={marketNameDraft}
+                          onChange={(event) => setMarketNameDraft(event.target.value)}
+                          disabled={!canEditOwnMarket}
+                          className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm focus:outline-none focus:border-emerald-400/60 disabled:opacity-60"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-white/70 text-sm">
+                        Столица рынка
+                        <select
+                          value={capitalProvinceIdDraft}
+                          onChange={(event) => setCapitalProvinceIdDraft(event.target.value)}
+                          disabled={!canEditOwnMarket}
+                          className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60 disabled:opacity-60"
+                        >
+                          <option value="" className="bg-[#0b111b] text-white">
+                            Выберите провинцию
+                          </option>
+                          {ownCountryProvinceIds.map((provinceId) => (
+                            <option
+                              key={`market-capital-edit:${provinceId}`}
+                              value={provinceId}
+                              className="bg-[#0b111b] text-white"
+                            >
+                              {provinceId}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1 text-white/70 text-sm">
+                        Цвет рынка
+                        <input
+                          type="color"
+                          value={marketColorDraft}
+                          onChange={(event) => setMarketColorDraft(event.target.value)}
+                          disabled={!canEditOwnMarket}
+                          className="h-9 rounded-lg bg-black/40 border border-white/10 p-1 disabled:opacity-60"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-white/70 text-sm">
+                        Логотип рынка
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={!canEditOwnMarket}
+                          onChange={(event) => handleLogoUpload(event.target.files?.[0])}
+                          className="text-xs text-white/70 file:mr-3 file:h-8 file:px-3 file:rounded-md file:border file:border-white/10 file:bg-black/30 file:text-white/80 disabled:opacity-60"
+                        />
+                      </label>
+                      {marketLogoDraft && (
+                        <div className="w-16 h-16 rounded-lg border border-white/10 bg-black/30 overflow-hidden">
+                          <img src={marketLogoDraft} alt="Market logo" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() =>
+                            onUpdateMarket(ownMarket.id, {
+                              actorCountryId: activeCountryId,
+                              name: marketNameDraft.trim() || ownMarket.name,
+                              color: marketColorDraft,
+                              logoDataUrl: marketLogoDraft,
+                              capitalProvinceId: capitalProvinceIdDraft || undefined,
+                            })
+                          }
+                          disabled={!canEditOwnMarket || !capitalProvinceIdDraft}
+                          className={`h-9 px-3 rounded-lg border text-sm inline-flex items-center gap-2 ${
+                            canEditOwnMarket && Boolean(capitalProvinceIdDraft)
+                              ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-200'
+                              : 'border-white/10 bg-black/30 text-white/40 cursor-not-allowed'
+                          }`}
+                        >
+                          <Save className="w-4 h-4" />
+                          Сохранить
+                        </button>
+                        <button
+                          onClick={() => onDeleteMarket(ownMarket.id, activeCountryId)}
+                          disabled={!canEditOwnMarket}
+                          className={`h-9 px-3 rounded-lg border text-sm inline-flex items-center gap-2 ${
+                            canEditOwnMarket
+                              ? 'border-red-400/35 bg-red-500/10 text-red-200'
+                              : 'border-white/10 bg-black/30 text-white/40 cursor-not-allowed'
+                          }`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Удалить рынок
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-white/85 text-sm font-semibold mb-2">Участники рынка</div>
+                      <div className="space-y-2">
+                        {ownMarket.memberCountryIds.map((memberId) => {
+                          const country = countries.find((item) => item.id === memberId);
+                          const canRemove = memberId !== ownMarket.leaderCountryId;
+                          return (
+                            <div
+                              key={`member:${memberId}`}
+                              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between gap-3"
+                            >
+                              <div className="inline-flex items-center gap-2 text-white/75 text-sm">
+                                {country?.flagDataUrl ? (
+                                  <img
+                                    src={country.flagDataUrl}
+                                    alt={`${country.name} flag`}
+                                    className="w-5 h-3.5 rounded-sm border border-white/20 object-cover"
+                                  />
+                                ) : null}
+                                {country?.name ?? memberId}
+                              </div>
+                              {canRemove ? (
+                                <button
+                                  onClick={() =>
+                                    onUpdateMarket(ownMarket.id, {
+                                      actorCountryId: activeCountryId,
+                                      memberCountryIds: ownMarket.memberCountryIds.filter(
+                                        (id) => id !== memberId,
+                                      ),
+                                    })
+                                  }
+                                  disabled={!canEditOwnMarket}
+                                  className="h-7 px-2 rounded-md border border-red-400/30 bg-red-500/10 text-red-200 text-xs disabled:opacity-50"
+                                >
+                                  Убрать
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-emerald-200/80">Центр рынка</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-white/85 text-sm font-semibold mb-2">
+                        Приглашение стран договором
+                      </div>
+                      <div className="text-white/55 text-xs mb-3">
+                        Новые страны добавляются только через дипломатическое предложение.
+                      </div>
+                      <div className="space-y-2">
+                        {inviteCandidates.length > 0 ? (
+                          inviteCandidates.map((country) => {
+                            const pending = pendingInviteCountryIds.has(country.id);
+                            return (
+                              <div
+                                key={`invite:${country.id}`}
+                                className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between gap-3"
+                              >
+                                <div className="inline-flex items-center gap-2 text-white/75 text-sm">
+                                  {country.flagDataUrl ? (
+                                    <img
+                                      src={country.flagDataUrl}
+                                      alt={`${country.name} flag`}
+                                      className="w-5 h-3.5 rounded-sm border border-white/20 object-cover"
+                                    />
+                                  ) : null}
+                                  {country.name}
+                                </div>
+                                <button
+                                  onClick={() => onInviteByTreaty(country.id)}
+                                  disabled={pending || !canEditOwnMarket}
+                                  className={`h-7 px-2 rounded-md border text-xs inline-flex items-center gap-1 ${
+                                    pending || !canEditOwnMarket
+                                      ? 'border-white/10 bg-black/30 text-white/35 cursor-not-allowed'
+                                      : 'border-sky-400/35 bg-sky-500/15 text-sky-200'
+                                  }`}
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                  {pending ? 'Уже отправлено' : 'Пригласить'}
+                                </button>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-white/50 text-sm">Нет доступных стран для приглашения.</div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="max-w-6xl space-y-4">
+                {!ownMarket ? (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white/60 text-sm">
+                    Сначала создайте рынок.
+                  </div>
+                ) : (
+                  <>
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-white/85 text-sm font-semibold mb-2 inline-flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4" />
+                        Биржа товаров
+                      </div>
+                      <div className="text-white/55 text-xs mb-3">
+                        Ресурсы автоматически появляются в таблице после добавления в админ-панели.
+                      </div>
+                      <div className="overflow-x-auto rounded-lg border border-white/10">
+                        <table className="min-w-[980px] w-full text-xs">
+                          <thead className="bg-black/40 text-white/70">
+                            <tr>
+                              <th className="text-left px-3 py-2 font-medium">#</th>
+                              <th className="text-left px-3 py-2 font-medium">Товар</th>
+                              <th className="text-right px-3 py-2 font-medium">Объем рынка</th>
+                              <th className="text-right px-3 py-2 font-medium">Мировой объем</th>
+                              <th className="text-right px-3 py-2 font-medium">Доля рынка</th>
+                              <th className="text-right px-3 py-2 font-medium">Поставщики</th>
+                              <th className="text-right px-3 py-2 font-medium">Ср. на поставщика</th>
+                              <th className="text-center px-3 py-2 font-medium">Ликвидность</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {goodsStats.rows.map((row) => (
+                              <tr
+                                key={`exchange:${row.resourceId}`}
+                                className="border-t border-white/10 bg-black/20"
+                              >
+                                <td className="px-3 py-2 text-white/55">{row.index}</td>
+                                <td className="px-3 py-2">
+                                  <span className="inline-flex items-center gap-2 text-white/80">
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full"
+                                      style={{ backgroundColor: row.resourceColor }}
+                                    />
+                                    {row.resourceName}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-right text-emerald-200">
+                                  {row.marketSupply.toFixed(0)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-white/70">
+                                  {row.worldSupply.toFixed(0)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-sky-200">
+                                  {row.marketShare.toFixed(1)}%
+                                </td>
+                                <td className="px-3 py-2 text-right text-white/70">{row.suppliers}</td>
+                                <td className="px-3 py-2 text-right text-white/70">
+                                  {row.avgPerSupplier.toFixed(1)}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <span
+                                    className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md border ${
+                                      row.liquidity === 'Высокая'
+                                        ? 'text-emerald-200 border-emerald-400/40 bg-emerald-500/15'
+                                        : row.liquidity === 'Средняя'
+                                          ? 'text-amber-200 border-amber-400/40 bg-amber-500/15'
+                                          : row.liquidity === 'Низкая'
+                                            ? 'text-orange-200 border-orange-400/40 bg-orange-500/15'
+                                            : 'text-rose-200 border-rose-400/40 bg-rose-500/15'
+                                    }`}
+                                  >
+                                    {row.liquidity}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                      <div className="text-white/85 text-sm font-semibold mb-2">
+                        Торговля и вклад стран
+                      </div>
+                      <div className="space-y-2">
+                        {goodsStats.byCountry.length > 0 ? (
+                          goodsStats.byCountry.map((entry) => (
+                            <div
+                              key={`country-trade:${entry.countryId}`}
+                              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between"
+                            >
+                              <span className="text-white/75 text-sm">{entry.countryName}</span>
+                              <span className="text-cyan-200 text-xs">{entry.total.toFixed(0)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-white/50 text-sm">Нет данных по участникам рынка.</div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
