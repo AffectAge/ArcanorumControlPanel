@@ -150,6 +150,7 @@ export type Market = {
   color: string;
   logoDataUrl?: string;
   memberCountryIds: string[];
+  warehouseByResourceId?: Record<string, number>;
   capitalProvinceId?: string;
   capitalLostSinceTurn?: number;
   createdTurn?: number;

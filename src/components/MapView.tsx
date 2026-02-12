@@ -40,6 +40,7 @@ type MapViewProps = {
     marketId: string;
     marketName: string;
     color: string;
+    logoDataUrl?: string;
   }[];
   selectedResourceId?: string;
   onSelectResource: (id?: string) => void;
@@ -582,39 +583,72 @@ export default function MapView({
         const center = provinceCenters.get(capital.provinceId);
         if (!center) return;
 
-        const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        ring.setAttribute('cx', `${center.x}`);
-        ring.setAttribute('cy', `${center.y}`);
-        ring.setAttribute('r', '5.8');
-        ring.setAttribute('fill', 'rgba(8, 15, 30, 0.88)');
-        ring.setAttribute('stroke', capital.color);
-        ring.setAttribute('stroke-width', '1.4');
-        overlay?.appendChild(ring);
+        const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        halo.setAttribute('cx', `${center.x}`);
+        halo.setAttribute('cy', `${center.y}`);
+        halo.setAttribute('r', '5.5');
+        halo.setAttribute('fill', capital.color);
+        halo.setAttribute('opacity', '0.16');
+        overlay?.appendChild(halo);
 
-        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-        dot.setAttribute('cx', `${center.x}`);
-        dot.setAttribute('cy', `${center.y}`);
-        dot.setAttribute('r', '2.2');
-        dot.setAttribute('fill', capital.color);
-        overlay?.appendChild(dot);
+        const outerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        outerRing.setAttribute('cx', `${center.x}`);
+        outerRing.setAttribute('cy', `${center.y}`);
+        outerRing.setAttribute('r', '3.9');
+        outerRing.setAttribute('fill', 'rgba(8, 15, 30, 0.92)');
+        outerRing.setAttribute('stroke', capital.color);
+        outerRing.setAttribute('stroke-width', '0.7');
+        overlay?.appendChild(outerRing);
 
+        const innerRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        innerRing.setAttribute('cx', `${center.x}`);
+        innerRing.setAttribute('cy', `${center.y}`);
+        innerRing.setAttribute('r', '2.6');
+        innerRing.setAttribute('fill', capital.color);
+        innerRing.setAttribute('opacity', '0.3');
+        innerRing.setAttribute('stroke', 'rgba(255,255,255,0.55)');
+        innerRing.setAttribute('stroke-width', '0.3');
+        overlay?.appendChild(innerRing);
+
+        const star = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        star.setAttribute('x', `${center.x}`);
+        star.setAttribute('y', `${center.y + 1.05}`);
+        star.setAttribute('text-anchor', 'middle');
+        star.setAttribute('fill', '#fef9c3');
+        star.setAttribute('font-size', '2.8');
+        star.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+        star.textContent = '★';
+        overlay?.appendChild(star);
+
+        if (capital.logoDataUrl) {
+          const logo = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+          logo.setAttribute('x', `${center.x - 1.6}`);
+          logo.setAttribute('y', `${center.y - 1.6}`);
+          logo.setAttribute('width', '3.2');
+          logo.setAttribute('height', '3.2');
+          logo.setAttribute('href', capital.logoDataUrl);
+          overlay?.appendChild(logo);
+        }
+
+        const labelWidth = Math.max(6, capital.marketName.length * 2.15 + 1.4);
         const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        labelBg.setAttribute('x', `${center.x + 7}`);
-        labelBg.setAttribute('y', `${center.y - 12}`);
-        labelBg.setAttribute('rx', '2');
-        labelBg.setAttribute('ry', '2');
-        labelBg.setAttribute('width', `${Math.max(20, capital.marketName.length * 5.4)}`);
-        labelBg.setAttribute('height', '10');
-        labelBg.setAttribute('fill', 'rgba(8, 15, 30, 0.82)');
-        labelBg.setAttribute('stroke', 'rgba(255,255,255,0.12)');
-        labelBg.setAttribute('stroke-width', '0.4');
+        labelBg.setAttribute('x', `${center.x - labelWidth / 2}`);
+        labelBg.setAttribute('y', `${center.y - 8.8}`);
+        labelBg.setAttribute('rx', '1.5');
+        labelBg.setAttribute('ry', '1.5');
+        labelBg.setAttribute('width', `${labelWidth}`);
+        labelBg.setAttribute('height', '4.9');
+        labelBg.setAttribute('fill', 'rgba(8, 15, 30, 0.9)');
+        labelBg.setAttribute('stroke', capital.color);
+        labelBg.setAttribute('stroke-width', '0.3');
         overlay?.appendChild(labelBg);
 
         const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        label.setAttribute('x', `${center.x + 10}`);
-        label.setAttribute('y', `${center.y - 5}`);
-        label.setAttribute('fill', '#dbeafe');
-        label.setAttribute('font-size', '4');
+        label.setAttribute('x', `${center.x}`);
+        label.setAttribute('y', `${center.y - 5.6}`);
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('fill', '#e2e8f0');
+        label.setAttribute('font-size', '1.9');
         label.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
         label.textContent = capital.marketName;
         overlay?.appendChild(label);

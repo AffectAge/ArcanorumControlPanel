@@ -663,10 +663,12 @@ function App() {
     if (creatorOwnedProvinceIds.length === 0) return;
     const marketId = createId();
     setMarkets((prev) => {
-      const alreadyOwnsMarket = prev.some(
-        (market) => market.creatorCountryId === payload.actorCountryId,
+      const alreadyInMarket = prev.some((market) =>
+        payload.actorCountryId
+          ? market.memberCountryIds.includes(payload.actorCountryId)
+          : false,
       );
-      if (alreadyOwnsMarket) return prev;
+      if (alreadyInMarket) return prev;
       const members = Array.from(
         new Set([payload.leaderCountryId, ...payload.memberCountryIds]),
       );
@@ -695,6 +697,7 @@ function App() {
             '#22c55e',
           logoDataUrl: payload.logoDataUrl,
           memberCountryIds: members,
+          warehouseByResourceId: {},
           capitalProvinceId: payload.capitalProvinceId,
           capitalLostSinceTurn: undefined,
           createdTurn: turn,
@@ -769,6 +772,83 @@ function App() {
           market.id !== marketId || market.creatorCountryId !== actorCountryId,
       ),
     );
+  };
+
+  const leaveMarket = (countryId?: string, marketId?: string) => {
+    if (!countryId) return;
+    setMarkets((prev) =>
+      prev
+        .map((market) => {
+          if (marketId && market.id !== marketId) return market;
+          if (!market.memberCountryIds.includes(countryId)) return market;
+          if (market.leaderCountryId === countryId) return market;
+          return {
+            ...market,
+            memberCountryIds: market.memberCountryIds.filter((id) => id !== countryId),
+          };
+        })
+        .filter(
+          (market) =>
+            market.memberCountryIds.length > 0 &&
+            market.memberCountryIds.includes(market.leaderCountryId),
+        ),
+    );
+    addEvent({
+      category: 'economy',
+      message: `${countries.find((entry) => entry.id === countryId)?.name ?? countryId} вышла из рынка.`,
+      countryId,
+      priority: 'low',
+    });
+  };
+
+  const tradeWithMarketWarehouse = (payload: {
+    marketId: string;
+    actorCountryId?: string;
+    resourceId: string;
+    amount: number;
+    action: 'buy' | 'sell';
+  }) => {
+    if (!payload.actorCountryId) return;
+    const amount = Math.max(1, Math.floor(payload.amount || 0));
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    let executed = false;
+    setMarkets((prev) =>
+      prev.map((market) => {
+        if (market.id !== payload.marketId) return market;
+        if (!market.memberCountryIds.includes(payload.actorCountryId as string)) {
+          return market;
+        }
+        const stockMap = { ...(market.warehouseByResourceId ?? {}) };
+        const current = Math.max(0, stockMap[payload.resourceId] ?? 0);
+        const delta = payload.action === 'sell' ? amount : -amount;
+        const next = current + delta;
+        if (next < 0) return market;
+        stockMap[payload.resourceId] = next;
+        executed = true;
+        return {
+          ...market,
+          warehouseByResourceId: stockMap,
+        };
+      }),
+    );
+
+    if (!executed) return;
+    const actorName =
+      countries.find((country) => country.id === payload.actorCountryId)?.name ??
+      payload.actorCountryId;
+    const resourceName =
+      resources.find((resource) => resource.id === payload.resourceId)?.name ??
+      payload.resourceId;
+    addEvent({
+      category: 'economy',
+      countryId: payload.actorCountryId,
+      priority: 'low',
+      message:
+        payload.action === 'sell'
+          ? `${actorName} продала ${amount} ед. ресурса "${resourceName}" на склад рынка.`
+          : `${actorName} купила ${amount} ед. ресурса "${resourceName}" со склада рынка.`,
+    });
   };
 
   const setRouteCountryStatus = (
@@ -1789,6 +1869,9 @@ function App() {
       const validProvinceIds = new Set(
         Object.keys(save.data.provinces ?? {}),
       );
+      const validResourceIds = new Set(
+        (save.data.resources ?? []).map((resource) => resource.id),
+      );
       return loaded
         .map((market) => {
           if (!validCountryIds.has(market.leaderCountryId)) return null;
@@ -1814,6 +1897,14 @@ function App() {
               '#22c55e',
             logoDataUrl: market.logoDataUrl,
             memberCountryIds: members,
+            warehouseByResourceId: Object.fromEntries(
+              Object.entries(market.warehouseByResourceId ?? {}).filter(
+                ([resourceId, amount]) =>
+                  validResourceIds.has(resourceId) &&
+                  Number.isFinite(amount) &&
+                  Number(amount) > 0,
+              ),
+            ),
             capitalProvinceId:
               market.capitalProvinceId &&
               validProvinceIds.has(market.capitalProvinceId)
@@ -2437,6 +2528,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           marketId: market.id,
           marketName: market.name,
           color: market.color,
+          logoDataUrl: market.logoDataUrl,
         }))
         .filter((entry) => Boolean(provinces[entry.provinceId])),
     [markets, provinces],
@@ -4779,6 +4871,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onCreateMarket={addMarket}
         onUpdateMarket={updateMarket}
         onDeleteMarket={deleteMarket}
+        onLeaveMarket={leaveMarket}
+        onTradeWithWarehouse={tradeWithMarketWarehouse}
         onInviteByTreaty={inviteCountryToMarketByTreaty}
       />
 
