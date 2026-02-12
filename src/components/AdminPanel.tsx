@@ -23,6 +23,7 @@ import type {
   ProvinceRecord,
   Trait,
   BuildingDefinition,
+  BuildingEconomy,
   Company,
   Industry,
   LogisticsRouteType,
@@ -100,6 +101,7 @@ type AdminPanelProps = {
     iconDataUrl?: string,
     industryId?: string,
     requirements?: BuildingDefinition['requirements'],
+    economy?: BuildingEconomy,
   ) => void;
   onAddIndustry: (name: string, iconDataUrl?: string, color?: string) => void;
   onAddCompany: (
@@ -156,6 +158,7 @@ type AdminPanelProps = {
     id: string,
     requirements?: BuildingDefinition['requirements'],
   ) => void;
+  onUpdateBuildingEconomy: (id: string, economy?: BuildingEconomy) => void;
   onUpdateIndustryColor: (id: string, color: string) => void;
   onUpdateCompanyColor: (id: string, color: string) => void;
   onUpdateClimateColor: (id: string, color: string) => void;
@@ -235,6 +238,7 @@ export default function AdminPanel({
   onUpdateIndustryIcon,
   onUpdateBuildingIndustry,
   onUpdateBuildingRequirements,
+  onUpdateBuildingEconomy,
   onUpdateIndustryColor,
   onUpdateCompanyColor,
   onUpdateClimateColor,
@@ -282,6 +286,16 @@ export default function AdminPanel({
   const [buildingCost, setBuildingCost] = useState(100);
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
   const [buildingIndustryId, setBuildingIndustryId] = useState<string>('');
+  const [buildingStartingDucats, setBuildingStartingDucats] = useState(0);
+  const [buildingExtractRows, setBuildingExtractRows] = useState<
+    { resourceId: string; amount: number }[]
+  >([]);
+  const [buildingInputRows, setBuildingInputRows] = useState<
+    { resourceId: string; amount: number }[]
+  >([]);
+  const [buildingOutputRows, setBuildingOutputRows] = useState<
+    { resourceId: string; amount: number }[]
+  >([]);
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
   const [editReqMaxPerProvince, setEditReqMaxPerProvince] = useState<number | ''>(0);
   const [editReqMaxPerCountry, setEditReqMaxPerCountry] = useState<number | ''>(0);
@@ -356,6 +370,10 @@ export default function AdminPanel({
   const [routeTypeTransportCapacityByCategory, setRouteTypeTransportCapacityByCategory] =
     useState<Record<string, number>>({});
 
+  const [economyDraftByBuildingId, setEconomyDraftByBuildingId] = useState<
+    Record<string, BuildingEconomy>
+  >({});
+
   const provinceIds = useMemo(() => Object.keys(provinces).sort(), [provinces]);
   const activeProvince = selectedProvince ? provinces[selectedProvince] : undefined;
 
@@ -365,12 +383,40 @@ export default function AdminPanel({
     setSelectedProvince(selectedProvinceId);
   }, [open, selectedProvinceId]);
 
-
-  if (!open) return null;
-
   const editingBuilding = editingBuildingId
     ? buildings.find((building) => building.id === editingBuildingId)
     : undefined;
+
+  const normalizeFlow = (
+    rows: { resourceId: string; amount: number }[] | undefined,
+  ) =>
+    (rows ?? [])
+      .map((row) => ({
+        resourceId: row.resourceId,
+        amount: Math.max(0, Math.floor(Number(row.amount) || 0)),
+      }))
+      .filter((row) => row.resourceId.length > 0 && row.amount > 0);
+
+  const normalizeEconomy = (economy: BuildingEconomy | undefined): BuildingEconomy => ({
+    startingDucats: Math.max(0, Math.floor(Number(economy?.startingDucats) || 0)),
+    extracts: normalizeFlow(economy?.extracts),
+    inputs: normalizeFlow(economy?.inputs),
+    outputs: normalizeFlow(economy?.outputs),
+  });
+
+  useEffect(() => {
+    setEconomyDraftByBuildingId((prev) => {
+      const next: Record<string, BuildingEconomy> = {};
+      buildings.forEach((building) => {
+        next[building.id] = prev[building.id]
+          ? normalizeEconomy(prev[building.id])
+          : normalizeEconomy(building.economy);
+      });
+      return next;
+    });
+  }, [buildings]);
+
+  if (!open) return null;
 
   const handleAddClimate = () => {
     const name = climateName.trim();
@@ -475,16 +521,39 @@ export default function AdminPanel({
   const handleAddBuilding = () => {
     const name = buildingName.trim();
     if (!name) return;
+    const economy: BuildingEconomy = normalizeEconomy({
+      startingDucats: buildingStartingDucats,
+      extracts: buildingExtractRows,
+      inputs: buildingInputRows,
+      outputs: buildingOutputRows,
+    });
     onAddBuilding(
       name,
       Math.max(1, Number(buildingCost) || 1),
       buildingIcon,
       buildingIndustryId || undefined,
+      undefined,
+      economy,
     );
     setBuildingName('');
     setBuildingCost(100);
     setBuildingIcon(undefined);
     setBuildingIndustryId('');
+    setBuildingStartingDucats(0);
+    setBuildingExtractRows([]);
+    setBuildingInputRows([]);
+    setBuildingOutputRows([]);
+  };
+
+  const upsertFlowRow = (
+    rows: { resourceId: string; amount: number }[],
+    resourceId: string,
+    amount: number,
+  ) => {
+    const safeAmount = Math.max(0, Math.floor(Number(amount) || 0));
+    const filtered = rows.filter((row) => row.resourceId !== resourceId);
+    if (safeAmount <= 0 || !resourceId) return filtered;
+    return [...filtered, { resourceId, amount: safeAmount }];
   };
 
   const openEditRequirements = (building: BuildingDefinition) => {
@@ -1781,6 +1850,20 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Стартовые дукаты
+                  <input
+                    type="number"
+                    min={0}
+                    value={buildingStartingDucats}
+                    onChange={(event) =>
+                      setBuildingStartingDucats(
+                        Math.max(0, Math.floor(Number(event.target.value) || 0)),
+                      )
+                    }
+                    className="w-32 h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Р›РѕРіРѕС‚РёРї
                   <div className="flex items-center gap-2">
                     <input
@@ -1815,6 +1898,102 @@ export default function AdminPanel({
                   <Plus className="w-4 h-4" />
                   Р”РѕР±Р°РІРёС‚СЊ
                 </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
+                  <div className="text-white/75 text-xs font-semibold">Добывает за ход</div>
+                  {resources.length > 0 ? (
+                    resources.map((resource) => {
+                      const current =
+                        buildingExtractRows.find((row) => row.resourceId === resource.id)
+                          ?.amount ?? 0;
+                      return (
+                        <label
+                          key={`new-building-extract:${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-xs text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={current}
+                            onChange={(event) =>
+                              setBuildingExtractRows((prev) =>
+                                upsertFlowRow(prev, resource.id, Number(event.target.value)),
+                              )
+                            }
+                            className="w-20 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                          />
+                        </label>
+                      );
+                    })
+                  ) : (
+                    <div className="text-white/45 text-xs">Нет ресурсов</div>
+                  )}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
+                  <div className="text-white/75 text-xs font-semibold">Потребляет за ход</div>
+                  {resources.length > 0 ? (
+                    resources.map((resource) => {
+                      const current =
+                        buildingInputRows.find((row) => row.resourceId === resource.id)
+                          ?.amount ?? 0;
+                      return (
+                        <label
+                          key={`new-building-input:${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-xs text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={current}
+                            onChange={(event) =>
+                              setBuildingInputRows((prev) =>
+                                upsertFlowRow(prev, resource.id, Number(event.target.value)),
+                              )
+                            }
+                            className="w-20 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                          />
+                        </label>
+                      );
+                    })
+                  ) : (
+                    <div className="text-white/45 text-xs">Нет ресурсов</div>
+                  )}
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
+                  <div className="text-white/75 text-xs font-semibold">Производит за ход</div>
+                  {resources.length > 0 ? (
+                    resources.map((resource) => {
+                      const current =
+                        buildingOutputRows.find((row) => row.resourceId === resource.id)
+                          ?.amount ?? 0;
+                      return (
+                        <label
+                          key={`new-building-output:${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-xs text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={current}
+                            onChange={(event) =>
+                              setBuildingOutputRows((prev) =>
+                                upsertFlowRow(prev, resource.id, Number(event.target.value)),
+                              )
+                            }
+                            className="w-20 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                          />
+                        </label>
+                      );
+                    })
+                  ) : (
+                    <div className="text-white/45 text-xs">Нет ресурсов</div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2587,7 +2766,7 @@ export default function AdminPanel({
                   buildings.map((building) => (
                     <div
                       key={building.id}
-                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                      className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 space-y-2"
                     >
                       <div className="flex items-center gap-3">
                         {building.iconDataUrl ? (
@@ -2610,6 +2789,18 @@ export default function AdminPanel({
                             РћС‚СЂР°СЃР»СЊ:{' '}
                             {industries.find((i) => i.id === building.industryId)
                               ?.name ?? 'вЂ”'}
+                          </div>
+                          <div className="text-white/40 text-xs">
+                            Стартовые дукаты:{' '}
+                            {Math.max(
+                              0,
+                              Math.floor(Number(building.economy?.startingDucats) || 0),
+                            )}
+                          </div>
+                          <div className="text-white/35 text-[11px]">
+                            Добыча: {building.economy?.extracts?.length ?? 0} ·
+                            Входов: {building.economy?.inputs?.length ?? 0} ·
+                            Выходов: {building.economy?.outputs?.length ?? 0}
                           </div>
                         </div>
                       </div>
@@ -2688,6 +2879,183 @@ export default function AdminPanel({
                           <Trash2 className="w-4 h-4 text-white/60" />
                         </button>
                       </div>
+                      <details className="w-full mt-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                        <summary className="cursor-pointer text-white/70 text-xs">
+                          Экономика здания
+                        </summary>
+                        <div className="mt-2 space-y-3">
+                          <label className="flex items-center justify-between gap-2 text-xs text-white/70">
+                            <span>Стартовые дукаты</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={
+                                economyDraftByBuildingId[building.id]?.startingDucats ??
+                                building.economy?.startingDucats ??
+                                0
+                              }
+                              onChange={(event) =>
+                                setEconomyDraftByBuildingId((prev) => ({
+                                  ...prev,
+                                  [building.id]: normalizeEconomy({
+                                    ...(prev[building.id] ?? building.economy),
+                                    startingDucats: Math.max(
+                                      0,
+                                      Math.floor(Number(event.target.value) || 0),
+                                    ),
+                                  }),
+                                }))
+                              }
+                              className="w-24 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                            />
+                          </label>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                              <div className="text-white/70 text-[11px]">Добывает</div>
+                              {resources.map((resource) => {
+                                const draft =
+                                  economyDraftByBuildingId[building.id] ?? building.economy;
+                                const value =
+                                  draft?.extracts?.find(
+                                    (item) => item.resourceId === resource.id,
+                                  )?.amount ?? 0;
+                                return (
+                                  <label
+                                    key={`economy-extract:${building.id}:${resource.id}`}
+                                    className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                                  >
+                                    <span>{resource.name}</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={value}
+                                      onChange={(event) =>
+                                        setEconomyDraftByBuildingId((prev) => {
+                                          const base = normalizeEconomy(
+                                            prev[building.id] ?? building.economy,
+                                          );
+                                          return {
+                                            ...prev,
+                                            [building.id]: {
+                                              ...base,
+                                              extracts: upsertFlowRow(
+                                                base.extracts ?? [],
+                                                resource.id,
+                                                Number(event.target.value),
+                                              ),
+                                            },
+                                          };
+                                        })
+                                      }
+                                      className="w-16 h-6 rounded-md bg-black/40 border border-white/10 px-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                                    />
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                              <div className="text-white/70 text-[11px]">Потребляет</div>
+                              {resources.map((resource) => {
+                                const draft =
+                                  economyDraftByBuildingId[building.id] ?? building.economy;
+                                const value =
+                                  draft?.inputs?.find(
+                                    (item) => item.resourceId === resource.id,
+                                  )?.amount ?? 0;
+                                return (
+                                  <label
+                                    key={`economy-input:${building.id}:${resource.id}`}
+                                    className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                                  >
+                                    <span>{resource.name}</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={value}
+                                      onChange={(event) =>
+                                        setEconomyDraftByBuildingId((prev) => {
+                                          const base = normalizeEconomy(
+                                            prev[building.id] ?? building.economy,
+                                          );
+                                          return {
+                                            ...prev,
+                                            [building.id]: {
+                                              ...base,
+                                              inputs: upsertFlowRow(
+                                                base.inputs ?? [],
+                                                resource.id,
+                                                Number(event.target.value),
+                                              ),
+                                            },
+                                          };
+                                        })
+                                      }
+                                      className="w-16 h-6 rounded-md bg-black/40 border border-white/10 px-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                                    />
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                              <div className="text-white/70 text-[11px]">Производит</div>
+                              {resources.map((resource) => {
+                                const draft =
+                                  economyDraftByBuildingId[building.id] ?? building.economy;
+                                const value =
+                                  draft?.outputs?.find(
+                                    (item) => item.resourceId === resource.id,
+                                  )?.amount ?? 0;
+                                return (
+                                  <label
+                                    key={`economy-output:${building.id}:${resource.id}`}
+                                    className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                                  >
+                                    <span>{resource.name}</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={value}
+                                      onChange={(event) =>
+                                        setEconomyDraftByBuildingId((prev) => {
+                                          const base = normalizeEconomy(
+                                            prev[building.id] ?? building.economy,
+                                          );
+                                          return {
+                                            ...prev,
+                                            [building.id]: {
+                                              ...base,
+                                              outputs: upsertFlowRow(
+                                                base.outputs ?? [],
+                                                resource.id,
+                                                Number(event.target.value),
+                                              ),
+                                            },
+                                          };
+                                        })
+                                      }
+                                      className="w-16 h-6 rounded-md bg-black/40 border border-white/10 px-1.5 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                                    />
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() =>
+                              onUpdateBuildingEconomy(
+                                building.id,
+                                normalizeEconomy(
+                                  economyDraftByBuildingId[building.id] ??
+                                    building.economy,
+                                ),
+                              )
+                            }
+                            className="h-7 px-3 rounded-md border border-emerald-400/35 bg-emerald-500/15 text-emerald-100 text-xs inline-flex items-center gap-1"
+                          >
+                            Сохранить экономику
+                          </button>
+                        </div>
+                      </details>
                     </div>
                   ))
                 ) : (

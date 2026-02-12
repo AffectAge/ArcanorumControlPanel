@@ -334,6 +334,70 @@ export default function SettingsModal({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Базовая цена ресурса
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Цена 1 единицы ресурса для покупки/продажи постройками.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={settings.defaultResourcePrice ?? 100}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        defaultResourcePrice: Math.max(
+                          1,
+                          Math.floor(Number(event.target.value) || 1),
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
+                  <div className="text-white/75 text-sm">
+                    Затраты инфраструктуры на 1 единицу товара
+                  </div>
+                  {[
+                    { id: 'resource-category-liquid', label: 'Жидкость' },
+                    { id: 'resource-category-gas', label: 'Газ' },
+                    { id: 'resource-category-energy', label: 'Энергия' },
+                    { id: 'resource-category-goods', label: 'Товар' },
+                    { id: 'resource-category-service', label: 'Услуга' },
+                  ].map((entry) => (
+                    <label
+                      key={`infra-cost:${entry.id}`}
+                      className="flex items-center justify-between gap-3 text-xs text-white/70"
+                    >
+                      <span>{entry.label}</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.1}
+                        value={settings.tradeInfrastructureCostByCategory?.[entry.id] ?? 1}
+                        onChange={(event) =>
+                          onChange({
+                            ...settings,
+                            tradeInfrastructureCostByCategory: {
+                              ...(settings.tradeInfrastructureCostByCategory ?? {}),
+                              [entry.id]: Math.max(
+                                0,
+                                Number(event.target.value) || 0,
+                              ),
+                            },
+                          })
+                        }
+                        className="w-24 h-8 rounded-md bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                      />
+                    </label>
+                  ))}
+                </div>
               </>
             )}
 

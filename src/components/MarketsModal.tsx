@@ -187,6 +187,8 @@ export default function MarketsModal({
     const supplierCountries = new Map<string, Set<string>>();
     const totalsByCountry = new Map<string, number>();
     const warehouse = memberMarket?.warehouseByResourceId ?? {};
+    const tradeStats = memberMarket?.tradeStatsByResourceId ?? {};
+    const priceByResource = memberMarket?.priceByResourceId ?? {};
 
     Object.values(provinces).forEach((province) => {
       const owner = province.ownerCountryId;
@@ -205,6 +207,7 @@ export default function MarketsModal({
     const rows = resources.map((resource, index) => {
       const market = marketSupply.get(resource.id) ?? 0;
       const world = worldSupply.get(resource.id) ?? 0;
+      const stats = tradeStats[resource.id];
       const warehouseStock = Math.max(0, warehouse[resource.id] ?? 0);
       const suppliers = supplierCountries.get(resource.id)?.size ?? 0;
       const marketShare = world > 0 ? (market / world) * 100 : 0;
@@ -212,8 +215,13 @@ export default function MarketsModal({
       const liquidity =
         market >= 1000 ? 'Высокая' : market >= 300 ? 'Средняя' : market > 0 ? 'Низкая' : 'Нет';
       const priceIndex = Math.max(
-        35,
-        Math.min(260, 100 + (world - market) / Math.max(20, world * 0.1)),
+        1,
+        Math.floor(
+          Number(
+            priceByResource[resource.id] ??
+              Math.max(35, Math.min(260, 100 + (world - market) / Math.max(20, world * 0.1))),
+          ) || 100,
+        ),
       );
       return {
         index: index + 1,
@@ -228,6 +236,10 @@ export default function MarketsModal({
         avgPerSupplier,
         liquidity,
         priceIndex,
+        demand: Math.max(0, Math.floor(Number(stats?.demand) || 0)),
+        supply: Math.max(0, Math.floor(Number(stats?.supply) || 0)),
+        bought: Math.max(0, Math.floor(Number(stats?.bought) || 0)),
+        sold: Math.max(0, Math.floor(Number(stats?.sold) || 0)),
       };
     });
 
@@ -794,4 +806,3 @@ export default function MarketsModal({
     </div>
   );
 }
-

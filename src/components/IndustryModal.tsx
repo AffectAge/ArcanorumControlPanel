@@ -955,6 +955,11 @@ export default function IndustryModal({
         owner: entry.owner,
         countryId: province.ownerCountryId,
         progress: undefined as number | undefined,
+        instanceId: entry.instanceId,
+        ducats: Math.max(0, Number(entry.ducats ?? 0)),
+        stockByResourceId: entry.stockByResourceId ?? {},
+        economyStatus: entry.economyStatus ?? 'inactive',
+        economyStatusReason: entry.economyStatusReason,
         isActive: isBuildingActiveForProvince(
           buildings.find((b) => b.id === entry.buildingId),
           province,
@@ -979,6 +984,11 @@ export default function IndustryModal({
             owner: entry.owner,
             countryId: province.ownerCountryId,
             progress: entry.progress,
+            instanceId: undefined,
+            ducats: 0,
+            stockByResourceId: {},
+            economyStatus: 'inactive' as const,
+            economyStatusReason: undefined as string | undefined,
             isActive: isBuildingActiveForProvince(
               buildings.find((b) => b.id === buildingId),
               province,
@@ -1011,6 +1021,11 @@ export default function IndustryModal({
         owner: undefined,
         countryId: province.ownerCountryId,
         progress: undefined as number | undefined,
+        instanceId: undefined,
+        ducats: 0,
+        stockByResourceId: {},
+        economyStatus: 'inactive' as const,
+        economyStatusReason: undefined as string | undefined,
         isActive: true,
       }));
 
@@ -1398,6 +1413,24 @@ export default function IndustryModal({
                     buildings,
                   );
                   const isActive = inactiveReasons.length === 0;
+                  const extractFlows = (building?.economy?.extracts ?? []).filter(
+                    (entry) => entry.amount > 0,
+                  );
+                  const inputFlows = (building?.economy?.inputs ?? []).filter(
+                    (entry) => entry.amount > 0,
+                  );
+                  const outputFlows = (building?.economy?.outputs ?? []).filter(
+                    (entry) => entry.amount > 0,
+                  );
+                  const stockEntries = Object.entries(card.stockByResourceId ?? {})
+                    .map(([resourceId, amount]) => ({
+                      resourceId,
+                      amount: Math.max(0, Math.floor(Number(amount) || 0)),
+                      resource: resources.find((item) => item.id === resourceId),
+                    }))
+                    .filter((entry) => entry.amount > 0);
+                  const economicActive =
+                    card.kind === 'built' ? card.economyStatus === 'active' : false;
                         const baseCost = Math.max(1, building?.cost ?? 1);
                         const demolishCost = Math.ceil(
                           (baseCost * (demolitionCostPercent ?? 0)) / 100,
@@ -1580,6 +1613,115 @@ export default function IndustryModal({
                                   {ownerLabel}
                                 </button>
                               </div>
+                              <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-white/45">Экономика</span>
+                                  {card.kind === 'built' ? (
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded border text-[10px] ${
+                                        economicActive
+                                          ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100'
+                                          : 'border-rose-400/40 bg-rose-500/10 text-rose-100'
+                                      }`}
+                                    >
+                                      {economicActive ? 'Активна' : 'Неактивна'}
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.5 rounded border border-amber-400/40 bg-amber-500/10 text-[10px] text-amber-100">
+                                      В строительстве
+                                    </span>
+                                  )}
+                                </div>
+                                {card.kind === 'built' && (
+                                  <div className="text-white/65">
+                                    Дукаты постройки: <span className="text-white">{card.ducats}</span>
+                                  </div>
+                                )}
+                                {card.kind === 'built' && card.economyStatusReason && (
+                                  <div className="text-white/50 text-[11px]">
+                                    Причина: {card.economyStatusReason}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                                <div className="text-white/45">Рецепт за ход</div>
+                                <div className="text-white/65">
+                                  Добыча:{' '}
+                                  {extractFlows.length > 0
+                                    ? extractFlows
+                                        .map((flow) => {
+                                          const name =
+                                            resources.find((r) => r.id === flow.resourceId)?.name ??
+                                            flow.resourceId;
+                                          return `${name} x${flow.amount}`;
+                                        })
+                                        .join(', ')
+                                    : 'нет'}
+                                </div>
+                                <div className="text-white/65">
+                                  Входы:{' '}
+                                  {inputFlows.length > 0
+                                    ? inputFlows
+                                        .map((flow) => {
+                                          const name =
+                                            resources.find((r) => r.id === flow.resourceId)
+                                              ?.name ?? flow.resourceId;
+                                          return `${name} x${flow.amount}`;
+                                        })
+                                        .join(', ')
+                                    : 'нет'}
+                                </div>
+                                <div className="text-white/65">
+                                  Выходы:{' '}
+                                  {outputFlows.length > 0
+                                    ? outputFlows
+                                        .map((flow) => {
+                                          const name =
+                                            resources.find((r) => r.id === flow.resourceId)
+                                              ?.name ?? flow.resourceId;
+                                          return `${name} x${flow.amount}`;
+                                        })
+                                        .join(', ')
+                                    : 'нет'}
+                                </div>
+                              </div>
+                              {card.kind === 'built' && (
+                                <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                                  <div className="text-white/45">Склад постройки</div>
+                                  {stockEntries.length > 0 ? (
+                                    stockEntries.map((entry) => (
+                                      <div
+                                        key={`${card.key}:stock:${entry.resourceId}`}
+                                        className="flex items-center justify-between gap-2 text-white/65"
+                                      >
+                                        <span className="inline-flex items-center gap-1.5 min-w-0">
+                                          {entry.resource?.iconDataUrl ? (
+                                            <img
+                                              src={entry.resource.iconDataUrl}
+                                              alt={entry.resource?.name ?? entry.resourceId}
+                                              className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                            />
+                                          ) : (
+                                            <span
+                                              className="w-2.5 h-2.5 rounded-full border border-white/20"
+                                              style={{
+                                                backgroundColor:
+                                                  entry.resource?.color ?? '#64748b',
+                                              }}
+                                            />
+                                          )}
+                                          <span className="truncate">
+                                            {entry.resource?.name ?? entry.resourceId}
+                                          </span>
+                                        </span>
+                                        <span className="text-white">{entry.amount}</span>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-white/45">Пусто</div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             {isEditing && ownerEditor && (
                               <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-3 text-xs text-white/70">
@@ -1777,6 +1919,24 @@ export default function IndustryModal({
                     buildings,
                   );
                   const isActive = inactiveReasons.length === 0;
+                  const extractFlows = (building?.economy?.extracts ?? []).filter(
+                    (entry) => entry.amount > 0,
+                  );
+                  const inputFlows = (building?.economy?.inputs ?? []).filter(
+                    (entry) => entry.amount > 0,
+                  );
+                  const outputFlows = (building?.economy?.outputs ?? []).filter(
+                    (entry) => entry.amount > 0,
+                  );
+                  const stockEntries = Object.entries(card.stockByResourceId ?? {})
+                    .map(([resourceId, amount]) => ({
+                      resourceId,
+                      amount: Math.max(0, Math.floor(Number(amount) || 0)),
+                      resource: resources.find((item) => item.id === resourceId),
+                    }))
+                    .filter((entry) => entry.amount > 0);
+                  const economicActive =
+                    card.kind === 'built' ? card.economyStatus === 'active' : false;
                   return (
                     <div
                       key={card.key}
@@ -1935,6 +2095,115 @@ export default function IndustryModal({
                             {ownerLabel}
                           </button>
                         </div>
+                        <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-white/45">Экономика</span>
+                            {card.kind === 'built' ? (
+                              <span
+                                className={`px-1.5 py-0.5 rounded border text-[10px] ${
+                                  economicActive
+                                    ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-100'
+                                    : 'border-rose-400/40 bg-rose-500/10 text-rose-100'
+                                }`}
+                              >
+                                {economicActive ? 'Активна' : 'Неактивна'}
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded border border-amber-400/40 bg-amber-500/10 text-[10px] text-amber-100">
+                                В строительстве
+                              </span>
+                            )}
+                          </div>
+                          {card.kind === 'built' && (
+                            <div className="text-white/65">
+                              Дукаты постройки: <span className="text-white">{card.ducats}</span>
+                            </div>
+                          )}
+                          {card.kind === 'built' && card.economyStatusReason && (
+                            <div className="text-white/50 text-[11px]">
+                              Причина: {card.economyStatusReason}
+                            </div>
+                          )}
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                          <div className="text-white/45">Рецепт за ход</div>
+                          <div className="text-white/65">
+                            Добыча:{' '}
+                            {extractFlows.length > 0
+                              ? extractFlows
+                                  .map((flow) => {
+                                    const name =
+                                      resources.find((r) => r.id === flow.resourceId)?.name ??
+                                      flow.resourceId;
+                                    return `${name} x${flow.amount}`;
+                                  })
+                                  .join(', ')
+                              : 'нет'}
+                          </div>
+                          <div className="text-white/65">
+                            Входы:{' '}
+                            {inputFlows.length > 0
+                              ? inputFlows
+                                  .map((flow) => {
+                                    const name =
+                                      resources.find((r) => r.id === flow.resourceId)?.name ??
+                                      flow.resourceId;
+                                    return `${name} x${flow.amount}`;
+                                  })
+                                  .join(', ')
+                              : 'нет'}
+                          </div>
+                          <div className="text-white/65">
+                            Выходы:{' '}
+                            {outputFlows.length > 0
+                              ? outputFlows
+                                  .map((flow) => {
+                                    const name =
+                                      resources.find((r) => r.id === flow.resourceId)?.name ??
+                                      flow.resourceId;
+                                    return `${name} x${flow.amount}`;
+                                  })
+                                  .join(', ')
+                              : 'нет'}
+                          </div>
+                        </div>
+                        {card.kind === 'built' && (
+                          <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                            <div className="text-white/45">Склад постройки</div>
+                            {stockEntries.length > 0 ? (
+                              stockEntries.map((entry) => (
+                                <div
+                                  key={`${card.key}:stock:${entry.resourceId}`}
+                                  className="flex items-center justify-between gap-2 text-white/65"
+                                >
+                                  <span className="inline-flex items-center gap-1.5 min-w-0">
+                                    {entry.resource?.iconDataUrl ? (
+                                      <img
+                                        src={entry.resource.iconDataUrl}
+                                        alt={entry.resource?.name ?? entry.resourceId}
+                                        className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                      />
+                                    ) : (
+                                      <span
+                                        className="w-2.5 h-2.5 rounded-full border border-white/20"
+                                        style={{
+                                          backgroundColor:
+                                            entry.resource?.color ?? '#64748b',
+                                        }}
+                                      />
+                                    )}
+                                    <span className="truncate">
+                                      {entry.resource?.name ?? entry.resourceId}
+                                    </span>
+                                  </span>
+                                  <span className="text-white">{entry.amount}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-white/45">Пусто</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                       {isEditing && ownerEditor && (
                         <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-3 text-xs text-white/70">

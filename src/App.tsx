@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Handshake } from 'lucide-react';
 import TopBar from './components/TopBar';
 import LeftToolbar from './components/LeftToolbar';
@@ -42,6 +42,7 @@ import type {
   Industry,
   Company,
   BuildingOwner,
+  BuildingEconomy,
   TraitCriteria,
   RequirementNode,
   DiplomacyAgreement,
@@ -167,9 +168,69 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
       );
       province.constructionProgress = converted;
     }
+    province.buildingsBuilt = (province.buildingsBuilt ?? []).map((entry) => {
+      const safeEntry = entry as any;
+      const owner =
+        safeEntry.owner && safeEntry.owner.type === 'company'
+          ? safeEntry.owner
+          : {
+              type: 'state',
+              countryId:
+                safeEntry.owner?.countryId ??
+                province.ownerCountryId ??
+                'state',
+            };
+      const stockRaw = safeEntry.stockByResourceId ?? {};
+      const stockByResourceId = Object.fromEntries(
+        Object.entries(stockRaw).filter(
+          ([, value]) => Number.isFinite(value) && Number(value) > 0,
+        ),
+      ) as Record<string, number>;
+      return {
+        ...safeEntry,
+        owner,
+        instanceId:
+          typeof safeEntry.instanceId === 'string' && safeEntry.instanceId.length > 0
+            ? safeEntry.instanceId
+            : createId(),
+        stockByResourceId,
+        ducats: Number.isFinite(safeEntry.ducats)
+          ? Math.max(0, Number(safeEntry.ducats))
+          : 0,
+        economyStatus:
+          safeEntry.economyStatus === 'active' ? 'active' : 'inactive',
+        economyStatusReason:
+          typeof safeEntry.economyStatusReason === 'string'
+            ? safeEntry.economyStatusReason
+            : undefined,
+      };
+    });
   });
   return next;
 };
+
+const normalizeResourceFlowList = (
+  value:
+    | BuildingEconomy['extracts']
+    | BuildingEconomy['inputs']
+    | BuildingEconomy['outputs']
+    | undefined,
+) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => ({
+      resourceId: String(entry?.resourceId ?? ''),
+      amount: Math.max(0, Math.floor(Number(entry?.amount) || 0)),
+    }))
+    .filter((entry) => entry.resourceId.length > 0 && entry.amount > 0);
+};
+
+const normalizeBuildingEconomy = (economy: BuildingEconomy | undefined): BuildingEconomy => ({
+  startingDucats: Math.max(0, Math.floor(Number(economy?.startingDucats) || 0)),
+  extracts: normalizeResourceFlowList(economy?.extracts),
+  inputs: normalizeResourceFlowList(economy?.inputs),
+  outputs: normalizeResourceFlowList(economy?.outputs),
+});
 
   const normalizeEventLog = (log?: EventLogState): EventLogState => {
     const base = createDefaultFilters();
@@ -226,26 +287,26 @@ const defaultLandscapeColors = ['#22c55e', '#10b981', '#84cc16', '#14b8a6'];
 const defaultClimateColors = ['#38bdf8', '#60a5fa', '#fbbf24', '#f97316'];
 const defaultReligionColors = ['#facc15', '#fb7185', '#a855f7', '#60a5fa'];
 const defaultResourceCategories: ResourceCategory[] = [
-  { id: 'resource-category-liquid', name: 'Жидкость', color: '#38bdf8' },
-  { id: 'resource-category-gas', name: 'Газ', color: '#a78bfa' },
-  { id: 'resource-category-energy', name: 'Энергия', color: '#f59e0b' },
-  { id: 'resource-category-goods', name: 'Товар', color: '#22c55e' },
-  { id: 'resource-category-service', name: 'Услуга', color: '#f472b6' },
+  { id: 'resource-category-liquid', name: 'Р–РёРґРєРѕСЃС‚СЊ', color: '#38bdf8' },
+  { id: 'resource-category-gas', name: 'Р“Р°Р·', color: '#a78bfa' },
+  { id: 'resource-category-energy', name: 'Р­РЅРµСЂРіРёСЏ', color: '#f59e0b' },
+  { id: 'resource-category-goods', name: 'РўРѕРІР°СЂ', color: '#22c55e' },
+  { id: 'resource-category-service', name: 'РЈСЃР»СѓРіР°', color: '#f472b6' },
 ];
 
 const initialMapLayers: MapLayer[] = [
-  { id: 'political', name: 'РџРѕР»РёС‚РёС‡РµСЃРєР°СЏ', visible: true },
-  { id: 'cultural', name: 'РљСѓР»СЊС‚СѓСЂРЅР°СЏ', visible: false },
-  { id: 'landscape', name: 'Р›Р°РЅРґС€Р°С„С‚', visible: false },
-  { id: 'continent', name: 'РљРѕРЅС‚РёРЅРµРЅС‚', visible: false },
-  { id: 'region', name: 'Р РµРіРёРѕРЅ', visible: false },
-  { id: 'climate', name: 'РљР»РёРјР°С‚', visible: false },
-  { id: 'religion', name: 'Р РµР»РёРіРёРё', visible: false },
-  { id: 'resources', name: 'Р РµСЃСѓСЂСЃС‹', visible: false },
-  { id: 'fertility', name: 'РџР»РѕРґРѕСЂРѕРґРЅРѕСЃС‚СЊ', visible: false },
-  { id: 'radiation', name: 'Р Р°РґРёР°С†РёСЏ', visible: false },
-  { id: 'pollution', name: 'Р—Р°РіСЂСЏР·РЅРµРЅРёСЏ', visible: false },
-  { id: 'colonization', name: 'РљРѕР»РѕРЅРёР·Р°С†РёСЏ', visible: false },
+  { id: 'political', name: 'Р СџР С•Р В»Р С‘РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р В°РЎРЏ', visible: true },
+  { id: 'cultural', name: 'Р С™РЎС“Р В»РЎРЉРЎвЂљРЎС“РЎР‚Р Р…Р В°РЎРЏ', visible: false },
+  { id: 'landscape', name: 'Р вЂєР В°Р Р…Р Т‘РЎв‚¬Р В°РЎвЂћРЎвЂљ', visible: false },
+  { id: 'continent', name: 'Р С™Р С•Р Р…РЎвЂљР С‘Р Р…Р ВµР Р…РЎвЂљ', visible: false },
+  { id: 'region', name: 'Р В Р ВµР С–Р С‘Р С•Р Р…', visible: false },
+  { id: 'climate', name: 'Р С™Р В»Р С‘Р СР В°РЎвЂљ', visible: false },
+  { id: 'religion', name: 'Р В Р ВµР В»Р С‘Р С–Р С‘Р С‘', visible: false },
+  { id: 'resources', name: 'Р В Р ВµРЎРѓРЎС“РЎР‚РЎРѓРЎвЂ№', visible: false },
+  { id: 'fertility', name: 'Р СџР В»Р С•Р Т‘Р С•РЎР‚Р С•Р Т‘Р Р…Р С•РЎРѓРЎвЂљРЎРЉ', visible: false },
+  { id: 'radiation', name: 'Р В Р В°Р Т‘Р С‘Р В°РЎвЂ Р С‘РЎРЏ', visible: false },
+  { id: 'pollution', name: 'Р вЂ”Р В°Р С–РЎР‚РЎРЏР В·Р Р…Р ВµР Р…Р С‘РЎРЏ', visible: false },
+  { id: 'colonization', name: 'Р С™Р С•Р В»Р С•Р Р…Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ', visible: false },
 ];
 
 function App() {
@@ -268,6 +329,14 @@ function App() {
     startingGold: 0,
     startingDucats: 100000,
     colonizationMaxActive: 0,
+    defaultResourcePrice: 100,
+    tradeInfrastructureCostByCategory: {
+      'resource-category-liquid': 1,
+      'resource-category-gas': 1.2,
+      'resource-category-energy': 0.7,
+      'resource-category-goods': 1.5,
+      'resource-category-service': 0.5,
+    },
   });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | undefined>(
@@ -292,22 +361,22 @@ function App() {
   const [industryOpen, setIndustryOpen] = useState(false);
   const [diplomacyOpen, setDiplomacyOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>([
-    { id: createId(), name: 'РЈРјРµСЂРµРЅРЅС‹Р№', color: '#38bdf8' },
-    { id: createId(), name: 'Р—Р°СЃСѓС€Р»РёРІС‹Р№', color: '#f59e0b' },
+    { id: createId(), name: 'Р Р€Р СР ВµРЎР‚Р ВµР Р…Р Р…РЎвЂ№Р в„–', color: '#38bdf8' },
+    { id: createId(), name: 'Р вЂ”Р В°РЎРѓРЎС“РЎв‚¬Р В»Р С‘Р Р†РЎвЂ№Р в„–', color: '#f59e0b' },
   ]);
   const [religions, setReligions] = useState<Trait[]>([
-    { id: createId(), name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ РєСѓР»СЊС‚', color: '#facc15' },
-    { id: createId(), name: 'Р›СѓРЅРЅС‹Р№ РєСѓР»СЊС‚', color: '#a855f7' },
+    { id: createId(), name: 'Р РЋР С•Р В»Р Р…Р ВµРЎвЂЎР Р…РЎвЂ№Р в„– Р С”РЎС“Р В»РЎРЉРЎвЂљ', color: '#facc15' },
+    { id: createId(), name: 'Р вЂєРЎС“Р Р…Р Р…РЎвЂ№Р в„– Р С”РЎС“Р В»РЎРЉРЎвЂљ', color: '#a855f7' },
   ]);
   const [landscapes, setLandscapes] = useState<Trait[]>([
-    { id: createId(), name: 'Р Р°РІРЅРёРЅР°', color: '#22c55e' },
-    { id: createId(), name: 'Р“РѕСЂС‹', color: '#10b981' },
+    { id: createId(), name: 'Р В Р В°Р Р†Р Р…Р С‘Р Р…Р В°', color: '#22c55e' },
+    { id: createId(), name: 'Р вЂњР С•РЎР‚РЎвЂ№', color: '#10b981' },
   ]);
   const [continents, setContinents] = useState<Trait[]>([]);
   const [regions, setRegions] = useState<Trait[]>([]);
   const [cultures, setCultures] = useState<Trait[]>([
-    { id: createId(), name: 'РЎРµРІРµСЂСЏРЅРµ', color: '#fb7185' },
-    { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
+    { id: createId(), name: 'Р РЋР ВµР Р†Р ВµРЎР‚РЎРЏР Р…Р Вµ', color: '#fb7185' },
+    { id: createId(), name: 'Р В®Р В¶Р В°Р Р…Р Вµ', color: '#f97316' },
   ]);
   const [resources, setResources] = useState<Trait[]>([]);
   const [resourceCategories, setResourceCategories] = useState<ResourceCategory[]>(
@@ -376,7 +445,7 @@ function App() {
     if (layers.some((layer) => layer.id === 'markets')) return layers;
     return [
       ...layers,
-      { id: 'markets', name: 'Рынки', visible: false },
+      { id: 'markets', name: 'Р С‹РЅРєРё', visible: false },
     ];
   }, []);
 
@@ -698,6 +767,9 @@ function App() {
           logoDataUrl: payload.logoDataUrl,
           memberCountryIds: members,
           warehouseByResourceId: {},
+          marketStockByResourceId: {},
+          priceByResourceId: {},
+          tradeStatsByResourceId: {},
           capitalProvinceId: payload.capitalProvinceId,
           capitalLostSinceTurn: undefined,
           createdTurn: turn,
@@ -795,7 +867,7 @@ function App() {
     );
     addEvent({
       category: 'economy',
-      message: `${countries.find((entry) => entry.id === countryId)?.name ?? countryId} вышла из рынка.`,
+      message: `${countries.find((entry) => entry.id === countryId)?.name ?? countryId} РІС‹С€Р»Р° РёР· СЂС‹РЅРєР°.`,
       countryId,
       priority: 'low',
     });
@@ -846,8 +918,8 @@ function App() {
       priority: 'low',
       message:
         payload.action === 'sell'
-          ? `${actorName} продала ${amount} ед. ресурса "${resourceName}" на склад рынка.`
-          : `${actorName} купила ${amount} ед. ресурса "${resourceName}" со склада рынка.`,
+          ? `${actorName} РїСЂРѕРґР°Р»Р° ${amount} РµРґ. СЂРµСЃСѓСЂСЃР° "${resourceName}" РЅР° СЃРєР»Р°Рґ СЂС‹РЅРєР°.`
+          : `${actorName} РєСѓРїРёР»Р° ${amount} РµРґ. СЂРµСЃСѓСЂСЃР° "${resourceName}" СЃРѕ СЃРєР»Р°РґР° СЂС‹РЅРєР°.`,
     });
   };
 
@@ -930,7 +1002,7 @@ function App() {
     if (actorPoints < demolishCost) {
       addEvent({
         category: 'economy',
-        message: `Недостаточно очков строительства для сноса маршрута "${route.name}". Требуется: ${demolishCost}.`,
+        message: `РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РѕС‡РєРѕРІ СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР° РґР»СЏ СЃРЅРѕСЃР° РјР°СЂС€СЂСѓС‚Р° "${route.name}". РўСЂРµР±СѓРµС‚СЃСЏ: ${demolishCost}.`,
         countryId: activeCountryId,
         priority: 'low',
       });
@@ -1022,7 +1094,7 @@ function App() {
           ...target,
           id: nextRouteId,
           name:
-            index === 0 ? target.name : `${target.name} (часть ${index + 1})`,
+            index === 0 ? target.name : `${target.name} (С‡Р°СЃС‚СЊ ${index + 1})`,
           provinceIds: target.provinceIds.slice(run.start, run.end + 2),
           constructionRequiredPoints: requiredPart,
           constructionProgressPoints: progressPart,
@@ -1071,8 +1143,8 @@ function App() {
     addEvent({
       category: 'economy',
       message: isOwner
-        ? `${actorName} снесла маршрут "${route.name}" (стоимость: ${demolishCost}).`
-        : `${actorName} снесла графы маршрута "${route.name}" на своей территории (стоимость: ${demolishCost}).`,
+        ? `${actorName} СЃРЅРµСЃР»Р° РјР°СЂС€СЂСѓС‚ "${route.name}" (СЃС‚РѕРёРјРѕСЃС‚СЊ: ${demolishCost}).`
+        : `${actorName} СЃРЅРµСЃР»Р° РіСЂР°С„С‹ РјР°СЂС€СЂСѓС‚Р° "${route.name}" РЅР° СЃРІРѕРµР№ С‚РµСЂСЂРёС‚РѕСЂРёРё (СЃС‚РѕРёРјРѕСЃС‚СЊ: ${demolishCost}).`,
       countryId: activeCountryId,
       priority: 'low',
     });
@@ -1222,6 +1294,406 @@ function App() {
     });
   }, [turn]);
 
+  useEffect(() => {
+    if (turn <= 0) return;
+    const resourceCategoryById = new Map(
+      resources.map((resource) => [resource.id, resource.resourceCategoryId]),
+    );
+    const basePrice = Math.max(1, Math.floor(gameSettings.defaultResourcePrice ?? 100));
+    const infraCostByCategory = gameSettings.tradeInfrastructureCostByCategory ?? {};
+    const normalizeTraitCriteria = (
+      criteria: TraitCriteria | undefined,
+      legacyId?: string,
+    ) => ({
+      anyOf: criteria?.anyOf ?? (legacyId ? [legacyId] : []),
+      noneOf: criteria?.noneOf ?? [],
+    });
+    const marketIndexByCountry = new Map<string, number>();
+    const nextMarkets = markets.map((market, index) => {
+      market.memberCountryIds.forEach((countryId) => marketIndexByCountry.set(countryId, index));
+      return {
+        ...market,
+        priceByResourceId: { ...(market.priceByResourceId ?? {}) },
+        tradeStatsByResourceId: {},
+      };
+    });
+    const nextProvinces: ProvinceRecord = {};
+    const provinceUsedByCategory = new Map<string, Record<string, number>>();
+    Object.values(provinces).forEach((province) => {
+      nextProvinces[province.id] = {
+        ...province,
+        buildingsBuilt: [...(province.buildingsBuilt ?? [])],
+        logisticsUsedByCategory: {},
+      };
+      provinceUsedByCategory.set(province.id, {});
+    });
+    const canOperate = (
+      provinceCopy: ProvinceData,
+      building: BuildingDefinition,
+      entry: (ProvinceData['buildingsBuilt'] extends Array<infer T> ? T : never),
+    ) => {
+      const owner = entry.owner;
+      const requirements = building.requirements;
+      if (!requirements) return { ok: true, reason: '???????' };
+      const builtCount = (id: string) =>
+        provinceCopy.buildingsBuilt?.filter((item) => item.buildingId === id).length ?? 0;
+      if (requirements.allowedCountries || requirements.allowedCompanies) {
+        if (owner.type === 'state') {
+          const mode = requirements.allowedCountriesMode ?? 'allow';
+          const list = requirements.allowedCountries ?? [];
+          if (list.length > 0) {
+            const included = list.includes(owner.countryId);
+            if ((mode === 'allow' && !included) || (mode === 'deny' && included)) {
+              return { ok: false, reason: '?????? ?? ????????????? ?????????' };
+            }
+          }
+        } else {
+          const mode = requirements.allowedCompaniesMode ?? 'allow';
+          const list = requirements.allowedCompanies ?? [];
+          if (list.length > 0) {
+            const included = list.includes(owner.companyId);
+            if ((mode === 'allow' && !included) || (mode === 'deny' && included)) {
+              return { ok: false, reason: '???????? ?? ????????????? ?????????' };
+            }
+          }
+        }
+      }
+      const climateReq = normalizeTraitCriteria(requirements.climate, requirements.climateId);
+      if (climateReq.anyOf.length > 0 && (!provinceCopy.climateId || !climateReq.anyOf.includes(provinceCopy.climateId))) {
+        return { ok: false, reason: '?????? ?? ????????' };
+      }
+      if (climateReq.noneOf.length > 0 && provinceCopy.climateId && climateReq.noneOf.includes(provinceCopy.climateId)) {
+        return { ok: false, reason: '?????? ????????' };
+      }
+      const landscapeReq = normalizeTraitCriteria(requirements.landscape, requirements.landscapeId);
+      if (landscapeReq.anyOf.length > 0 && (!provinceCopy.landscapeId || !landscapeReq.anyOf.includes(provinceCopy.landscapeId))) {
+        return { ok: false, reason: '???????? ?? ????????' };
+      }
+      if (landscapeReq.noneOf.length > 0 && provinceCopy.landscapeId && landscapeReq.noneOf.includes(provinceCopy.landscapeId)) {
+        return { ok: false, reason: '???????? ????????' };
+      }
+      const cultureReq = normalizeTraitCriteria(requirements.culture, requirements.cultureId);
+      if (cultureReq.anyOf.length > 0 && (!provinceCopy.cultureId || !cultureReq.anyOf.includes(provinceCopy.cultureId))) {
+        return { ok: false, reason: '???????? ?? ????????' };
+      }
+      if (cultureReq.noneOf.length > 0 && provinceCopy.cultureId && cultureReq.noneOf.includes(provinceCopy.cultureId)) {
+        return { ok: false, reason: '???????? ?????????' };
+      }
+      const religionReq = normalizeTraitCriteria(requirements.religion, requirements.religionId);
+      if (religionReq.anyOf.length > 0 && (!provinceCopy.religionId || !religionReq.anyOf.includes(provinceCopy.religionId))) {
+        return { ok: false, reason: '??????? ?? ????????' };
+      }
+      if (religionReq.noneOf.length > 0 && provinceCopy.religionId && religionReq.noneOf.includes(provinceCopy.religionId)) {
+        return { ok: false, reason: '??????? ?????????' };
+      }
+      if (requirements.resources) {
+        const amounts = provinceCopy.resourceAmounts ?? {};
+        const legacyRequired = Object.entries(requirements.resources)
+          .filter(([, value]) => typeof value === 'number' && value > 0)
+          .map(([id]) => id);
+        const required = requirements.resources.anyOf ?? legacyRequired;
+        const forbidden = requirements.resources.noneOf ?? [];
+        if (required.some((id) => (amounts[id] ?? 0) <= 0)) return { ok: false, reason: '??? ????????? ???????? ? ?????????' };
+        if (forbidden.some((id) => (amounts[id] ?? 0) > 0)) return { ok: false, reason: '???? ??????????? ???????' };
+      }
+      if (requirements.radiation) {
+        const value = provinceCopy.radiation ?? 0;
+        if (requirements.radiation.min != null && value < requirements.radiation.min) return { ok: false, reason: '????????????? ??????? ????????' };
+        if (requirements.radiation.max != null && value > requirements.radiation.max) return { ok: false, reason: '??????? ??????? ????????' };
+      }
+      if (requirements.pollution) {
+        const value = provinceCopy.pollution ?? 0;
+        if (requirements.pollution.min != null && value < requirements.pollution.min) return { ok: false, reason: '????????????? ??????? ???????????' };
+        if (requirements.pollution.max != null && value > requirements.pollution.max) return { ok: false, reason: '??????? ??????? ???????????' };
+      }
+      if (requirements.buildings) {
+        const ok = Object.entries(requirements.buildings).every(([depId, constraint]) => {
+          const count = builtCount(depId);
+          const dep = (constraint as any).province ?? constraint;
+          if (dep?.min != null && count < dep.min) return false;
+          if (dep?.max != null && count > dep.max) return false;
+          return true;
+        });
+        if (!ok) return { ok: false, reason: '?? ????????? ?????????? ?? ???????' };
+      } else if (requirements.dependencies) {
+        const ok = requirements.dependencies.every((depId) => builtCount(depId) > 0);
+        if (!ok) return { ok: false, reason: '?? ????????? ???????????' };
+      }
+      return { ok: true, reason: '???????' };
+    };
+    type SimInstance = {
+      provinceId: string;
+      entryIndex: number;
+      economy: BuildingEconomy;
+      stock: Record<string, number>;
+      ducats: number;
+      status: 'active' | 'inactive';
+      statusReason?: string;
+      marketIndex: number;
+      productionScale: number;
+      producedByResource: Record<string, number>;
+      unmetByResource: Record<string, number>;
+    };
+    const instancesByMarket = new Map<number, SimInstance[]>();
+    const allInstances: SimInstance[] = [];
+    const getMarketStats = (marketIndex: number, resourceId: string) => {
+      const market = nextMarkets[marketIndex];
+      if (!market.tradeStatsByResourceId) market.tradeStatsByResourceId = {};
+      const current = market.tradeStatsByResourceId[resourceId];
+      if (current) return current;
+      const created = { demand: 0, supply: 0, bought: 0, sold: 0 };
+      market.tradeStatsByResourceId[resourceId] = created;
+      return created;
+    };
+    const consumeInfra = (instance: SimInstance, resourceId: string, unitsWanted: number) => {
+      const categoryId = resourceCategoryById.get(resourceId) ?? '';
+      const perUnit = Math.max(
+        0.000001,
+        Number((categoryId && infraCostByCategory[categoryId]) != null ? infraCostByCategory[categoryId] : 1) || 1,
+      );
+      const province = nextProvinces[instance.provinceId];
+      const capacity = province.logisticsPointsByCategory ?? {};
+      const used = provinceUsedByCategory.get(instance.provinceId) ?? {};
+      const available = Math.max(0, (capacity[categoryId] ?? 0) - (used[categoryId] ?? 0));
+      const allowed = Math.max(0, Math.min(unitsWanted, Math.floor(available / perUnit)));
+      if (allowed > 0) {
+        used[categoryId] = (used[categoryId] ?? 0) + allowed * perUnit;
+        provinceUsedByCategory.set(instance.provinceId, used);
+      }
+      return allowed;
+    };
+    Object.values(nextProvinces).forEach((province) => {
+      (province.buildingsBuilt ?? []).forEach((entry, index) => {
+        const building = buildings.find((item) => item.id === entry.buildingId);
+        if (!building) {
+          province.buildingsBuilt![index] = {
+            ...entry,
+            economyStatus: 'inactive',
+            economyStatusReason: '?????? ??????? ?? ???????????',
+          };
+          return;
+        }
+        const ownerCountryId =
+          entry.owner.type === 'state'
+            ? entry.owner.countryId
+            : companies.find((company) => company.id === entry.owner.companyId)?.countryId;
+        if (!ownerCountryId) {
+          province.buildingsBuilt![index] = {
+            ...entry,
+            economyStatus: 'inactive',
+            economyStatusReason: '?? ????????? ????????',
+          };
+          return;
+        }
+        const marketIndex = marketIndexByCountry.get(ownerCountryId);
+        if (marketIndex == null) {
+          province.buildingsBuilt![index] = {
+            ...entry,
+            economyStatus: 'inactive',
+            economyStatusReason: '?????? ?? ??????? ? ?????',
+          };
+          return;
+        }
+        const activeCheck = canOperate(province, building, entry as any);
+        const economy = normalizeBuildingEconomy(building.economy);
+        const instance: SimInstance = {
+          provinceId: province.id,
+          entryIndex: index,
+          economy,
+          stock: { ...(entry.stockByResourceId ?? {}) },
+          ducats: Number.isFinite(entry.ducats)
+            ? Math.max(0, Number(entry.ducats))
+            : Math.max(0, economy.startingDucats ?? 0),
+          status: activeCheck.ok ? 'active' : 'inactive',
+          statusReason: activeCheck.ok ? '???????' : activeCheck.reason,
+          marketIndex,
+          productionScale: 1,
+          producedByResource: {},
+          unmetByResource: {},
+        };
+        allInstances.push(instance);
+        if (!instancesByMarket.has(marketIndex)) instancesByMarket.set(marketIndex, []);
+        instancesByMarket.get(marketIndex)?.push(instance);
+      });
+    });
+    instancesByMarket.forEach((instances, marketIndex) => {
+      const active = instances.filter((instance) => instance.status === 'active');
+      if (active.length === 0) return;
+
+      active.forEach((instance) => {
+        const province = nextProvinces[instance.provinceId];
+        if (!province) return;
+        const provinceResources = { ...(province.resourceAmounts ?? {}) };
+        (instance.economy.extracts ?? []).forEach((extract) => {
+          const extractAmount = Math.max(0, Math.floor(Number(extract.amount) || 0));
+          if (extractAmount <= 0) return;
+          const availableInProvince = Math.max(
+            0,
+            Math.floor(Number(provinceResources[extract.resourceId] ?? 0) || 0),
+          );
+          if (availableInProvince <= 0) return;
+          const mined = Math.min(extractAmount, availableInProvince);
+          if (mined <= 0) return;
+          const remaining = Math.max(0, availableInProvince - mined);
+          if (remaining > 0) {
+            provinceResources[extract.resourceId] = remaining;
+          } else if (extract.resourceId in provinceResources) {
+            delete provinceResources[extract.resourceId];
+          }
+          instance.stock[extract.resourceId] = (instance.stock[extract.resourceId] ?? 0) + mined;
+          getMarketStats(marketIndex, extract.resourceId).supply += mined;
+        });
+        province.resourceAmounts = provinceResources;
+      });
+
+      const offersByResource = new Map<string, { instance: SimInstance; available: number }[]>();
+      active.forEach((instance) => {
+        Object.entries(instance.stock).forEach(([resourceId, amount]) => {
+          const safe = Math.max(0, Math.floor(Number(amount) || 0));
+          if (safe <= 0) return;
+          if (!offersByResource.has(resourceId)) offersByResource.set(resourceId, []);
+          offersByResource.get(resourceId)?.push({ instance, available: safe });
+          getMarketStats(marketIndex, resourceId).supply += safe;
+        });
+      });
+      active.forEach((buyer) => {
+        const fulfillment: number[] = [];
+        (buyer.economy.inputs ?? []).forEach((input) => {
+          const required = Math.max(0, Math.floor(input.amount));
+          if (required <= 0) return;
+          let remaining = required;
+          const fromOwn = Math.min(remaining, Math.max(0, buyer.stock[input.resourceId] ?? 0));
+          if (fromOwn > 0) {
+            buyer.stock[input.resourceId] = Math.max(0, (buyer.stock[input.resourceId] ?? 0) - fromOwn);
+            remaining -= fromOwn;
+          }
+          if (remaining > 0) {
+            const stats = getMarketStats(marketIndex, input.resourceId);
+            stats.demand += remaining;
+            const offers = offersByResource.get(input.resourceId) ?? [];
+            for (const offer of offers) {
+              if (remaining <= 0) break;
+              if (offer.available <= 0) continue;
+              if (offer.instance === buyer) continue;
+              const byMoney = Math.floor(buyer.ducats / basePrice);
+              const byBuyerInfra = consumeInfra(buyer, input.resourceId, remaining);
+              if (byBuyerInfra <= 0 || byMoney <= 0) break;
+              const bySellerInfra = consumeInfra(offer.instance, input.resourceId, offer.available);
+              if (bySellerInfra <= 0) continue;
+              const traded = Math.max(0, Math.min(remaining, offer.available, byMoney, byBuyerInfra, bySellerInfra));
+              if (traded <= 0) continue;
+              offer.available -= traded;
+              offer.instance.stock[input.resourceId] = Math.max(
+                0,
+                (offer.instance.stock[input.resourceId] ?? 0) - traded,
+              );
+              buyer.ducats -= traded * basePrice;
+              offer.instance.ducats += traded * basePrice;
+              remaining -= traded;
+              stats.bought += traded;
+              stats.sold += traded;
+            }
+          }
+          buyer.unmetByResource[input.resourceId] = remaining;
+          fulfillment.push(required > 0 ? (required - remaining) / required : 1);
+        });
+        buyer.productionScale =
+          fulfillment.length > 0 ? Math.max(0, Math.min(...fulfillment)) : 1;
+      });
+      active.forEach((instance) => {
+        if (instance.productionScale <= 0) {
+          instance.status = 'inactive';
+          instance.statusReason = '???????????? ?????? ??? ????????????';
+          return;
+        }
+        (instance.economy.outputs ?? []).forEach((output) => {
+          const produced = Math.floor(Math.max(0, output.amount) * instance.productionScale);
+          if (produced <= 0) return;
+          instance.stock[output.resourceId] = (instance.stock[output.resourceId] ?? 0) + produced;
+          instance.producedByResource[output.resourceId] =
+            (instance.producedByResource[output.resourceId] ?? 0) + produced;
+          getMarketStats(marketIndex, output.resourceId).supply += produced;
+        });
+      });
+      const producedOffers = new Map<string, { instance: SimInstance; available: number }[]>();
+      active.forEach((instance) => {
+        Object.entries(instance.producedByResource).forEach(([resourceId, amount]) => {
+          const safe = Math.max(0, Math.floor(Number(amount) || 0));
+          if (safe <= 0) return;
+          if (!producedOffers.has(resourceId)) producedOffers.set(resourceId, []);
+          producedOffers.get(resourceId)?.push({ instance, available: safe });
+        });
+      });
+      active.forEach((buyer) => {
+        Object.entries(buyer.unmetByResource).forEach(([resourceId, unmet]) => {
+          let remaining = Math.max(0, Math.floor(Number(unmet) || 0));
+          if (remaining <= 0) return;
+          const offers = producedOffers.get(resourceId) ?? [];
+          for (const offer of offers) {
+            if (remaining <= 0) break;
+            if (offer.available <= 0) continue;
+            if (offer.instance === buyer) continue;
+            const byMoney = Math.floor(buyer.ducats / basePrice);
+            const byBuyerInfra = consumeInfra(buyer, resourceId, remaining);
+            if (byBuyerInfra <= 0 || byMoney <= 0) break;
+            const bySellerInfra = consumeInfra(offer.instance, resourceId, offer.available);
+            if (bySellerInfra <= 0) continue;
+            const traded = Math.max(0, Math.min(remaining, offer.available, byMoney, byBuyerInfra, bySellerInfra));
+            if (traded <= 0) continue;
+            offer.available -= traded;
+            offer.instance.stock[resourceId] = Math.max(
+              0,
+              (offer.instance.stock[resourceId] ?? 0) - traded,
+            );
+            buyer.ducats -= traded * basePrice;
+            offer.instance.ducats += traded * basePrice;
+            remaining -= traded;
+            const stats = getMarketStats(marketIndex, resourceId);
+            stats.bought += traded;
+            stats.sold += traded;
+          }
+          buyer.unmetByResource[resourceId] = remaining;
+        });
+      });
+    });
+    allInstances.forEach((instance) => {
+      const province = nextProvinces[instance.provinceId];
+      if (!province?.buildingsBuilt || instance.entryIndex >= province.buildingsBuilt.length) return;
+      const source = province.buildingsBuilt[instance.entryIndex];
+      province.buildingsBuilt[instance.entryIndex] = {
+        ...source,
+        stockByResourceId: Object.fromEntries(
+          Object.entries(instance.stock).filter(([, amount]) => Number(amount) > 0),
+        ),
+        ducats: Math.max(0, Math.floor(instance.ducats)),
+        economyStatus: instance.status,
+        economyStatusReason: instance.statusReason,
+      };
+    });
+    Object.values(nextProvinces).forEach((province) => {
+      const used = provinceUsedByCategory.get(province.id) ?? {};
+      province.logisticsUsedByCategory = Object.fromEntries(
+        Object.entries(used).filter(([, amount]) => Number(amount) > 0),
+      );
+    });
+    const clamp = (value: number, min: number, max: number) =>
+      Math.max(min, Math.min(max, value));
+    nextMarkets.forEach((market) => {
+      const nextPrices = { ...(market.priceByResourceId ?? {}) };
+      Object.entries(market.tradeStatsByResourceId ?? {}).forEach(([resourceId, stats]) => {
+        const prev = nextPrices[resourceId] ?? basePrice;
+        const ratio = (stats.demand - stats.supply) / Math.max(1, stats.supply);
+        const target = basePrice * (1 + clamp(ratio, -0.7, 1.2) * 0.6);
+        nextPrices[resourceId] = Math.round(
+          clamp(prev * 0.75 + target * 0.25, basePrice * 0.3, basePrice * 3.5),
+        );
+      });
+      market.priceByResourceId = nextPrices;
+    });
+    setProvinces(nextProvinces);
+    setMarkets(nextMarkets);
+  }, [turn]);
+
   const pruneLogEntries = (
     entries: EventLogEntry[],
     currentTurn: number,
@@ -1318,7 +1790,7 @@ function App() {
           province.colonizationProgress = {};
           addEvent({
             category: 'colonization',
-            message: `${country.name} Р·Р°РІРµСЂС€РёР»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
+            message: `${country.name} Р В·Р В°Р Р†Р ВµРЎР‚РЎв‚¬Р С‘Р В»Р В° Р С”Р С•Р В»Р С•Р Р…Р С‘Р В·Р В°РЎвЂ Р С‘РЎР‹ Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${provinceId}.`,
             countryId,
             priority: 'high',
           });
@@ -1378,9 +1850,13 @@ function App() {
         let builtChanged = false;
 
         Object.entries(progress).forEach(([buildingId, entries]) => {
-          const cost = buildings.find((b) => b.id === buildingId)?.cost ?? 100;
-          const buildingName =
-            buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
+          const buildingDef = buildings.find((b) => b.id === buildingId);
+          const cost = buildingDef?.cost ?? 100;
+          const buildingName = buildingDef?.name ?? buildingId;
+          const startingDucats = Math.max(
+            0,
+            Math.floor(Number(buildingDef?.economy?.startingDucats) || 0),
+          );
           const remaining: { progress: number; owner: BuildingOwner }[] = [];
           let completed = 0;
 
@@ -1388,7 +1864,15 @@ function App() {
             const updated = entry.progress + share;
             if (updated >= cost) {
               completed += 1;
-              builtList.push({ buildingId, owner: entry.owner });
+              builtList.push({
+                instanceId: createId(),
+                buildingId,
+                owner: entry.owner,
+                stockByResourceId: {},
+                ducats: startingDucats,
+                economyStatus: 'inactive',
+                economyStatusReason: 'РўРѕР»СЊРєРѕ РїРѕСЃС‚СЂРѕРµРЅРѕ',
+              });
             } else {
               remaining.push({ ...entry, progress: updated });
             }
@@ -1398,7 +1882,7 @@ function App() {
             builtChanged = true;
             addEvent({
               category: 'economy',
-              message: `РЎС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ Р·Р°РІРµСЂС€РµРЅРѕ: ${buildingName} x${completed} РІ РїСЂРѕРІРёРЅС†РёРё ${province.id}.`,
+              message: `Р РЋРЎвЂљРЎР‚Р С•Р С‘РЎвЂљР ВµР В»РЎРЉРЎРѓРЎвЂљР Р†Р С• Р В·Р В°Р Р†Р ВµРЎР‚РЎв‚¬Р ВµР Р…Р С•: ${buildingName} x${completed} Р Р† Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${province.id}.`,
               countryId,
               priority: 'medium',
             });
@@ -1459,7 +1943,7 @@ function App() {
     completedRoutes.forEach((route) => {
       addEvent({
         category: 'economy',
-        message: `Строительство маршрута завершено: ${route.name}.`,
+        message: `РЎС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ РјР°СЂС€СЂСѓС‚Р° Р·Р°РІРµСЂС€РµРЅРѕ: ${route.name}.`,
         countryId,
         priority: 'medium',
       });
@@ -1485,7 +1969,7 @@ function App() {
       setTurn((prev) => prev + 1);
       addEvent({
         category: 'system',
-        message: `РќР°С‡Р°Р»СЃСЏ РіР»РѕР±Р°Р»СЊРЅС‹Р№ С…РѕРґ ${turn + 1}`,
+        message: `Р СњР В°РЎвЂЎР В°Р В»РЎРѓРЎРЏ Р С–Р В»Р С•Р В±Р В°Р В»РЎРЉР Р…РЎвЂ№Р в„– РЎвЂ¦Р С•Р Т‘ ${turn + 1}`,
         priority: 'low',
       });
       countries.forEach((country) => {
@@ -1582,7 +2066,7 @@ function App() {
                 ?.name ?? proposal.toCountryId;
             addEvent({
               category: 'diplomacy',
-              message: `${toName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName} (РёСЃС‚РµРє СЃСЂРѕРє).`,
+              message: `${toName} Р С•РЎвЂљР С”Р В»Р С•Р Р…Р С‘Р В»Р В° Р С—РЎР‚Р ВµР Т‘Р В»Р С•Р В¶Р ВµР Р…Р С‘Р Вµ Р Т‘Р С•Р С–Р С•Р Р†Р С•РЎР‚Р В° Р С•РЎвЂљ ${fromName} (Р С‘РЎРѓРЎвЂљР ВµР С” РЎРѓРЎР‚Р С•Р С”).`,
               countryId: proposal.toCountryId,
               priority: 'low',
             });
@@ -1644,7 +2128,7 @@ function App() {
             agreement.guestCountryId;
           addEvent({
             category: 'diplomacy',
-            message: `пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ ${hostName} - ${guestName} пїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.`,
+            message: `РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… ${hostName} - ${guestName} РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…. РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р… РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р…РїС—Р….`,
             countryId: agreement.hostCountryId,
             priority: 'low',
           });
@@ -1678,7 +2162,7 @@ function App() {
               nextMarkets.push({ ...market, capitalLostSinceTurn: undefined });
               addEvent({
                 category: 'economy',
-                message: `Столица рынка "${market.name}" снова назначена. Таймер удаления сброшен.`,
+                message: `РЎС‚РѕР»РёС†Р° СЂС‹РЅРєР° "${market.name}" СЃРЅРѕРІР° РЅР°Р·РЅР°С‡РµРЅР°. РўР°Р№РјРµСЂ СѓРґР°Р»РµРЅРёСЏ СЃР±СЂРѕС€РµРЅ.`,
                 countryId: market.creatorCountryId,
                 priority: 'low',
               });
@@ -1696,7 +2180,7 @@ function App() {
             marketsChanged = true;
             addEvent({
               category: 'economy',
-              message: `Рынок "${market.name}" удален: новая столица не назначена в срок (${marketCapitalGraceTurns} ход.).`,
+              message: `Р С‹РЅРѕРє "${market.name}" СѓРґР°Р»РµРЅ: РЅРѕРІР°СЏ СЃС‚РѕР»РёС†Р° РЅРµ РЅР°Р·РЅР°С‡РµРЅР° РІ СЃСЂРѕРє (${marketCapitalGraceTurns} С…РѕРґ.).`,
               countryId: market.creatorCountryId,
               priority: 'medium',
             });
@@ -1707,7 +2191,7 @@ function App() {
             marketsChanged = true;
             addEvent({
               category: 'economy',
-              message: `Рынок "${market.name}" потерял столицу. Назначьте новую в течение ${turnsLeft} ход.`,
+              message: `Р С‹РЅРѕРє "${market.name}" РїРѕС‚РµСЂСЏР» СЃС‚РѕР»РёС†Сѓ. РќР°Р·РЅР°С‡СЊС‚Рµ РЅРѕРІСѓСЋ РІ С‚РµС‡РµРЅРёРµ ${turnsLeft} С…РѕРґ.`,
               countryId: market.creatorCountryId,
               priority: 'high',
             });
@@ -1856,7 +2340,12 @@ function App() {
             : undefined,
       })),
     );
-    setBuildings(save.data.buildings ?? buildings);
+    setBuildings(
+      (save.data.buildings ?? buildings).map((building) => ({
+        ...building,
+        economy: normalizeBuildingEconomy(building.economy),
+      })),
+    );
     setIndustries(save.data.industries ?? industries);
     setCompanies(save.data.companies ?? companies);
     setDiplomacyAgreements(save.data.diplomacy ?? []);
@@ -1903,6 +2392,35 @@ function App() {
                   validResourceIds.has(resourceId) &&
                   Number.isFinite(amount) &&
                   Number(amount) > 0,
+              ),
+            ),
+            marketStockByResourceId: Object.fromEntries(
+              Object.entries(market.marketStockByResourceId ?? {}).filter(
+                ([resourceId, amount]) =>
+                  validResourceIds.has(resourceId) &&
+                  Number.isFinite(amount) &&
+                  Number(amount) > 0,
+              ),
+            ),
+            priceByResourceId: Object.fromEntries(
+              Object.entries(market.priceByResourceId ?? {}).filter(
+                ([resourceId, amount]) =>
+                  validResourceIds.has(resourceId) &&
+                  Number.isFinite(amount) &&
+                  Number(amount) > 0,
+              ),
+            ),
+            tradeStatsByResourceId: Object.fromEntries(
+              Object.entries(market.tradeStatsByResourceId ?? {}).map(
+                ([resourceId, value]) => [
+                  resourceId,
+                  {
+                    demand: Math.max(0, Math.floor(Number((value as any)?.demand) || 0)),
+                    supply: Math.max(0, Math.floor(Number((value as any)?.supply) || 0)),
+                    bought: Math.max(0, Math.floor(Number((value as any)?.bought) || 0)),
+                    sold: Math.max(0, Math.floor(Number((value as any)?.sold) || 0)),
+                  },
+                ],
               ),
             ),
             capitalProvinceId:
@@ -1983,6 +2501,14 @@ function App() {
       startingGold: 0,
       startingDucats: 100000,
       colonizationMaxActive: 0,
+      defaultResourcePrice: 100,
+      tradeInfrastructureCostByCategory: {
+        'resource-category-liquid': 1,
+        'resource-category-gas': 1.2,
+        'resource-category-energy': 0.7,
+        'resource-category-goods': 1.5,
+        'resource-category-service': 0.5,
+      },
       ...(save.data.settings ?? {}),
     });
     setEventLog(normalizeEventLog(save.data.eventLog));
@@ -2022,7 +2548,7 @@ function App() {
       const now = new Date().toISOString();
       return {
         id: typeof entry.id === 'string' ? entry.id : createId(),
-        name: typeof entry.name === 'string' ? entry.name : 'РРјРїРѕСЂС‚',
+        name: typeof entry.name === 'string' ? entry.name : 'Р ВР СР С—Р С•РЎР‚РЎвЂљ',
         createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : now,
         updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : now,
         data: entry.data,
@@ -2045,7 +2571,7 @@ function App() {
     }
 
     if (incoming.length === 0) {
-      throw new Error('Р¤Р°Р№Р» РЅРµ СЃРѕРґРµСЂР¶РёС‚ РєРѕСЂСЂРµРєС‚РЅС‹С… СЃРѕС…СЂР°РЅРµРЅРёР№.');
+      throw new Error('Р В¤Р В°Р в„–Р В» Р Р…Р Вµ РЎРѓР С•Р Т‘Р ВµРЎР‚Р В¶Р С‘РЎвЂљ Р С”Р С•РЎР‚РЎР‚Р ВµР С”РЎвЂљР Р…РЎвЂ№РЎвЂ¦ РЎРѓР С•РЎвЂ¦РЎР‚Р В°Р Р…Р ВµР Р…Р С‘Р в„–.');
     }
 
     const existingIds = new Set(saves.map((save) => save.id));
@@ -2066,22 +2592,22 @@ function App() {
     setSelectedProvinceId(undefined);
     setProvinces({});
     setClimates([
-      { id: createId(), name: 'РЈРјРµСЂРµРЅРЅС‹Р№', color: '#38bdf8' },
-      { id: createId(), name: 'Р—Р°СЃСѓС€Р»РёРІС‹Р№', color: '#f59e0b' },
+      { id: createId(), name: 'Р Р€Р СР ВµРЎР‚Р ВµР Р…Р Р…РЎвЂ№Р в„–', color: '#38bdf8' },
+      { id: createId(), name: 'Р вЂ”Р В°РЎРѓРЎС“РЎв‚¬Р В»Р С‘Р Р†РЎвЂ№Р в„–', color: '#f59e0b' },
     ]);
     setReligions([
-      { id: createId(), name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ РєСѓР»СЊС‚', color: '#facc15' },
-      { id: createId(), name: 'Р›СѓРЅРЅС‹Р№ РєСѓР»СЊС‚', color: '#a855f7' },
+      { id: createId(), name: 'Р РЋР С•Р В»Р Р…Р ВµРЎвЂЎР Р…РЎвЂ№Р в„– Р С”РЎС“Р В»РЎРЉРЎвЂљ', color: '#facc15' },
+      { id: createId(), name: 'Р вЂєРЎС“Р Р…Р Р…РЎвЂ№Р в„– Р С”РЎС“Р В»РЎРЉРЎвЂљ', color: '#a855f7' },
     ]);
     setLandscapes([
-      { id: createId(), name: 'Р Р°РІРЅРёРЅР°', color: '#22c55e' },
-      { id: createId(), name: 'Р“РѕСЂС‹', color: '#10b981' },
+      { id: createId(), name: 'Р В Р В°Р Р†Р Р…Р С‘Р Р…Р В°', color: '#22c55e' },
+      { id: createId(), name: 'Р вЂњР С•РЎР‚РЎвЂ№', color: '#10b981' },
     ]);
     setContinents([]);
     setRegions([]);
     setCultures([
-      { id: createId(), name: 'РЎРµРІРµСЂСЏРЅРµ', color: '#fb7185' },
-      { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
+      { id: createId(), name: 'Р РЋР ВµР Р†Р ВµРЎР‚РЎРЏР Р…Р Вµ', color: '#fb7185' },
+      { id: createId(), name: 'Р В®Р В¶Р В°Р Р…Р Вµ', color: '#f97316' },
     ]);
     setResources([]);
     setResourceCategories(defaultResourceCategories);
@@ -2112,6 +2638,14 @@ function App() {
       startingGold: 0,
       startingDucats: 100000,
       colonizationMaxActive: 0,
+      defaultResourcePrice: 100,
+      tradeInfrastructureCostByCategory: {
+        'resource-category-liquid': 1,
+        'resource-category-gas': 1.2,
+        'resource-category-energy': 0.7,
+        'resource-category-goods': 1.5,
+        'resource-category-service': 0.5,
+      },
     });
     setEventLog(createDefaultLog());
     setHotseatOpen(false);
@@ -2435,11 +2969,11 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     });
     legends.colonization = [
       ...colonizationLegend,
-      { label: 'Р—Р°РїСЂРµС‰РµРЅРѕ Рє РєРѕР»РѕРЅРёР·Р°С†РёРё', color: '#f87171' },
-      { label: 'РќР°С€Рё РїСЂРѕРІРёРЅС†РёРё', color: COLONIZATION_OWN_COLOR },
-      { label: 'РќР°С€Рё РєРѕР»РѕРЅРёРё', color: COLONIZATION_OWN_COLOR },
-      { label: 'Р§СѓР¶РёРµ РїСЂРѕРІРёРЅС†РёРё', color: COLONIZATION_OTHER_COLOR },
-      { label: 'Р§СѓР¶РёРµ РєРѕР»РѕРЅРёРё', color: COLONIZATION_OTHER_COLOR },
+      { label: 'Р вЂ”Р В°Р С—РЎР‚Р ВµРЎвЂ°Р ВµР Р…Р С• Р С” Р С”Р С•Р В»Р С•Р Р…Р С‘Р В·Р В°РЎвЂ Р С‘Р С‘', color: '#f87171' },
+      { label: 'Р СњР В°РЎв‚¬Р С‘ Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘', color: COLONIZATION_OWN_COLOR },
+      { label: 'Р СњР В°РЎв‚¬Р С‘ Р С”Р С•Р В»Р С•Р Р…Р С‘Р С‘', color: COLONIZATION_OWN_COLOR },
+      { label: 'Р В§РЎС“Р В¶Р С‘Р Вµ Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘', color: COLONIZATION_OTHER_COLOR },
+      { label: 'Р В§РЎС“Р В¶Р С‘Р Вµ Р С”Р С•Р В»Р С•Р Р…Р С‘Р С‘', color: COLONIZATION_OTHER_COLOR },
     ];
     legends.climate = climates.map((item) => ({
       label: item.name,
@@ -2478,7 +3012,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       color: item.color,
     }));
     if (countries.length > 5) {
-      legends.political.push({ label: 'Р”СЂСѓРіРёРµ СЃС‚СЂР°РЅС‹', color: '#94a3b8' });
+      legends.political.push({ label: 'Р вЂќРЎР‚РЎС“Р С–Р С‘Р Вµ РЎРѓРЎвЂљРЎР‚Р В°Р Р…РЎвЂ№', color: '#94a3b8' });
     }
     const envSteps = [0, 20, 40, 60, 80, 100];
     legends.radiation = envSteps.slice(0, -1).map((from, index) => {
@@ -2942,7 +3476,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     if (activeLimit > 0 && activeCount >= activeLimit) {
       addEvent({
         category: 'colonization',
-        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РґРѕСЃС‚РёРіР»Р° Р»РёРјРёС‚Р° Р°РєС‚РёРІРЅС‹С… РєРѕР»РѕРЅРёР·Р°С†РёР№ (${activeLimit}).`,
+        message: `${country?.name ?? 'Р РЋРЎвЂљРЎР‚Р В°Р Р…Р В°'} Р Т‘Р С•РЎРѓРЎвЂљР С‘Р С–Р В»Р В° Р В»Р С‘Р СР С‘РЎвЂљР В° Р В°Р С”РЎвЂљР С‘Р Р†Р Р…РЎвЂ№РЎвЂ¦ Р С”Р С•Р В»Р С•Р Р…Р С‘Р В·Р В°РЎвЂ Р С‘Р в„– (${activeLimit}).`,
         countryId,
         priority: 'low',
       });
@@ -2958,7 +3492,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         progress[countryId] = 0;
         addEvent({
           category: 'colonization',
-          message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РЅР°С‡Р°Р»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
+          message: `${country?.name ?? 'Р РЋРЎвЂљРЎР‚Р В°Р Р…Р В°'} Р Р…Р В°РЎвЂЎР В°Р В»Р В° Р С”Р С•Р В»Р С•Р Р…Р С‘Р В·Р В°РЎвЂ Р С‘РЎР‹ Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${provinceId}.`,
           countryId,
           priority: 'medium',
         });
@@ -2983,7 +3517,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       delete progress[countryId];
       addEvent({
         category: 'colonization',
-        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
+        message: `${country?.name ?? 'Р РЋРЎвЂљРЎР‚Р В°Р Р…Р В°'} Р С•РЎвЂљР СР ВµР Р…Р С‘Р В»Р В° Р С”Р С•Р В»Р С•Р Р…Р С‘Р В·Р В°РЎвЂ Р С‘РЎР‹ Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${provinceId}.`,
         countryId,
         priority: 'low',
       });
@@ -3028,10 +3562,19 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     iconDataUrl?: string,
     industryId?: string,
     requirements?: BuildingDefinition['requirements'],
+    economy?: BuildingEconomy,
   ) => {
     setBuildings((prev) => [
       ...prev,
-      { id: createId(), name, cost, iconDataUrl, industryId, requirements },
+      {
+        id: createId(),
+        name,
+        cost,
+        iconDataUrl,
+        industryId,
+        requirements,
+        economy: normalizeBuildingEconomy(economy),
+      },
     ]);
   };
 
@@ -3200,7 +3743,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       payload.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${fromName} РѕС‚РїСЂР°РІРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° СЃС‚СЂР°РЅРµ ${toName}.`,
+      message: `${fromName} Р С•РЎвЂљР С—РЎР‚Р В°Р Р†Р С‘Р В»Р В° Р С—РЎР‚Р ВµР Т‘Р В»Р С•Р В¶Р ВµР Р…Р С‘Р Вµ Р Т‘Р С•Р С–Р С•Р Р†Р С•РЎР‚Р В° РЎРѓРЎвЂљРЎР‚Р В°Р Р…Р Вµ ${toName}.`,
       countryId: payload.fromCountryId,
       priority: 'low',
     });
@@ -3235,7 +3778,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       fromCountryId: activeCountryId,
       toCountryId: targetCountryId,
       agreement: {
-        title: `Приглашение в рынок ${ownMarket.name}`,
+        title: `РџСЂРёРіР»Р°С€РµРЅРёРµ РІ СЂС‹РЅРѕРє ${ownMarket.name}`,
         hostCountryId: activeCountryId,
         guestCountryId: targetCountryId,
         agreementCategory: 'market_invite',
@@ -3284,7 +3827,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           ?.name ?? proposal.agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `${voterName} РїРѕРґС‚РІРµСЂРґРёР»Р° РїСЂРѕРґР»РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° ${hostName} в†” ${guestName}.`,
+        message: `${voterName} Р С—Р С•Р Т‘РЎвЂљР Р†Р ВµРЎР‚Р Т‘Р С‘Р В»Р В° Р С—РЎР‚Р С•Р Т‘Р В»Р ВµР Р…Р С‘Р Вµ Р Т‘Р С•Р С–Р С•Р Р†Р С•РЎР‚Р В° ${hostName} РІвЂ вЂќ ${guestName}.`,
         countryId: voterId,
         priority: 'low',
       });
@@ -3292,7 +3835,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         applyDiplomacyAgreement(renewedAgreement);
         addEvent({
           category: 'diplomacy',
-          message: `Р”РѕРіРѕРІРѕСЂ ${hostName} в†” ${guestName} РїСЂРѕРґР»РµРЅ.`,
+          message: `Р вЂќР С•Р С–Р С•Р Р†Р С•РЎР‚ ${hostName} РІвЂ вЂќ ${guestName} Р С—РЎР‚Р С•Р Т‘Р В»Р ВµР Р….`,
           countryId: renewedAgreement.hostCountryId,
           priority: 'low',
         });
@@ -3346,7 +3889,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${toName} РїСЂРёРЅСЏР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName}.`,
+      message: `${toName} Р С—РЎР‚Р С‘Р Р…РЎРЏР В»Р В° Р С—РЎР‚Р ВµР Т‘Р В»Р С•Р В¶Р ВµР Р…Р С‘Р Вµ Р Т‘Р С•Р С–Р С•Р Р†Р С•РЎР‚Р В° Р С•РЎвЂљ ${fromName}.`,
       countryId: proposal.toCountryId,
       priority: 'low',
     });
@@ -3370,7 +3913,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           ?.name ?? proposal.agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `${deciderName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРѕРґР»РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° ${hostName} в†” ${guestName}.`,
+        message: `${deciderName} Р С•РЎвЂљР С”Р В»Р С•Р Р…Р С‘Р В»Р В° Р С—РЎР‚Р С•Р Т‘Р В»Р ВµР Р…Р С‘Р Вµ Р Т‘Р С•Р С–Р С•Р Р†Р С•РЎР‚Р В° ${hostName} РІвЂ вЂќ ${guestName}.`,
         countryId: deciderId,
         priority: 'low',
       });
@@ -3384,7 +3927,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${toName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName}.`,
+      message: `${toName} Р С•РЎвЂљР С”Р В»Р С•Р Р…Р С‘Р В»Р В° Р С—РЎР‚Р ВµР Т‘Р В»Р С•Р В¶Р ВµР Р…Р С‘Р Вµ Р Т‘Р С•Р С–Р С•Р Р†Р С•РЎР‚Р В° Р С•РЎвЂљ ${fromName}.`,
       countryId: proposal.toCountryId,
       priority: 'low',
     });
@@ -3404,7 +3947,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${fromName} РѕС‚РѕР·РІР°Р»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РґР»СЏ ${toName}.`,
+      message: `${fromName} Р С•РЎвЂљР С•Р В·Р Р†Р В°Р В»Р В° Р С—РЎР‚Р ВµР Т‘Р В»Р С•Р В¶Р ВµР Р…Р С‘Р Вµ Р Т‘Р С•Р С–Р С•Р Р†Р С•РЎР‚Р В° Р Т‘Р В»РЎРЏ ${toName}.`,
       countryId: proposal.fromCountryId,
       priority: 'low',
     });
@@ -3422,7 +3965,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `Р”РѕРіРѕРІРѕСЂ ${hostName} в†’ ${guestName} РѕС‚РјРµРЅС‘РЅ.`,
+        message: `Р вЂќР С•Р С–Р С•Р Р†Р С•РЎР‚ ${hostName} РІвЂ вЂ™ ${guestName} Р С•РЎвЂљР СР ВµР Р…РЎвЂР Р….`,
         countryId: agreement.hostCountryId,
         priority: 'low',
       });
@@ -3450,6 +3993,16 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     setBuildings((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, requirements } : item,
+      ),
+    );
+  };
+
+  const updateBuildingEconomy = (id: string, economy?: BuildingEconomy) => {
+    setBuildings((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, economy: normalizeBuildingEconomy(economy) }
+          : item,
       ),
     );
   };
@@ -3485,9 +4038,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     const ownerLabel =
       owner.type === 'state'
         ? countries.find((item) => item.id === owner.countryId)?.name ??
-          'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
+          'Р С–Р С•РЎРѓРЎС“Р Т‘Р В°РЎР‚РЎРѓРЎвЂљР Р†Р С•'
         : companies.find((item) => item.id === owner.companyId)?.name ??
-          'РєРѕРјРїР°РЅРёСЏ';
+          'Р С”Р С•Р СР С—Р В°Р Р…Р С‘РЎРЏ';
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId == null) return prev;
@@ -4034,7 +4587,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       progress[buildingId] = entries;
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РЅР°С‡Р°Р»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
+        message: `${country?.name ?? 'Р РЋРЎвЂљРЎР‚Р В°Р Р…Р В°'} Р Р…Р В°РЎвЂЎР В°Р В»Р В° РЎРѓРЎвЂљРЎР‚Р С•Р С‘РЎвЂљР ВµР В»РЎРЉРЎРѓРЎвЂљР Р†Р С• ${buildingName} Р Р† Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -4065,9 +4618,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       const ownerLabel =
         removed?.owner.type === 'state'
           ? countries.find((item) => item.id === removed?.owner.countryId)?.name ??
-            'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
+            'Р С–Р С•РЎРѓРЎС“Р Т‘Р В°РЎР‚РЎРѓРЎвЂљР Р†Р С•'
           : companies.find((item) => item.id === removed?.owner.companyId)?.name ??
-            'РєРѕРјРїР°РЅРёСЏ';
+            'Р С”Р С•Р СР С—Р В°Р Р…Р С‘РЎРЏ';
       if (entries.length > 0) {
         progress[buildingId] = entries;
       } else {
@@ -4075,7 +4628,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       }
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
+        message: `${country?.name ?? 'Р РЋРЎвЂљРЎР‚Р В°Р Р…Р В°'} Р С•РЎвЂљР СР ВµР Р…Р С‘Р В»Р В° РЎРѓРЎвЂљРЎР‚Р С•Р С‘РЎвЂљР ВµР В»РЎРЉРЎРѓРЎвЂљР Р†Р С• ${buildingName} Р Р† Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -4245,6 +4798,23 @@ const layerPaint: MapLayerPaint = useMemo(() => {
 
   const deleteResource = (id: string) => {
     setResources((prev) => prev.filter((r) => r.id !== id));
+    setBuildings((prev) =>
+      prev.map((building) => ({
+        ...building,
+        economy: normalizeBuildingEconomy({
+          ...(building.economy ?? {}),
+          extracts: (building.economy?.extracts ?? []).filter(
+            (item) => item.resourceId !== id,
+          ),
+          inputs: (building.economy?.inputs ?? []).filter(
+            (item) => item.resourceId !== id,
+          ),
+          outputs: (building.economy?.outputs ?? []).filter(
+            (item) => item.resourceId !== id,
+          ),
+        }),
+      })),
+    );
     setProvinces((prev) => {
       const next: ProvinceRecord = { ...prev };
       Object.values(next).forEach((province) => {
@@ -4253,9 +4823,33 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           delete nextAmounts[id];
           province.resourceAmounts = nextAmounts;
         }
+        if (province.buildingsBuilt?.length) {
+          province.buildingsBuilt = province.buildingsBuilt.map((entry) => {
+            const stock = { ...(entry.stockByResourceId ?? {}) };
+            if (id in stock) {
+              delete stock[id];
+              return { ...entry, stockByResourceId: stock };
+            }
+            return entry;
+          });
+        }
       });
       return next;
     });
+    setMarkets((prev) =>
+      prev.map((market) => {
+        const warehouse = { ...(market.warehouseByResourceId ?? {}) };
+        const marketStock = { ...(market.marketStockByResourceId ?? {}) };
+        if (!(id in warehouse) && !(id in marketStock)) return market;
+        delete warehouse[id];
+        delete marketStock[id];
+        return {
+          ...market,
+          warehouseByResourceId: warehouse,
+          marketStockByResourceId: marketStock,
+        };
+      }),
+    );
   };
 
   const setProvinceResourceAmount = (
@@ -4367,7 +4961,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                 );
                 const province = provinces[id];
                 if (!province) {
-                  setRoutePlannerHint('Провинция не найдена в данных карты.');
+                  setRoutePlannerHint('РџСЂРѕРІРёРЅС†РёСЏ РЅРµ РЅР°Р№РґРµРЅР° РІ РґР°РЅРЅС‹С… РєР°СЂС‚С‹.');
                   return prev;
                 }
                 if (!activeCountryId) {
@@ -4447,7 +5041,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                 }
                 if (prev.includes(id)) {
                   setRoutePlannerHint(
-                    'Провинция уже есть в этом маршруте. Выберите другую соседнюю.',
+                    'РџСЂРѕРІРёРЅС†РёСЏ СѓР¶Рµ РµСЃС‚СЊ РІ СЌС‚РѕРј РјР°СЂС€СЂСѓС‚Рµ. Р’С‹Р±РµСЂРёС‚Рµ РґСЂСѓРіСѓСЋ СЃРѕСЃРµРґРЅСЋСЋ.',
                   );
                   return prev;
                 }
@@ -4456,7 +5050,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                   const neighbors = provinces[lastId]?.adjacentProvinceIds ?? [];
                   if (!neighbors.includes(id)) {
                     setRoutePlannerHint(
-                      'Нельзя перескочить через провинцию: выберите соседнюю.',
+                      'РќРµР»СЊР·СЏ РїРµСЂРµСЃРєРѕС‡РёС‚СЊ С‡РµСЂРµР· РїСЂРѕРІРёРЅС†РёСЋ: РІС‹Р±РµСЂРёС‚Рµ СЃРѕСЃРµРґРЅСЋСЋ.',
                     );
                     return prev;
                   }
@@ -4526,7 +5120,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
               ?????????, ??? ????????, ????? ????????? ??? ?????????.
             </div>
             <div className="text-cyan-100/75 text-[11px] leading-tight mt-1">
-              Стоимость: {logisticsDraftTotalCost} (участков: {Math.max(0, logisticsRouteProvinceIds.length - 1)} x {logisticsDraftSegmentCost})
+              РЎС‚РѕРёРјРѕСЃС‚СЊ: {logisticsDraftTotalCost} (СѓС‡Р°СЃС‚РєРѕРІ: {Math.max(0, logisticsRouteProvinceIds.length - 1)} x {logisticsDraftSegmentCost})
             </div>
             {routePlannerHint && (
               <div className="text-amber-200/90 text-[11px] leading-tight mt-1">
@@ -4537,11 +5131,11 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           <button
             onClick={() => {
               if (!logisticsRouteDraft || logisticsRouteProvinceIds.length < 2) {
-                setRoutePlannerHint('Для строительства нужно выбрать минимум 2 провинции.');
+                setRoutePlannerHint('Р”Р»СЏ СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР° РЅСѓР¶РЅРѕ РІС‹Р±СЂР°С‚СЊ РјРёРЅРёРјСѓРј 2 РїСЂРѕРІРёРЅС†РёРё.');
                 return;
               }
               if (!activeCountryId) {
-                setRoutePlannerHint('Выберите активную страну для строительства.');
+                setRoutePlannerHint('Р’С‹Р±РµСЂРёС‚Рµ Р°РєС‚РёРІРЅСѓСЋ СЃС‚СЂР°РЅСѓ РґР»СЏ СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР°.');
                 return;
               }
               const draftRouteType = logistics.routeTypes.find(
@@ -4577,7 +5171,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                   countries.find((item) => item.id === blockedHostId)?.name ??
                   blockedHostId;
                 setRoutePlannerHint(
-                  `Превышены лимиты или нет прав логистического договора для страны ${blockedCountryName}.`,
+                  `РџСЂРµРІС‹С€РµРЅС‹ Р»РёРјРёС‚С‹ РёР»Рё РЅРµС‚ РїСЂР°РІ Р»РѕРіРёСЃС‚РёС‡РµСЃРєРѕРіРѕ РґРѕРіРѕРІРѕСЂР° РґР»СЏ СЃС‚СЂР°РЅС‹ ${blockedCountryName}.`,
                 );
                 return;
               }
@@ -4658,17 +5252,17 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="w-[360px] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-white/10 text-white text-base font-semibold">
-              РџСЂРµРґР»РѕР¶РµРЅРёРµ РѕС‚РїСЂР°РІР»РµРЅРѕ
+              Р СџРЎР‚Р ВµР Т‘Р В»Р С•Р В¶Р ВµР Р…Р С‘Р Вµ Р С•РЎвЂљР С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…Р С•
             </div>
             <div className="px-5 py-4 text-white/70 text-sm">
-              РџСЂРµРґР»РѕР¶РµРЅРёРµ РЅР°РїСЂР°РІР»РµРЅРѕ СЃС‚СЂР°РЅРµ {diplomacySentNotice.toCountryName}.
+              Р СџРЎР‚Р ВµР Т‘Р В»Р С•Р В¶Р ВµР Р…Р С‘Р Вµ Р Р…Р В°Р С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…Р С• РЎРѓРЎвЂљРЎР‚Р В°Р Р…Р Вµ {diplomacySentNotice.toCountryName}.
             </div>
             <div className="px-5 py-4 border-t border-white/10 flex justify-end">
               <button
                 onClick={() => setDiplomacySentNotice({ open: false, toCountryName: '' })}
                 className="h-9 px-4 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm"
               >
-                РћРє
+                Р С›Р С”
               </button>
             </div>
           </div>
@@ -5043,12 +5637,12 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             const ownerLabel =
               removed?.owner.type === 'state'
                 ? countries.find((item) => item.id === removed?.owner.countryId)
-                    ?.name ?? 'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
+                    ?.name ?? 'Р С–Р С•РЎРѓРЎС“Р Т‘Р В°РЎР‚РЎРѓРЎвЂљР Р†Р С•'
                 : companies.find((item) => item.id === removed?.owner.companyId)
-                    ?.name ?? 'РєРѕРјРїР°РЅРёСЏ';
+                    ?.name ?? 'Р С”Р С•Р СР С—Р В°Р Р…Р С‘РЎРЏ';
             addEvent({
               category: 'economy',
-              message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
+              message: `${country?.name ?? 'Р РЋРЎвЂљРЎР‚Р В°Р Р…Р В°'} Р С•РЎвЂљР СР ВµР Р…Р С‘Р В»Р В° РЎРѓРЎвЂљРЎР‚Р С•Р С‘РЎвЂљР ВµР В»РЎРЉРЎРѓРЎвЂљР Р†Р С• ${buildingName} Р Р† Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${provinceId} (${ownerLabel}).`,
               countryId: province.ownerCountryId,
               priority: 'low',
             });
@@ -5071,7 +5665,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           if (available < demolishCost) {
             addEvent({
               category: 'economy',
-              message: `РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РѕС‡РєРѕРІ СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР° РґР»СЏ СЃРЅРѕСЃР° Р·РґР°РЅРёСЏ РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
+              message: `Р СњР ВµР Т‘Р С•РЎРѓРЎвЂљР В°РЎвЂљР С•РЎвЂЎР Р…Р С• Р С•РЎвЂЎР С”Р С•Р Р† РЎРѓРЎвЂљРЎР‚Р С•Р С‘РЎвЂљР ВµР В»РЎРЉРЎРѓРЎвЂљР Р†Р В° Р Т‘Р В»РЎРЏ РЎРѓР Р…Р С•РЎРѓР В° Р В·Р Т‘Р В°Р Р…Р С‘РЎРЏ Р Р† Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${provinceId}.`,
               countryId: country?.id,
               priority: 'low',
             });
@@ -5104,7 +5698,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             const buildingName = building?.name ?? buildingId;
             addEvent({
               category: 'economy',
-              message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} СЃРЅРµСЃР»Р° ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (СЃС‚РѕРёРјРѕСЃС‚СЊ: ${demolishCost}).`,
+              message: `${country?.name ?? 'Р РЋРЎвЂљРЎР‚Р В°Р Р…Р В°'} РЎРѓР Р…Р ВµРЎРѓР В»Р В° ${buildingName} Р Р† Р С—РЎР‚Р С•Р Р†Р С‘Р Р…РЎвЂ Р С‘Р С‘ ${provinceId} (РЎРѓРЎвЂљР С•Р С‘Р СР С•РЎРѓРЎвЂљРЎРЉ: ${demolishCost}).`,
               countryId: province.ownerCountryId,
               priority: 'low',
             });
@@ -5240,6 +5834,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onUpdateBuildingIcon={updateBuildingIcon}
         onUpdateBuildingIndustry={updateBuildingIndustry}
         onUpdateBuildingRequirements={updateBuildingRequirements}
+        onUpdateBuildingEconomy={updateBuildingEconomy}
         onUpdateClimateColor={(id, color) =>
           updateTraitColor(setClimates, id, color)
         }
