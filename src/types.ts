@@ -151,6 +151,7 @@ export type Market = {
   logoDataUrl?: string;
   memberCountryIds: string[];
   warehouseByResourceId?: Record<string, number>;
+  priceByResourceId?: Record<string, number>;
   capitalProvinceId?: string;
   capitalLostSinceTurn?: number;
   createdTurn?: number;
@@ -164,6 +165,9 @@ export type Trait = {
   color: string;
   iconDataUrl?: string;
   resourceCategoryId?: string;
+  basePrice?: number;
+  minMarketPrice?: number;
+  maxMarketPrice?: number;
 };
 
 export type ResourceCategory = {
@@ -200,6 +204,10 @@ export type BuildingDefinition = {
   cost: number;
   iconDataUrl?: string;
   industryId?: string;
+  startingDucats?: number;
+  consumptionByResourceId?: Record<string, number>;
+  extractionByResourceId?: Record<string, number>;
+  productionByResourceId?: Record<string, number>;
   requirements?: {
     resources?: TraitCriteria;
     buildings?: Record<
@@ -355,6 +363,15 @@ export type ConstructionEntry = {
 export type BuiltBuilding = {
   buildingId: string;
   owner: BuildingOwner;
+  warehouseByResourceId?: Record<string, number>;
+  ducats?: number;
+  lastProductivity?: number;
+  lastPurchaseNeedByResourceId?: Record<string, number>;
+  lastPurchasedByResourceId?: Record<string, number>;
+  lastPurchaseCostDucats?: number;
+  lastConsumedByResourceId?: Record<string, number>;
+  lastExtractedByResourceId?: Record<string, number>;
+  lastProducedByResourceId?: Record<string, number>;
 };
 
 export type EventCategory =

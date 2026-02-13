@@ -42,6 +42,7 @@ import type {
   Industry,
   Company,
   BuildingOwner,
+  BuiltBuilding,
   TraitCriteria,
   RequirementNode,
   DiplomacyAgreement,
@@ -66,6 +67,68 @@ const createId = () =>
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const DEFAULT_RESOURCE_BASE_PRICE = 1;
+const MARKET_PRICE_SMOOTHING = 0.15;
+
+const normalizePositiveNumber = (value: unknown): number | undefined => {
+  if (!Number.isFinite(value)) return undefined;
+  const safe = Number(value);
+  return safe > 0 ? safe : undefined;
+};
+
+const normalizeResourceMap = (
+  value?: Record<string, number>,
+): Record<string, number> | undefined => {
+  if (!value) return undefined;
+  const next = Object.fromEntries(
+    Object.entries(value).filter(
+      ([resourceId, amount]) =>
+        Boolean(resourceId) &&
+        Number.isFinite(amount) &&
+        Number(amount) > 0,
+    ),
+  );
+  return Object.keys(next).length > 0 ? next : undefined;
+};
+
+const normalizeResourcePrice = (value: unknown, fallback = DEFAULT_RESOURCE_BASE_PRICE) => {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0.01, Number(value));
+};
+
+const normalizeOptionalResourcePrice = (value: unknown): number | undefined => {
+  if (!Number.isFinite(value)) return undefined;
+  const safe = Math.max(0.01, Number(value));
+  return safe > 0 ? safe : undefined;
+};
+
+const normalizeBuildingDefinitions = (
+  list: BuildingDefinition[],
+): BuildingDefinition[] =>
+  list.map((building) => ({
+    ...building,
+    startingDucats: normalizePositiveNumber(building.startingDucats),
+    consumptionByResourceId: normalizeResourceMap(building.consumptionByResourceId),
+    extractionByResourceId: normalizeResourceMap(building.extractionByResourceId),
+    productionByResourceId: normalizeResourceMap(building.productionByResourceId),
+  }));
+
+const normalizeResources = (list: Trait[]): Trait[] =>
+  list.map((resource) => {
+    const basePrice = normalizeResourcePrice(resource.basePrice);
+    const minMarketPrice = normalizeOptionalResourcePrice(resource.minMarketPrice);
+    const maxMarketPrice = normalizeOptionalResourcePrice(resource.maxMarketPrice);
+    const boundedMin =
+      minMarketPrice == null ? undefined : Math.min(minMarketPrice, maxMarketPrice ?? minMarketPrice);
+    const boundedMax =
+      maxMarketPrice == null ? undefined : Math.max(maxMarketPrice, boundedMin ?? maxMarketPrice);
+    return {
+      ...resource,
+      basePrice,
+      minMarketPrice: boundedMin,
+      maxMarketPrice: boundedMax,
+    };
+  });
 
 const radiationColor = (value: number) => {
   const t = clamp01(value / 100);
@@ -95,9 +158,52 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
     } else if (Array.isArray(province.buildingsBuilt)) {
       const first = province.buildingsBuilt[0] as any;
       if (first && typeof first === 'object' && 'buildingId' in first) {
-        // already in new format
+        province.buildingsBuilt = (province.buildingsBuilt as BuiltBuilding[]).map(
+          (entry) => {
+            const owner =
+              entry.owner.type === 'state'
+                ? {
+                    type: 'state' as const,
+                    countryId: entry.owner.countryId ?? province.ownerCountryId ?? 'state',
+                  }
+                : entry.owner;
+            return {
+              ...entry,
+              owner,
+              warehouseByResourceId: normalizeResourceMap(entry.warehouseByResourceId),
+              ducats:
+                Number.isFinite(entry.ducats) && Number(entry.ducats) > 0
+                  ? Number(entry.ducats)
+                  : undefined,
+              lastProductivity:
+                Number.isFinite(entry.lastProductivity)
+                  ? clamp01(Number(entry.lastProductivity))
+                  : 1,
+              lastPurchaseNeedByResourceId: normalizeResourceMap(
+                entry.lastPurchaseNeedByResourceId,
+              ),
+              lastPurchasedByResourceId: normalizeResourceMap(
+                entry.lastPurchasedByResourceId,
+              ),
+              lastPurchaseCostDucats:
+                Number.isFinite(entry.lastPurchaseCostDucats) &&
+                Number(entry.lastPurchaseCostDucats) >= 0
+                  ? Number(entry.lastPurchaseCostDucats)
+                  : 0,
+              lastConsumedByResourceId: normalizeResourceMap(
+                entry.lastConsumedByResourceId,
+              ),
+              lastExtractedByResourceId: normalizeResourceMap(
+                entry.lastExtractedByResourceId,
+              ),
+              lastProducedByResourceId: normalizeResourceMap(
+                entry.lastProducedByResourceId,
+              ),
+            };
+          },
+        );
       } else {
-        const converted: { buildingId: string; owner: BuildingOwner }[] = [];
+        const converted: BuiltBuilding[] = [];
         (province.buildingsBuilt as unknown as string[]).forEach((id) => {
           converted.push({
             buildingId: id,
@@ -105,12 +211,21 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
               type: 'state',
               countryId: province.ownerCountryId ?? 'state',
             },
+            warehouseByResourceId: undefined,
+            ducats: undefined,
+            lastProductivity: 1,
+            lastPurchaseNeedByResourceId: undefined,
+            lastPurchasedByResourceId: undefined,
+            lastPurchaseCostDucats: 0,
+            lastConsumedByResourceId: undefined,
+            lastExtractedByResourceId: undefined,
+            lastProducedByResourceId: undefined,
           });
         });
         province.buildingsBuilt = converted;
       }
     } else {
-      const converted: { buildingId: string; owner: BuildingOwner }[] = [];
+      const converted: BuiltBuilding[] = [];
       Object.entries(province.buildingsBuilt as unknown as Record<string, number>)
         .forEach(([id, count]) => {
           const safe = Math.max(0, Math.floor(count ?? 0));
@@ -121,6 +236,15 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
                 type: 'state',
                 countryId: province.ownerCountryId ?? 'state',
               },
+              warehouseByResourceId: undefined,
+              ducats: undefined,
+              lastProductivity: 1,
+              lastPurchaseNeedByResourceId: undefined,
+              lastPurchasedByResourceId: undefined,
+              lastPurchaseCostDucats: 0,
+              lastConsumedByResourceId: undefined,
+              lastExtractedByResourceId: undefined,
+              lastProducedByResourceId: undefined,
             });
           }
         });
@@ -698,6 +822,12 @@ function App() {
           logoDataUrl: payload.logoDataUrl,
           memberCountryIds: members,
           warehouseByResourceId: {},
+          priceByResourceId: Object.fromEntries(
+            resources.map((resource) => [
+              resource.id,
+              normalizeResourcePrice(resource.basePrice),
+            ]),
+          ),
           capitalProvinceId: payload.capitalProvinceId,
           capitalLostSinceTurn: undefined,
           createdTurn: turn,
@@ -1472,6 +1602,344 @@ function App() {
     );
   };
 
+  const getOwnerCountryIdForBuilding = (
+    owner: BuildingOwner,
+    provinceOwnerCountryId?: string,
+  ): string | undefined =>
+    owner.type === 'state'
+      ? owner.countryId || provinceOwnerCountryId
+      : companies.find((company) => company.id === owner.companyId)?.countryId;
+
+  const applyBuildingEconomyTurn = () => {
+    type BuildingRuntime = {
+      provinceId: string;
+      provinceOwnerCountryId?: string;
+      entry: BuiltBuilding;
+      definition?: BuildingDefinition;
+      ownerCountryId?: string;
+    };
+
+    const definitionById = new Map(buildings.map((building) => [building.id, building]));
+    const resourceById = new Map(resources.map((resource) => [resource.id, resource]));
+    const marketByCountry = new Map<string, Market>();
+    markets.forEach((market) => {
+      market.memberCountryIds.forEach((countryId) => {
+        marketByCountry.set(countryId, market);
+      });
+    });
+    const demandByMarketAndResource = new Map<string, Record<string, number>>();
+    const factualSupplyByMarketAndResource = new Map<string, Record<string, number>>();
+    Object.values(provinces).forEach((province) => {
+      if (!province.ownerCountryId) return;
+      const market = marketByCountry.get(province.ownerCountryId);
+      if (!market) return;
+      const demand = demandByMarketAndResource.get(market.id) ?? {};
+      const factualSupply = factualSupplyByMarketAndResource.get(market.id) ?? {};
+      (province.buildingsBuilt ?? []).forEach((entry) => {
+        const definition = definitionById.get(entry.buildingId);
+        Object.entries(definition?.consumptionByResourceId ?? {}).forEach(
+          ([resourceId, amount]) => {
+            if (!Number.isFinite(amount) || amount <= 0) return;
+            demand[resourceId] = Math.max(0, (demand[resourceId] ?? 0) + amount);
+          },
+        );
+        Object.entries(entry.lastExtractedByResourceId ?? {}).forEach(
+          ([resourceId, amount]) => {
+            if (!Number.isFinite(amount) || amount <= 0) return;
+            factualSupply[resourceId] = Math.max(
+              0,
+              (factualSupply[resourceId] ?? 0) + amount,
+            );
+          },
+        );
+        Object.entries(entry.lastProducedByResourceId ?? {}).forEach(
+          ([resourceId, amount]) => {
+            if (!Number.isFinite(amount) || amount <= 0) return;
+            factualSupply[resourceId] = Math.max(
+              0,
+              (factualSupply[resourceId] ?? 0) + amount,
+            );
+          },
+        );
+      });
+      demandByMarketAndResource.set(market.id, demand);
+      factualSupplyByMarketAndResource.set(market.id, factualSupply);
+    });
+    const nextMarketPricesByMarketId = new Map<string, Record<string, number>>();
+    markets.forEach((market) => {
+      const demand = demandByMarketAndResource.get(market.id) ?? {};
+      const factualSupply = factualSupplyByMarketAndResource.get(market.id) ?? {};
+      const nextPrices: Record<string, number> = {};
+      resources.forEach((resource) => {
+        const basePrice = normalizeResourcePrice(resource.basePrice, DEFAULT_RESOURCE_BASE_PRICE);
+        const currentPrice = normalizeResourcePrice(
+          market.priceByResourceId?.[resource.id],
+          basePrice,
+        );
+        const resourceDemand = Math.max(0, demand[resource.id] ?? 0);
+        const resourceSupply = Math.max(0, factualSupply[resource.id] ?? 0);
+        const ratio = (resourceDemand + 1) / (resourceSupply + 1);
+        let targetPrice = basePrice * ratio;
+        if (resource.minMarketPrice != null) {
+          targetPrice = Math.max(targetPrice, resource.minMarketPrice);
+        }
+        if (resource.maxMarketPrice != null) {
+          targetPrice = Math.min(targetPrice, resource.maxMarketPrice);
+        }
+        let nextPrice = currentPrice + (targetPrice - currentPrice) * MARKET_PRICE_SMOOTHING;
+        if (resource.minMarketPrice != null) {
+          nextPrice = Math.max(nextPrice, resource.minMarketPrice);
+        }
+        if (resource.maxMarketPrice != null) {
+          nextPrice = Math.min(nextPrice, resource.maxMarketPrice);
+        }
+        nextPrices[resource.id] = normalizeResourcePrice(nextPrice, basePrice);
+      });
+      nextMarketPricesByMarketId.set(market.id, nextPrices);
+    });
+    if (nextMarketPricesByMarketId.size > 0) {
+      setMarkets((prev) =>
+        prev.map((market) => ({
+          ...market,
+          priceByResourceId:
+            nextMarketPricesByMarketId.get(market.id) ??
+            market.priceByResourceId ??
+            {},
+        })),
+      );
+    }
+
+    setProvinces((prev) => {
+      const hasBuiltBuildings = Object.values(prev).some(
+        (province) => (province.buildingsBuilt?.length ?? 0) > 0,
+      );
+      if (!hasBuiltBuildings) return prev;
+
+      const next: ProvinceRecord = {};
+      const runtime: BuildingRuntime[] = [];
+
+      Object.entries(prev).forEach(([provinceId, province]) => {
+        const nextBuilt = (province.buildingsBuilt ?? []).map((entry) => {
+          const definition = definitionById.get(entry.buildingId);
+          const startingDucats = normalizePositiveNumber(definition?.startingDucats) ?? 0;
+          return {
+            ...entry,
+            owner:
+              entry.owner.type === 'state'
+                ? {
+                    type: 'state' as const,
+                    countryId: entry.owner.countryId || province.ownerCountryId || 'state',
+                  }
+                : entry.owner,
+            warehouseByResourceId: {
+              ...(normalizeResourceMap(entry.warehouseByResourceId) ?? {}),
+            },
+            ducats:
+              Number.isFinite(entry.ducats) && Number(entry.ducats) >= 0
+                ? Number(entry.ducats)
+                : startingDucats,
+            lastProductivity:
+              Number.isFinite(entry.lastProductivity)
+                ? clamp01(Number(entry.lastProductivity))
+                : 1,
+            lastPurchaseNeedByResourceId: undefined,
+            lastPurchasedByResourceId: undefined,
+            lastPurchaseCostDucats: 0,
+            lastConsumedByResourceId: {},
+            lastExtractedByResourceId: {},
+            lastProducedByResourceId: {},
+          };
+        });
+
+        next[provinceId] = {
+          ...province,
+          buildingsBuilt: nextBuilt,
+        };
+
+        nextBuilt.forEach((entry) => {
+          const ownerCountryId = getOwnerCountryIdForBuilding(
+            entry.owner,
+            province.ownerCountryId,
+          );
+          runtime.push({
+            provinceId,
+            provinceOwnerCountryId: province.ownerCountryId,
+            entry,
+            definition: definitionById.get(entry.buildingId),
+            ownerCountryId,
+          });
+        });
+      });
+
+      runtime.forEach((buyer) => {
+        const consumption = normalizeResourceMap(buyer.definition?.consumptionByResourceId);
+        const extraction = normalizeResourceMap(buyer.definition?.extractionByResourceId);
+        const production = normalizeResourceMap(buyer.definition?.productionByResourceId);
+        const consumptionEntries = Object.entries(consumption ?? {});
+        const buyerWarehouse = buyer.entry.warehouseByResourceId ?? {};
+        const buyerMarket = buyer.ownerCountryId
+          ? marketByCountry.get(buyer.ownerCountryId)
+          : undefined;
+        const purchaseNeedByResourceId: Record<string, number> = {};
+        const actualPurchasedByResourceId: Record<string, number> = {};
+        let purchaseCostDucats = 0;
+
+        if (consumptionEntries.length > 0 && buyerMarket) {
+          consumptionEntries.forEach(([resourceId, requiredAmount]) => {
+            let shortage = Math.max(
+              0,
+              requiredAmount - Math.max(0, buyerWarehouse[resourceId] ?? 0),
+            );
+            if (shortage > 0) {
+              purchaseNeedByResourceId[resourceId] = shortage;
+            }
+            if (shortage <= 0) return;
+
+            for (const seller of runtime) {
+              if (seller === buyer) continue;
+              if (
+                !seller.provinceOwnerCountryId ||
+                !buyerMarket.memberCountryIds.includes(seller.provinceOwnerCountryId)
+              ) {
+                continue;
+              }
+              if (shortage <= 0) break;
+
+              const sellerWarehouse = seller.entry.warehouseByResourceId ?? {};
+              const sellerStock = Math.max(0, sellerWarehouse[resourceId] ?? 0);
+              if (sellerStock <= 0) continue;
+              const buyerMarketPrices =
+                nextMarketPricesByMarketId.get(buyerMarket.id) ??
+                buyerMarket.priceByResourceId ??
+                {};
+              const unitPrice = normalizeResourcePrice(
+                buyerMarketPrices[resourceId],
+                normalizeResourcePrice(resourceById.get(resourceId)?.basePrice),
+              );
+
+              const buyerFunds = Math.max(0, buyer.entry.ducats ?? 0);
+              const affordable = Math.floor(buyerFunds / unitPrice);
+              if (affordable <= 0) break;
+
+              const amount = Math.min(shortage, sellerStock, affordable);
+              if (amount <= 0) continue;
+
+              buyerWarehouse[resourceId] = Math.max(
+                0,
+                (buyerWarehouse[resourceId] ?? 0) + amount,
+              );
+              sellerWarehouse[resourceId] = Math.max(
+                0,
+                (sellerWarehouse[resourceId] ?? 0) - amount,
+              );
+              if (sellerWarehouse[resourceId] <= 0) {
+                delete sellerWarehouse[resourceId];
+              }
+              seller.entry.warehouseByResourceId = sellerWarehouse;
+              buyer.entry.ducats = Math.max(
+                0,
+                (buyer.entry.ducats ?? 0) - amount * unitPrice,
+              );
+              actualPurchasedByResourceId[resourceId] = Math.max(
+                0,
+                (actualPurchasedByResourceId[resourceId] ?? 0) + amount,
+              );
+              purchaseCostDucats += amount * unitPrice;
+              seller.entry.ducats = Math.max(
+                0,
+                (seller.entry.ducats ?? 0) + amount * unitPrice,
+              );
+              shortage -= amount;
+            }
+          });
+        }
+
+        let productivity = 1;
+        const actualConsumedByResourceId: Record<string, number> = {};
+        const actualExtractedByResourceId: Record<string, number> = {};
+        const actualProducedByResourceId: Record<string, number> = {};
+        if (consumptionEntries.length > 0) {
+          productivity = consumptionEntries.reduce((minRatio, [resourceId, requiredAmount]) => {
+            if (requiredAmount <= 0) return minRatio;
+            const available = Math.max(0, buyerWarehouse[resourceId] ?? 0);
+            return Math.min(minRatio, available / requiredAmount);
+          }, 1);
+          productivity = Number.isFinite(productivity) ? clamp01(productivity) : 0;
+
+          consumptionEntries.forEach(([resourceId, requiredAmount]) => {
+            const amountToConsume = requiredAmount * productivity;
+            if (amountToConsume <= 0) return;
+            actualConsumedByResourceId[resourceId] = amountToConsume;
+            const remaining = Math.max(0, (buyerWarehouse[resourceId] ?? 0) - amountToConsume);
+            if (remaining > 0) {
+              buyerWarehouse[resourceId] = remaining;
+            } else {
+              delete buyerWarehouse[resourceId];
+            }
+          });
+        }
+
+        buyer.entry.lastProductivity = productivity;
+        buyer.entry.lastPurchaseNeedByResourceId = normalizeResourceMap(
+          purchaseNeedByResourceId,
+        );
+        buyer.entry.lastPurchasedByResourceId = normalizeResourceMap(
+          actualPurchasedByResourceId,
+        );
+        buyer.entry.lastPurchaseCostDucats = Math.max(0, purchaseCostDucats);
+        buyer.entry.lastConsumedByResourceId = normalizeResourceMap(actualConsumedByResourceId);
+        buyer.entry.warehouseByResourceId = buyerWarehouse;
+        if (productivity <= 0) {
+          buyer.entry.lastExtractedByResourceId = undefined;
+          buyer.entry.lastProducedByResourceId = undefined;
+          return;
+        }
+
+        const provinceForExtraction = next[buyer.provinceId];
+        const provinceResourceAmounts = {
+          ...(provinceForExtraction.resourceAmounts ?? {}),
+        };
+        let provinceAmountsChanged = false;
+        Object.entries(extraction ?? {}).forEach(([resourceId, baseAmount]) => {
+          const plannedExtraction = baseAmount * productivity;
+          if (plannedExtraction <= 0) return;
+          const provinceStock = Math.max(0, provinceResourceAmounts[resourceId] ?? 0);
+          const extracted = Math.min(plannedExtraction, provinceStock);
+          if (extracted <= 0) return;
+          actualExtractedByResourceId[resourceId] = extracted;
+          buyerWarehouse[resourceId] = Math.max(
+            0,
+            (buyerWarehouse[resourceId] ?? 0) + extracted,
+          );
+          const provinceRemaining = Math.max(0, provinceStock - extracted);
+          if (provinceRemaining > 0) {
+            provinceResourceAmounts[resourceId] = provinceRemaining;
+          } else {
+            delete provinceResourceAmounts[resourceId];
+          }
+          provinceAmountsChanged = true;
+        });
+        if (provinceAmountsChanged) {
+          provinceForExtraction.resourceAmounts = provinceResourceAmounts;
+        }
+
+        Object.entries(production ?? {}).forEach(([resourceId, baseAmount]) => {
+          const produced = baseAmount * productivity;
+          if (produced <= 0) return;
+          actualProducedByResourceId[resourceId] = produced;
+          buyerWarehouse[resourceId] = Math.max(
+            0,
+            (buyerWarehouse[resourceId] ?? 0) + produced,
+          );
+        });
+        buyer.entry.lastExtractedByResourceId = normalizeResourceMap(actualExtractedByResourceId);
+        buyer.entry.lastProducedByResourceId = normalizeResourceMap(actualProducedByResourceId);
+      });
+
+      return next;
+    });
+  };
+
   const endTurn = () => {
     if (countries.length === 0) return;
     const currentIndex = countries.findIndex(
@@ -1492,6 +1960,7 @@ function App() {
         applyColonizationTurn(country.id);
         applyConstructionTurn(country.id);
       });
+      applyBuildingEconomyTurn();
     }
     setActiveCountryId(nextId);
     if (wraps) {
@@ -1846,7 +2315,7 @@ function App() {
     const validResourceCategoryIds = new Set(
       loadedResourceCategories.map((category) => category.id),
     );
-    setResources(
+    const normalizedLoadedResources = normalizeResources(
       (save.data.resources ?? resources).map((item) => ({
         ...item,
         resourceCategoryId:
@@ -1856,7 +2325,8 @@ function App() {
             : undefined,
       })),
     );
-    setBuildings(save.data.buildings ?? buildings);
+    setResources(normalizedLoadedResources);
+    setBuildings(normalizeBuildingDefinitions(save.data.buildings ?? buildings));
     setIndustries(save.data.industries ?? industries);
     setCompanies(save.data.companies ?? companies);
     setDiplomacyAgreements(save.data.diplomacy ?? []);
@@ -1869,8 +2339,12 @@ function App() {
       const validProvinceIds = new Set(
         Object.keys(save.data.provinces ?? {}),
       );
-      const validResourceIds = new Set(
-        (save.data.resources ?? []).map((resource) => resource.id),
+      const validResourceIds = new Set(normalizedLoadedResources.map((resource) => resource.id));
+      const resourceBasePriceById = new Map(
+        normalizedLoadedResources.map((resource) => [
+          resource.id,
+          normalizeResourcePrice(resource.basePrice),
+        ]),
       );
       return loaded
         .map((market) => {
@@ -1904,6 +2378,15 @@ function App() {
                   Number.isFinite(amount) &&
                   Number(amount) > 0,
               ),
+            ),
+            priceByResourceId: Object.fromEntries(
+              normalizedLoadedResources.map((resource) => [
+                resource.id,
+                normalizeResourcePrice(
+                  market.priceByResourceId?.[resource.id],
+                  resourceBasePriceById.get(resource.id) ?? DEFAULT_RESOURCE_BASE_PRICE,
+                ),
+              ]),
             ),
             capitalProvinceId:
               market.capitalProvinceId &&
@@ -3027,11 +3510,26 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     cost: number,
     iconDataUrl?: string,
     industryId?: string,
+    startingDucats?: number,
+    consumptionByResourceId?: Record<string, number>,
+    extractionByResourceId?: Record<string, number>,
+    productionByResourceId?: Record<string, number>,
     requirements?: BuildingDefinition['requirements'],
   ) => {
     setBuildings((prev) => [
       ...prev,
-      { id: createId(), name, cost, iconDataUrl, industryId, requirements },
+      {
+        id: createId(),
+        name,
+        cost,
+        iconDataUrl,
+        industryId,
+        startingDucats: normalizePositiveNumber(startingDucats),
+        consumptionByResourceId: normalizeResourceMap(consumptionByResourceId),
+        extractionByResourceId: normalizeResourceMap(extractionByResourceId),
+        productionByResourceId: normalizeResourceMap(productionByResourceId),
+        requirements,
+      },
     ]);
   };
 
@@ -3450,6 +3948,37 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     setBuildings((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, requirements } : item,
+      ),
+    );
+  };
+
+  const updateBuildingEconomy = (
+    id: string,
+    patch: Pick<
+      BuildingDefinition,
+      | 'startingDucats'
+      | 'consumptionByResourceId'
+      | 'extractionByResourceId'
+      | 'productionByResourceId'
+    >,
+  ) => {
+    setBuildings((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              startingDucats: normalizePositiveNumber(patch.startingDucats),
+              consumptionByResourceId: normalizeResourceMap(
+                patch.consumptionByResourceId,
+              ),
+              extractionByResourceId: normalizeResourceMap(
+                patch.extractionByResourceId,
+              ),
+              productionByResourceId: normalizeResourceMap(
+                patch.productionByResourceId,
+              ),
+            }
+          : item,
       ),
     );
   };
@@ -4094,11 +4623,40 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     color: string,
     iconDataUrl?: string,
     resourceCategoryId?: string,
+    basePrice?: number,
+    minMarketPrice?: number,
+    maxMarketPrice?: number,
   ) => {
+    const normalizedBasePrice = normalizeResourcePrice(basePrice);
+    const normalizedMin = normalizeOptionalResourcePrice(minMarketPrice);
+    const normalizedMax = normalizeOptionalResourcePrice(maxMarketPrice);
+    const boundedMin =
+      normalizedMin == null ? undefined : Math.min(normalizedMin, normalizedMax ?? normalizedMin);
+    const boundedMax =
+      normalizedMax == null ? undefined : Math.max(normalizedMax, boundedMin ?? normalizedMax);
+    const resourceId = createId();
     setResources((prev) => [
       ...prev,
-      { id: createId(), name, color, iconDataUrl, resourceCategoryId },
+      {
+        id: resourceId,
+        name,
+        color,
+        iconDataUrl,
+        resourceCategoryId,
+        basePrice: normalizedBasePrice,
+        minMarketPrice: boundedMin,
+        maxMarketPrice: boundedMax,
+      },
     ]);
+    setMarkets((prev) =>
+      prev.map((market) => ({
+        ...market,
+        priceByResourceId: {
+          ...(market.priceByResourceId ?? {}),
+          [resourceId]: normalizedBasePrice,
+        },
+      })),
+    );
   };
 
   const addResourceCategory = (name: string, color?: string) => {
@@ -4113,6 +4671,59 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       prev.map((item) =>
         item.id === resourceId ? { ...item, resourceCategoryId } : item,
       ),
+    );
+  };
+
+  const updateResourcePricing = (
+    resourceId: string,
+    patch: {
+      basePrice?: number;
+      minMarketPrice?: number;
+      maxMarketPrice?: number;
+    },
+  ) => {
+    let nextBasePrice = DEFAULT_RESOURCE_BASE_PRICE;
+    setResources((prev) =>
+      prev.map((item) => {
+        if (item.id !== resourceId) return item;
+        const basePrice = normalizeResourcePrice(
+          patch.basePrice ?? item.basePrice,
+          DEFAULT_RESOURCE_BASE_PRICE,
+        );
+        const minPriceRaw = normalizeOptionalResourcePrice(
+          patch.minMarketPrice ?? item.minMarketPrice,
+        );
+        const maxPriceRaw = normalizeOptionalResourcePrice(
+          patch.maxMarketPrice ?? item.maxMarketPrice,
+        );
+        const minMarketPrice =
+          minPriceRaw == null ? undefined : Math.min(minPriceRaw, maxPriceRaw ?? minPriceRaw);
+        const maxMarketPrice =
+          maxPriceRaw == null ? undefined : Math.max(maxPriceRaw, minMarketPrice ?? maxPriceRaw);
+        nextBasePrice = basePrice;
+        return {
+          ...item,
+          basePrice,
+          minMarketPrice,
+          maxMarketPrice,
+        };
+      }),
+    );
+    setMarkets((prev) =>
+      prev.map((market) => {
+        const current = normalizeResourcePrice(
+          market.priceByResourceId?.[resourceId],
+          nextBasePrice,
+        );
+        const nextPrices = {
+          ...(market.priceByResourceId ?? {}),
+          [resourceId]: current,
+        };
+        return {
+          ...market,
+          priceByResourceId: nextPrices,
+        };
+      }),
     );
   };
 
@@ -4256,6 +4867,17 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       });
       return next;
     });
+    setMarkets((prev) =>
+      prev.map((market) => {
+        if (!market.priceByResourceId || !(id in market.priceByResourceId)) return market;
+        const nextPrices = { ...market.priceByResourceId };
+        delete nextPrices[id];
+        return {
+          ...market,
+          priceByResourceId: nextPrices,
+        };
+      }),
+    );
   };
 
   const setProvinceResourceAmount = (
@@ -4865,6 +5487,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         markets={markets}
         provinces={provinces}
         resources={resources}
+        buildings={buildings}
         proposals={diplomacyProposals}
         activeCountryId={activeCountryId}
         onClose={() => setMarketsOpen(false)}
@@ -5240,6 +5863,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onUpdateBuildingIcon={updateBuildingIcon}
         onUpdateBuildingIndustry={updateBuildingIndustry}
         onUpdateBuildingRequirements={updateBuildingRequirements}
+        onUpdateBuildingEconomy={updateBuildingEconomy}
         onUpdateClimateColor={(id, color) =>
           updateTraitColor(setClimates, id, color)
         }
@@ -5262,6 +5886,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           updateTraitColor(setResources, id, color)
         }
         onUpdateResourceCategoryColor={updateResourceCategoryColor}
+        onUpdateResourcePricing={updateResourcePricing}
         onUpdateResourceCategory={updateResourceCategory}
         onDeleteClimate={deleteClimate}
         onDeleteReligion={deleteReligion}
@@ -5281,6 +5906,3 @@ const layerPaint: MapLayerPaint = useMemo(() => {
 }
 
 export default App;
-
-
-

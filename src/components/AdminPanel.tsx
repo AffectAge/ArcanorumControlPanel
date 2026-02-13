@@ -92,6 +92,9 @@ type AdminPanelProps = {
     color: string,
     iconDataUrl?: string,
     resourceCategoryId?: string,
+    basePrice?: number,
+    minMarketPrice?: number,
+    maxMarketPrice?: number,
   ) => void;
   onAddResourceCategory: (name: string, color?: string) => void;
   onAddBuilding: (
@@ -99,6 +102,10 @@ type AdminPanelProps = {
     cost: number,
     iconDataUrl?: string,
     industryId?: string,
+    startingDucats?: number,
+    consumptionByResourceId?: Record<string, number>,
+    extractionByResourceId?: Record<string, number>,
+    productionByResourceId?: Record<string, number>,
     requirements?: BuildingDefinition['requirements'],
   ) => void;
   onAddIndustry: (name: string, iconDataUrl?: string, color?: string) => void;
@@ -156,6 +163,16 @@ type AdminPanelProps = {
     id: string,
     requirements?: BuildingDefinition['requirements'],
   ) => void;
+  onUpdateBuildingEconomy: (
+    id: string,
+    patch: Pick<
+      BuildingDefinition,
+      | 'startingDucats'
+      | 'consumptionByResourceId'
+      | 'extractionByResourceId'
+      | 'productionByResourceId'
+    >,
+  ) => void;
   onUpdateIndustryColor: (id: string, color: string) => void;
   onUpdateCompanyColor: (id: string, color: string) => void;
   onUpdateClimateColor: (id: string, color: string) => void;
@@ -166,6 +183,14 @@ type AdminPanelProps = {
   onUpdateCultureColor: (id: string, color: string) => void;
   onUpdateResourceColor: (id: string, color: string) => void;
   onUpdateResourceCategoryColor: (id: string, color: string) => void;
+  onUpdateResourcePricing: (
+    resourceId: string,
+    patch: {
+      basePrice?: number;
+      minMarketPrice?: number;
+      maxMarketPrice?: number;
+    },
+  ) => void;
   onUpdateResourceCategory: (resourceId: string, categoryId?: string) => void;
   onDeleteClimate: (id: string) => void;
   onDeleteReligion: (id: string) => void;
@@ -181,6 +206,26 @@ type AdminPanelProps = {
 };
 
 const emptyColor = '#4ade80';
+type BuildingEconomyMap = Record<string, number>;
+
+const normalizeBuildingEconomyMap = (
+  value?: Record<string, number>,
+): BuildingEconomyMap =>
+  Object.fromEntries(
+    Object.entries(value ?? {}).filter(
+      ([resourceId, amount]) =>
+        Boolean(resourceId) &&
+        Number.isFinite(amount) &&
+        Number(amount) > 0,
+    ),
+  );
+
+const sanitizeOptionalEconomyMap = (
+  value: BuildingEconomyMap,
+): BuildingEconomyMap | undefined => {
+  const next = normalizeBuildingEconomyMap(value);
+  return Object.keys(next).length > 0 ? next : undefined;
+};
 
 export default function AdminPanel({
   open,
@@ -235,6 +280,7 @@ export default function AdminPanel({
   onUpdateIndustryIcon,
   onUpdateBuildingIndustry,
   onUpdateBuildingRequirements,
+  onUpdateBuildingEconomy,
   onUpdateIndustryColor,
   onUpdateCompanyColor,
   onUpdateClimateColor,
@@ -245,6 +291,7 @@ export default function AdminPanel({
   onUpdateCultureColor,
   onUpdateResourceColor,
   onUpdateResourceCategoryColor,
+  onUpdateResourcePricing,
   onUpdateResourceCategory,
   onDeleteClimate,
   onDeleteReligion,
@@ -282,6 +329,21 @@ export default function AdminPanel({
   const [buildingCost, setBuildingCost] = useState(100);
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
   const [buildingIndustryId, setBuildingIndustryId] = useState<string>('');
+  const [buildingStartingDucats, setBuildingStartingDucats] = useState<number | ''>(0);
+  const [buildingConsumptionByResourceId, setBuildingConsumptionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [buildingExtractionByResourceId, setBuildingExtractionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [buildingProductionByResourceId, setBuildingProductionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [editingEconomyBuildingId, setEditingEconomyBuildingId] = useState<string | null>(null);
+  const [editEconomyStartingDucats, setEditEconomyStartingDucats] = useState<number | ''>(0);
+  const [editEconomyConsumptionByResourceId, setEditEconomyConsumptionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [editEconomyExtractionByResourceId, setEditEconomyExtractionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [editEconomyProductionByResourceId, setEditEconomyProductionByResourceId] =
+    useState<BuildingEconomyMap>({});
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
   const [editReqMaxPerProvince, setEditReqMaxPerProvince] = useState<number | ''>(0);
   const [editReqMaxPerCountry, setEditReqMaxPerCountry] = useState<number | ''>(0);
@@ -332,6 +394,9 @@ export default function AdminPanel({
   const [companyColor, setCompanyColor] = useState('#a855f7');
   const [resourceColor, setResourceColor] = useState('#22c55e');
   const [resourceIcon, setResourceIcon] = useState<string | undefined>(undefined);
+  const [resourceBasePrice, setResourceBasePrice] = useState<number | ''>(1);
+  const [resourceMinMarketPrice, setResourceMinMarketPrice] = useState<number | ''>(0);
+  const [resourceMaxMarketPrice, setResourceMaxMarketPrice] = useState<number | ''>(0);
   const [routeTypeName, setRouteTypeName] = useState('');
   const [routeTypeColor, setRouteTypeColor] = useState('#38bdf8');
   const [routeTypeWidth, setRouteTypeWidth] = useState<number | ''>(1.2);
@@ -370,6 +435,9 @@ export default function AdminPanel({
 
   const editingBuilding = editingBuildingId
     ? buildings.find((building) => building.id === editingBuildingId)
+    : undefined;
+  const editingEconomyBuilding = editingEconomyBuildingId
+    ? buildings.find((building) => building.id === editingEconomyBuildingId)
     : undefined;
 
   const handleAddClimate = () => {
@@ -419,10 +487,25 @@ export default function AdminPanel({
   const handleAddResource = () => {
     const name = resourceName.trim();
     if (!name) return;
-    onAddResource(name, resourceColor, resourceIcon, resourceCategoryId || undefined);
+    onAddResource(
+      name,
+      resourceColor,
+      resourceIcon,
+      resourceCategoryId || undefined,
+      resourceBasePrice === '' ? undefined : Math.max(0.01, Number(resourceBasePrice) || 1),
+      resourceMinMarketPrice === '' || Number(resourceMinMarketPrice) <= 0
+        ? undefined
+        : Math.max(0.01, Number(resourceMinMarketPrice)),
+      resourceMaxMarketPrice === '' || Number(resourceMaxMarketPrice) <= 0
+        ? undefined
+        : Math.max(0.01, Number(resourceMaxMarketPrice)),
+    );
     setResourceName('');
     setResourceIcon(undefined);
     setResourceCategoryId('');
+    setResourceBasePrice(1);
+    setResourceMinMarketPrice(0);
+    setResourceMaxMarketPrice(0);
   };
 
   const handleAddResourceCategory = () => {
@@ -480,11 +563,57 @@ export default function AdminPanel({
       Math.max(1, Number(buildingCost) || 1),
       buildingIcon,
       buildingIndustryId || undefined,
+      buildingStartingDucats === '' ? undefined : Math.max(0, Number(buildingStartingDucats) || 0),
+      sanitizeOptionalEconomyMap(buildingConsumptionByResourceId),
+      sanitizeOptionalEconomyMap(buildingExtractionByResourceId),
+      sanitizeOptionalEconomyMap(buildingProductionByResourceId),
     );
     setBuildingName('');
     setBuildingCost(100);
     setBuildingIcon(undefined);
     setBuildingIndustryId('');
+    setBuildingStartingDucats(0);
+    setBuildingConsumptionByResourceId({});
+    setBuildingExtractionByResourceId({});
+    setBuildingProductionByResourceId({});
+  };
+
+  const openEditEconomy = (building: BuildingDefinition) => {
+    setEditingEconomyBuildingId(building.id);
+    setEditEconomyStartingDucats(building.startingDucats ?? 0);
+    setEditEconomyConsumptionByResourceId(
+      normalizeBuildingEconomyMap(building.consumptionByResourceId),
+    );
+    setEditEconomyExtractionByResourceId(
+      normalizeBuildingEconomyMap(building.extractionByResourceId),
+    );
+    setEditEconomyProductionByResourceId(
+      normalizeBuildingEconomyMap(building.productionByResourceId),
+    );
+  };
+
+  const closeEditEconomy = () => {
+    setEditingEconomyBuildingId(null);
+  };
+
+  const saveEditEconomy = () => {
+    if (!editingEconomyBuildingId) return;
+    onUpdateBuildingEconomy(editingEconomyBuildingId, {
+      startingDucats:
+        editEconomyStartingDucats === ''
+          ? undefined
+          : Math.max(0, Number(editEconomyStartingDucats) || 0),
+      consumptionByResourceId: sanitizeOptionalEconomyMap(
+        editEconomyConsumptionByResourceId,
+      ),
+      extractionByResourceId: sanitizeOptionalEconomyMap(
+        editEconomyExtractionByResourceId,
+      ),
+      productionByResourceId: sanitizeOptionalEconomyMap(
+        editEconomyProductionByResourceId,
+      ),
+    });
+    closeEditEconomy();
   };
 
   const openEditRequirements = (building: BuildingDefinition) => {
@@ -2382,6 +2511,57 @@ export default function AdminPanel({
                     ))}
                   </select>
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
+                  База
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={resourceBasePrice}
+                    onChange={(event) =>
+                      setResourceBasePrice(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0.01, Number(event.target.value) || 0.01),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
+                  Мин
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={resourceMinMarketPrice}
+                    onChange={(event) =>
+                      setResourceMinMarketPrice(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
+                  Макс
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={resourceMaxMarketPrice}
+                    onChange={(event) =>
+                      setResourceMaxMarketPrice(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
                 <button
                   onClick={handleAddResource}
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
@@ -2449,6 +2629,51 @@ export default function AdminPanel({
                         }
                         className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                       />
+                      <label className="flex items-center gap-1 text-[10px] text-white/60">
+                        Б
+                        <input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          value={resource.basePrice ?? 1}
+                          onChange={(event) =>
+                            onUpdateResourcePricing(resource.id, {
+                              basePrice: Math.max(0.01, Number(event.target.value) || 1),
+                            })
+                          }
+                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] text-white/60">
+                        Мин
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={resource.minMarketPrice ?? 0}
+                          onChange={(event) =>
+                            onUpdateResourcePricing(resource.id, {
+                              minMarketPrice: Math.max(0, Number(event.target.value) || 0),
+                            })
+                          }
+                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] text-white/60">
+                        Макс
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={resource.maxMarketPrice ?? 0}
+                          onChange={(event) =>
+                            onUpdateResourcePricing(resource.id, {
+                              maxMarketPrice: Math.max(0, Number(event.target.value) || 0),
+                            })
+                          }
+                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
                       <div className="flex items-center gap-2 flex-row-reverse">
                         {resource.iconDataUrl && (
                           <button
@@ -2545,6 +2770,22 @@ export default function AdminPanel({
                     ))}
                   </select>
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[170px]">
+                  Стартовые дукаты
+                  <input
+                    type="number"
+                    min={0}
+                    value={buildingStartingDucats}
+                    onChange={(event) =>
+                      setBuildingStartingDucats(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Р›РѕРіРѕС‚РёРї
                   <div className="flex items-center gap-2">
@@ -2581,6 +2822,94 @@ export default function AdminPanel({
                   Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
+              {resources.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-white/70 text-xs">Потребление за ход</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {resources.map((resource) => (
+                        <label
+                          key={`add-consume-${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={buildingConsumptionByResourceId[resource.id] ?? 0}
+                            onChange={(event) =>
+                              setBuildingConsumptionByResourceId((prev) => {
+                                const next = { ...prev };
+                                const amount = Math.max(0, Number(event.target.value) || 0);
+                                if (amount > 0) next[resource.id] = amount;
+                                else delete next[resource.id];
+                                return next;
+                              })
+                            }
+                            className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-white/70 text-xs">Добыча за ход</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {resources.map((resource) => (
+                        <label
+                          key={`add-extract-${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={buildingExtractionByResourceId[resource.id] ?? 0}
+                            onChange={(event) =>
+                              setBuildingExtractionByResourceId((prev) => {
+                                const next = { ...prev };
+                                const amount = Math.max(0, Number(event.target.value) || 0);
+                                if (amount > 0) next[resource.id] = amount;
+                                else delete next[resource.id];
+                                return next;
+                              })
+                            }
+                            className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-white/70 text-xs">Производство за ход</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {resources.map((resource) => (
+                        <label
+                          key={`add-produce-${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={buildingProductionByResourceId[resource.id] ?? 0}
+                            onChange={(event) =>
+                              setBuildingProductionByResourceId((prev) => {
+                                const next = { ...prev };
+                                const amount = Math.max(0, Number(event.target.value) || 0);
+                                if (amount > 0) next[resource.id] = amount;
+                                else delete next[resource.id];
+                                return next;
+                              })
+                            }
+                            className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {buildings.length > 0 ? (
@@ -2610,6 +2939,12 @@ export default function AdminPanel({
                             РћС‚СЂР°СЃР»СЊ:{' '}
                             {industries.find((i) => i.id === building.industryId)
                               ?.name ?? 'вЂ”'}
+                          </div>
+                          <div className="text-white/40 text-xs">
+                            Экономика: старт {Math.max(0, building.startingDucats ?? 0)} / потр.{' '}
+                            {Object.keys(building.consumptionByResourceId ?? {}).length} / доб.{' '}
+                            {Object.keys(building.extractionByResourceId ?? {}).length} / пр-во{' '}
+                            {Object.keys(building.productionByResourceId ?? {}).length}
                           </div>
                         </div>
                       </div>
@@ -2671,6 +3006,15 @@ export default function AdminPanel({
                               РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
                             </span>
                           </label>
+                          <button
+                            onClick={() => openEditEconomy(building)}
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-cyan-400/40 relative group"
+                          >
+                            <Package className="w-4 h-4 text-white/60" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Экономика
+                            </span>
+                          </button>
                           <button
                             onClick={() => openEditRequirements(building)}
                             className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-emerald-400/40 relative group"
@@ -3588,6 +3932,167 @@ export default function AdminPanel({
         </div>
       </div>
     </div>
+
+    {editingEconomyBuildingId && (
+        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="absolute inset-4 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <div className="text-white text-lg font-semibold">
+                  Экономика здания
+                </div>
+                <div className="text-white/60 text-sm">
+                  {editingEconomyBuilding?.name ?? 'Здание'}
+                </div>
+              </div>
+              <button
+                onClick={closeEditEconomy}
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/70 flex items-center justify-center hover:border-emerald-400/40"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto legend-scroll px-5 py-4 space-y-4">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <label className="flex flex-col gap-2 text-white/70 text-sm max-w-[220px]">
+                  Стартовые дукаты
+                  <input
+                    type="number"
+                    min={0}
+                    value={editEconomyStartingDucats}
+                    onChange={(event) =>
+                      setEditEconomyStartingDucats(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+
+                {resources.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/70 text-xs">Потребление за ход</div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {resources.map((resource) => (
+                          <label
+                            key={`edit-consume-${resource.id}`}
+                            className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                          >
+                            <span>{resource.name}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editEconomyConsumptionByResourceId[resource.id] ?? 0}
+                              onChange={(event) =>
+                                setEditEconomyConsumptionByResourceId((prev) => {
+                                  const next = { ...prev };
+                                  const amount = Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  );
+                                  if (amount > 0) next[resource.id] = amount;
+                                  else delete next[resource.id];
+                                  return next;
+                                })
+                              }
+                              className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/70 text-xs">Добыча за ход</div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {resources.map((resource) => (
+                          <label
+                            key={`edit-extract-${resource.id}`}
+                            className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                          >
+                            <span>{resource.name}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editEconomyExtractionByResourceId[resource.id] ?? 0}
+                              onChange={(event) =>
+                                setEditEconomyExtractionByResourceId((prev) => {
+                                  const next = { ...prev };
+                                  const amount = Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  );
+                                  if (amount > 0) next[resource.id] = amount;
+                                  else delete next[resource.id];
+                                  return next;
+                                })
+                              }
+                              className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/70 text-xs">Производство за ход</div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {resources.map((resource) => (
+                          <label
+                            key={`edit-produce-${resource.id}`}
+                            className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                          >
+                            <span>{resource.name}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editEconomyProductionByResourceId[resource.id] ?? 0}
+                              onChange={(event) =>
+                                setEditEconomyProductionByResourceId((prev) => {
+                                  const next = { ...prev };
+                                  const amount = Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  );
+                                  if (amount > 0) next[resource.id] = amount;
+                                  else delete next[resource.id];
+                                  return next;
+                                })
+                              }
+                              className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-white/50 text-sm">Нет ресурсов</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-white/10">
+              <button
+                onClick={closeEditEconomy}
+                className="h-9 px-3 rounded-lg border border-white/10 bg-black/30 text-white/60 text-sm hover:border-emerald-400/40"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={saveEditEconomy}
+                className="h-9 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     {editingBuildingId && (
         <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm animate-fadeIn">

@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import type {
+  BuildingDefinition,
   Country,
   DiplomacyProposal,
   Market,
@@ -24,6 +25,7 @@ type MarketsModalProps = {
   markets: Market[];
   provinces: ProvinceRecord;
   resources: Trait[];
+  buildings: BuildingDefinition[];
   proposals: DiplomacyProposal[];
   activeCountryId?: string;
   onClose: () => void;
@@ -62,12 +64,47 @@ type MarketsModalProps = {
 
 type MarketsTab = 'market' | 'goods';
 
+type ExchangeHeaderProps = {
+  label: string;
+  help: string;
+  align?: 'left' | 'right' | 'center';
+};
+
+function ExchangeHeader({ label, help, align = 'right' }: ExchangeHeaderProps) {
+  const alignClass =
+    align === 'left'
+      ? 'text-left'
+      : align === 'center'
+        ? 'text-center'
+        : 'text-right';
+  const contentAlignClass =
+    align === 'left'
+      ? 'justify-start'
+      : align === 'center'
+        ? 'justify-center'
+        : 'justify-end';
+  return (
+    <th className={`px-3 py-2 font-medium ${alignClass}`}>
+      <div className={`group relative inline-flex items-center gap-1.5 ${contentAlignClass}`}>
+        <span>{label}</span>
+        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/20 bg-white/5 text-[10px] text-white/60">
+          ?
+        </span>
+        <span className="pointer-events-none absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100 z-20">
+          {help}
+        </span>
+      </div>
+    </th>
+  );
+}
+
 export default function MarketsModal({
   open,
   countries,
   markets,
   provinces,
   resources,
+  buildings,
   proposals,
   activeCountryId,
   onClose,
@@ -182,46 +219,135 @@ export default function MarketsModal({
 
   const goodsStats = useMemo(() => {
     const memberSet = new Set(memberMarket?.memberCountryIds ?? []);
-    const worldSupply = new Map<string, number>();
-    const marketSupply = new Map<string, number>();
+    const worldDeposits = new Map<string, number>();
+    const worldMarketVolume = new Map<string, number>();
+    const depositSupply = new Map<string, number>();
+    const marketDemand = new Map<string, number>();
+    const marketProductionMax = new Map<string, number>();
+    const marketProductionFact = new Map<string, number>();
     const supplierCountries = new Map<string, Set<string>>();
     const totalsByCountry = new Map<string, number>();
     const warehouse = memberMarket?.warehouseByResourceId ?? {};
+    const definitionById = new Map(buildings.map((building) => [building.id, building]));
+
+    markets.forEach((market) => {
+      Object.entries(market.warehouseByResourceId ?? {}).forEach(([resourceId, amount]) => {
+        if (!Number.isFinite(amount) || amount <= 0) return;
+        worldMarketVolume.set(resourceId, (worldMarketVolume.get(resourceId) ?? 0) + amount);
+      });
+    });
 
     Object.values(provinces).forEach((province) => {
       const owner = province.ownerCountryId;
       Object.entries(province.resourceAmounts ?? {}).forEach(([resourceId, amount]) => {
         if (!Number.isFinite(amount) || amount <= 0) return;
-        worldSupply.set(resourceId, (worldSupply.get(resourceId) ?? 0) + amount);
+        worldDeposits.set(resourceId, (worldDeposits.get(resourceId) ?? 0) + amount);
         if (!memberMarket || !owner || !memberSet.has(owner)) return;
-        marketSupply.set(resourceId, (marketSupply.get(resourceId) ?? 0) + amount);
+        depositSupply.set(resourceId, (depositSupply.get(resourceId) ?? 0) + amount);
         totalsByCountry.set(owner, (totalsByCountry.get(owner) ?? 0) + amount);
         const suppliers = supplierCountries.get(resourceId) ?? new Set<string>();
         suppliers.add(owner);
         supplierCountries.set(resourceId, suppliers);
       });
+      if (!memberMarket || !owner || !memberSet.has(owner)) return;
+      (province.buildingsBuilt ?? []).forEach((entry) => {
+        const definition = definitionById.get(entry.buildingId);
+        Object.entries(definition?.consumptionByResourceId ?? {}).forEach(
+          ([resourceId, amount]) => {
+            if (!Number.isFinite(amount) || amount <= 0) return;
+            marketDemand.set(resourceId, (marketDemand.get(resourceId) ?? 0) + amount);
+          },
+        );
+        Object.entries(definition?.extractionByResourceId ?? {}).forEach(
+          ([resourceId, amount]) => {
+            if (!Number.isFinite(amount) || amount <= 0) return;
+            marketProductionMax.set(
+              resourceId,
+              (marketProductionMax.get(resourceId) ?? 0) + amount,
+            );
+          },
+        );
+        Object.entries(definition?.productionByResourceId ?? {}).forEach(
+          ([resourceId, amount]) => {
+            if (!Number.isFinite(amount) || amount <= 0) return;
+            marketProductionMax.set(
+              resourceId,
+              (marketProductionMax.get(resourceId) ?? 0) + amount,
+            );
+          },
+        );
+        Object.entries(entry.lastExtractedByResourceId ?? {}).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          marketProductionFact.set(
+            resourceId,
+            (marketProductionFact.get(resourceId) ?? 0) + amount,
+          );
+        });
+        Object.entries(entry.lastProducedByResourceId ?? {}).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          marketProductionFact.set(
+            resourceId,
+            (marketProductionFact.get(resourceId) ?? 0) + amount,
+          );
+        });
+      });
     });
 
     const rows = resources.map((resource, index) => {
-      const market = marketSupply.get(resource.id) ?? 0;
-      const world = worldSupply.get(resource.id) ?? 0;
+      const deposits = depositSupply.get(resource.id) ?? 0;
+      const worldDepositsAmount = worldDeposits.get(resource.id) ?? 0;
+      const worldMarketAmount = worldMarketVolume.get(resource.id) ?? 0;
+      const demand = marketDemand.get(resource.id) ?? 0;
+      const supplyMax = marketProductionMax.get(resource.id) ?? 0;
+      const supplyFact = marketProductionFact.get(resource.id) ?? 0;
       const warehouseStock = Math.max(0, warehouse[resource.id] ?? 0);
+      const totalMarketStock = warehouseStock;
+      const marketPrice = Math.max(
+        0.01,
+        Number(
+          memberMarket?.priceByResourceId?.[resource.id] ??
+            resource.basePrice ??
+            1,
+        ) || 1,
+      );
       const suppliers = supplierCountries.get(resource.id)?.size ?? 0;
-      const marketShare = world > 0 ? (market / world) * 100 : 0;
-      const avgPerSupplier = suppliers > 0 ? market / suppliers : 0;
+      const marketShare = worldMarketAmount > 0 ? (totalMarketStock / worldMarketAmount) * 100 : 0;
+      const depositShare =
+        worldDepositsAmount > 0 ? (deposits / worldDepositsAmount) * 100 : 0;
+      const avgPerSupplier = suppliers > 0 ? deposits / suppliers : 0;
       const liquidity =
-        market >= 1000 ? 'Высокая' : market >= 300 ? 'Средняя' : market > 0 ? 'Низкая' : 'Нет';
+        totalMarketStock >= 1000
+          ? 'Высокая'
+          : totalMarketStock >= 300
+            ? 'Средняя'
+            : totalMarketStock > 0
+              ? 'Низкая'
+              : 'Нет';
       const priceIndex = Math.max(
         35,
-        Math.min(260, 100 + (world - market) / Math.max(20, world * 0.1)),
+        Math.min(
+          260,
+          100 +
+            (worldMarketAmount - totalMarketStock) /
+              Math.max(20, worldMarketAmount * 0.1),
+        ),
       );
       return {
         index: index + 1,
         resourceId: resource.id,
         resourceName: resource.name,
         resourceColor: resource.color,
-        marketSupply: market,
-        worldSupply: world,
+        marketPrice,
+        marketValue: totalMarketStock * marketPrice,
+        depositValue: deposits * marketPrice,
+        marketDemand: demand,
+        marketProductionFact: supplyFact,
+        marketProductionMax: supplyMax,
+        marketSupply: totalMarketStock,
+        depositSupply: deposits,
+        worldMarketSupply: worldMarketAmount,
+        worldDeposits: worldDepositsAmount,
+        depositShare,
         warehouseStock,
         suppliers,
         marketShare,
@@ -245,7 +371,7 @@ export default function MarketsModal({
     );
 
     return { rows, byCountry, warehouseTotal };
-  }, [memberMarket, provinces, resources, countries]);
+  }, [memberMarket, provinces, resources, countries, buildings]);
   const canTradeWarehouse = Boolean(
     activeCountryId &&
       memberMarket &&
@@ -651,19 +777,88 @@ export default function MarketsModal({
                         Ресурсы автоматически появляются на бирже. Склад - общий буфер рынка для покупок и продаж.
                       </div>
                       <div className="overflow-x-auto rounded-lg border border-white/10">
-                        <table className="min-w-[1140px] w-full text-xs">
+                        <table className="min-w-[1960px] w-full text-xs">
                           <thead className="bg-black/45 text-white/70">
                             <tr>
-                              <th className="text-left px-3 py-2 font-medium">#</th>
-                              <th className="text-left px-3 py-2 font-medium">Товар</th>
-                              <th className="text-right px-3 py-2 font-medium">Объем рынка</th>
-                              <th className="text-right px-3 py-2 font-medium">Мировой объем</th>
-                              <th className="text-right px-3 py-2 font-medium">Доля рынка</th>
-                              <th className="text-right px-3 py-2 font-medium">Поставщики</th>
-                              <th className="text-right px-3 py-2 font-medium">Индекс цены</th>
-                              <th className="text-right px-3 py-2 font-medium">Склад</th>
-                              <th className="text-center px-3 py-2 font-medium">Ликвидность</th>
-                              <th className="text-right px-3 py-2 font-medium">Операции</th>
+                              <ExchangeHeader
+                                align="left"
+                                label="#"
+                                help="Порядковый номер строки ресурса в таблице биржи."
+                              />
+                              <ExchangeHeader
+                                align="left"
+                                label="Товар"
+                                help="Название ресурса в текущей строке биржи."
+                              />
+                              <ExchangeHeader
+                                label="Цена за единицу"
+                                help="Текущая рыночная цена 1 единицы ресурса в вашем рынке."
+                              />
+                              <ExchangeHeader
+                                label="Цена рынка"
+                                help="Оценка стоимости всего объема ресурса в рынке: цена за единицу x объем рынка."
+                              />
+                              <ExchangeHeader
+                                label="Спрос"
+                                help="Сумма максимального потребления этого ресурса зданиями рынка за ход."
+                              />
+                              <ExchangeHeader
+                                label="Предложение (факт)"
+                                help="Фактическая добыча и производство ресурса зданиями рынка за последний ход. Это значение участвует в расчете цены."
+                              />
+                              <ExchangeHeader
+                                label="Предложение (макс)"
+                                help="Максимально возможная добыча и производство по настройкам зданий рынка. В расчете цены не участвует."
+                              />
+                              <ExchangeHeader
+                                label="Объем рынка"
+                                help="Количество ресурса в обороте рынка (на складе рынка), без месторождений."
+                              />
+                              <ExchangeHeader
+                                label="Объем месторождений"
+                                help="Запасы ресурса в провинциях стран вашего рынка."
+                              />
+                              <ExchangeHeader
+                                label="Стоимость месторождений"
+                                help="Оценка запасов месторождений: объем месторождений x цена за единицу."
+                              />
+                              <ExchangeHeader
+                                label="Мировой объем"
+                                help="Суммарный объем этого ресурса в обороте всех рынков мира."
+                              />
+                              <ExchangeHeader
+                                label="Доля рынка"
+                                help="Доля вашего рынка в мировом объеме ресурса."
+                              />
+                              <ExchangeHeader
+                                label="Мировые запасы"
+                                help="Суммарные запасы ресурса в месторождениях всех провинций мира."
+                              />
+                              <ExchangeHeader
+                                label="Доля месторождений"
+                                help="Доля месторождений вашего рынка в мировых запасах ресурса."
+                              />
+                              <ExchangeHeader
+                                label="Поставщики"
+                                help="Количество стран вашего рынка, у которых есть месторождения этого ресурса."
+                              />
+                              <ExchangeHeader
+                                label="Индекс цены"
+                                help="Условный индекс дефицита/избытка: выше 100 при дефиците, ниже 100 при избытке."
+                              />
+                              <ExchangeHeader
+                                label="Склад"
+                                help="Текущий остаток ресурса на складе вашего рынка."
+                              />
+                              <ExchangeHeader
+                                align="center"
+                                label="Ликвидность"
+                                help="Качественная оценка доступности ресурса по объему на складе рынка."
+                              />
+                              <ExchangeHeader
+                                label="Операции"
+                                help="Ручная покупка и продажа ресурса через склад рынка."
+                              />
                             </tr>
                           </thead>
                           <tbody>
@@ -683,13 +878,40 @@ export default function MarketsModal({
                                   </span>
                                 </td>
                                 <td className="px-3 py-2 text-right text-emerald-200">
+                                  {row.marketPrice.toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-amber-200">
+                                  {row.marketValue.toFixed(2)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-rose-200">
+                                  {row.marketDemand.toFixed(0)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-teal-200">
+                                  {row.marketProductionFact.toFixed(0)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-cyan-200">
+                                  {row.marketProductionMax.toFixed(0)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-emerald-200">
                                   {row.marketSupply.toFixed(0)}
                                 </td>
+                                <td className="px-3 py-2 text-right text-violet-200">
+                                  {row.depositSupply.toFixed(0)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-fuchsia-200">
+                                  {row.depositValue.toFixed(2)}
+                                </td>
                                 <td className="px-3 py-2 text-right text-white/70">
-                                  {row.worldSupply.toFixed(0)}
+                                  {row.worldMarketSupply.toFixed(0)}
                                 </td>
                                 <td className="px-3 py-2 text-right text-sky-200">
                                   {row.marketShare.toFixed(1)}%
+                                </td>
+                                <td className="px-3 py-2 text-right text-violet-200">
+                                  {row.worldDeposits.toFixed(0)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-fuchsia-200">
+                                  {row.depositShare.toFixed(1)}%
                                 </td>
                                 <td className="px-3 py-2 text-right text-white/70">{row.suppliers}</td>
                                 <td className="px-3 py-2 text-right text-amber-200">
@@ -794,4 +1016,3 @@ export default function MarketsModal({
     </div>
   );
 }
-
