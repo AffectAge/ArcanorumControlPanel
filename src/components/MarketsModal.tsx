@@ -277,6 +277,12 @@ export default function MarketsModal({
             (marketBuildingVolume.get(resourceId) ?? 0) + amount,
           );
         });
+        const inactiveByProductivity =
+          Number.isFinite(entry.lastProductivity) &&
+          Number(entry.lastProductivity) <= 0;
+        if (inactiveByProductivity) {
+          return;
+        }
         const definition = definitionById.get(entry.buildingId);
         Object.entries(definition?.consumptionByResourceId ?? {}).forEach(
           ([resourceId, amount]) => {
@@ -870,7 +876,7 @@ export default function MarketsModal({
                               />
                               <ExchangeHeader
                                 label="Предложение (факт)"
-                                help="Фактическая добыча и производство ресурса зданиями рынка за последний ход. Это значение участвует в расчете цены."
+                                help="Фактическая добыча и производство ресурса зданиями рынка за последний ход. Участвует в расчете цены как часть предложения."
                               />
                               <ExchangeHeader
                                 label="Предложение (макс)"
@@ -878,7 +884,7 @@ export default function MarketsModal({
                               />
                               <ExchangeHeader
                                 label="Объем рынка"
-                                help="Сумма ресурса на складах зданий, расположенных в провинциях стран вашего рынка."
+                                help="Сумма ресурса на складах зданий, расположенных в провинциях стран вашего рынка. Участвует в расчете цены как часть предложения."
                               />
                               <ExchangeHeader
                                 label="Объем месторождений"
