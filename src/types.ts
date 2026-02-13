@@ -76,19 +76,6 @@ export type ProvinceData = {
   buildingsBuilt?: BuiltBuilding[];
   constructionProgress?: Record<string, ConstructionEntry[]>;
   logisticsPointsByCategory?: Record<string, number>;
-  logisticsUsedByCategory?: Record<string, number>;
-};
-
-export type BuildingResourceFlow = {
-  resourceId: string;
-  amount: number;
-};
-
-export type BuildingEconomy = {
-  startingDucats?: number;
-  extracts?: BuildingResourceFlow[];
-  inputs?: BuildingResourceFlow[];
-  outputs?: BuildingResourceFlow[];
 };
 
 export type LogisticsRouteType = {
@@ -164,17 +151,6 @@ export type Market = {
   logoDataUrl?: string;
   memberCountryIds: string[];
   warehouseByResourceId?: Record<string, number>;
-  marketStockByResourceId?: Record<string, number>;
-  priceByResourceId?: Record<string, number>;
-  tradeStatsByResourceId?: Record<
-    string,
-    {
-      demand: number;
-      supply: number;
-      bought: number;
-      sold: number;
-    }
-  >;
   capitalProvinceId?: string;
   capitalLostSinceTurn?: number;
   createdTurn?: number;
@@ -216,8 +192,6 @@ export type GameSettings = {
   startingGold?: number;
   startingDucats?: number;
   colonizationMaxActive?: number;
-  tradeInfrastructureCostByCategory?: Record<string, number>;
-  defaultResourcePrice?: number;
 };
 
 export type BuildingDefinition = {
@@ -226,7 +200,6 @@ export type BuildingDefinition = {
   cost: number;
   iconDataUrl?: string;
   industryId?: string;
-  economy?: BuildingEconomy;
   requirements?: {
     resources?: TraitCriteria;
     buildings?: Record<
@@ -380,13 +353,8 @@ export type ConstructionEntry = {
 };
 
 export type BuiltBuilding = {
-  instanceId?: string;
   buildingId: string;
   owner: BuildingOwner;
-  stockByResourceId?: Record<string, number>;
-  ducats?: number;
-  economyStatus?: 'active' | 'inactive';
-  economyStatusReason?: string;
 };
 
 export type EventCategory =

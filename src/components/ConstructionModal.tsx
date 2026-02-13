@@ -983,12 +983,6 @@ export default function ConstructionModal({
                             }`
                           : 'Не построено'}
                       </div>
-                      <div className="text-white/45 text-[11px]">
-                        Стартовые дукаты: {Math.max(0, Math.floor(Number(building.economy?.startingDucats) || 0))}
-                      </div>
-                      <div className="text-white/45 text-[11px]">
-                        Добыча: {(building.economy?.extracts ?? []).filter((entry) => entry.amount > 0).length} · Входы: {(building.economy?.inputs ?? []).filter((entry) => entry.amount > 0).length} · Выходы: {(building.economy?.outputs ?? []).filter((entry) => entry.amount > 0).length}
-                      </div>
                     </div>
                   </div>
 
