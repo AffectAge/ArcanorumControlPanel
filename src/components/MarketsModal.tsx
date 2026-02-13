@@ -1,7 +1,10 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowDown,
+  ArrowUp,
   BarChart3,
   Globe2,
+  Minus,
   Package,
   Plus,
   Save,
@@ -97,6 +100,28 @@ function ExchangeHeader({ label, help, align = 'right' }: ExchangeHeaderProps) {
     </th>
   );
 }
+
+const PRICE_TREND_EPSILON = 0.0001;
+
+const getSparklinePath = (values: number[], width = 84, height = 22) => {
+  if (values.length === 0) return '';
+  if (values.length === 1) {
+    const y = height / 2;
+    return `M 0 ${y} L ${width} ${y}`;
+  }
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min;
+  const step = width / Math.max(1, values.length - 1);
+  return values
+    .map((value, index) => {
+      const x = index * step;
+      const normalizedY = range <= PRICE_TREND_EPSILON ? 0.5 : (value - min) / range;
+      const y = height - normalizedY * height;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+};
 
 export default function MarketsModal({
   open,
@@ -221,6 +246,7 @@ export default function MarketsModal({
     const memberSet = new Set(memberMarket?.memberCountryIds ?? []);
     const worldDeposits = new Map<string, number>();
     const worldMarketVolume = new Map<string, number>();
+    const marketBuildingVolume = new Map<string, number>();
     const depositSupply = new Map<string, number>();
     const marketDemand = new Map<string, number>();
     const marketProductionMax = new Map<string, number>();
@@ -229,13 +255,6 @@ export default function MarketsModal({
     const totalsByCountry = new Map<string, number>();
     const warehouse = memberMarket?.warehouseByResourceId ?? {};
     const definitionById = new Map(buildings.map((building) => [building.id, building]));
-
-    markets.forEach((market) => {
-      Object.entries(market.warehouseByResourceId ?? {}).forEach(([resourceId, amount]) => {
-        if (!Number.isFinite(amount) || amount <= 0) return;
-        worldMarketVolume.set(resourceId, (worldMarketVolume.get(resourceId) ?? 0) + amount);
-      });
-    });
 
     Object.values(provinces).forEach((province) => {
       const owner = province.ownerCountryId;
@@ -251,6 +270,13 @@ export default function MarketsModal({
       });
       if (!memberMarket || !owner || !memberSet.has(owner)) return;
       (province.buildingsBuilt ?? []).forEach((entry) => {
+        Object.entries(entry.warehouseByResourceId ?? {}).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          marketBuildingVolume.set(
+            resourceId,
+            (marketBuildingVolume.get(resourceId) ?? 0) + amount,
+          );
+        });
         const definition = definitionById.get(entry.buildingId);
         Object.entries(definition?.consumptionByResourceId ?? {}).forEach(
           ([resourceId, amount]) => {
@@ -293,6 +319,18 @@ export default function MarketsModal({
       });
     });
 
+    Object.values(provinces).forEach((province) => {
+      (province.buildingsBuilt ?? []).forEach((entry) => {
+        Object.entries(entry.warehouseByResourceId ?? {}).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          worldMarketVolume.set(
+            resourceId,
+            (worldMarketVolume.get(resourceId) ?? 0) + amount,
+          );
+        });
+      });
+    });
+
     const rows = resources.map((resource, index) => {
       const deposits = depositSupply.get(resource.id) ?? 0;
       const worldDepositsAmount = worldDeposits.get(resource.id) ?? 0;
@@ -301,7 +339,7 @@ export default function MarketsModal({
       const supplyMax = marketProductionMax.get(resource.id) ?? 0;
       const supplyFact = marketProductionFact.get(resource.id) ?? 0;
       const warehouseStock = Math.max(0, warehouse[resource.id] ?? 0);
-      const totalMarketStock = warehouseStock;
+      const totalMarketStock = Math.max(0, marketBuildingVolume.get(resource.id) ?? 0);
       const marketPrice = Math.max(
         0.01,
         Number(
@@ -310,6 +348,32 @@ export default function MarketsModal({
             1,
         ) || 1,
       );
+      const historyRaw = (memberMarket?.priceHistoryByResourceId?.[resource.id] ?? []).filter(
+        (item) => Number.isFinite(item) && Number(item) > 0,
+      ) as number[];
+      const marketPriceHistory =
+        historyRaw.length > 0
+          ? [...historyRaw.slice(-10)]
+          : [marketPrice];
+      if (
+        marketPriceHistory.length === 0 ||
+        Math.abs(marketPriceHistory[marketPriceHistory.length - 1] - marketPrice) >
+          PRICE_TREND_EPSILON
+      ) {
+        marketPriceHistory.push(marketPrice);
+      }
+      const normalizedPriceHistory = marketPriceHistory.slice(-10);
+      const previousPrice =
+        normalizedPriceHistory.length > 1
+          ? normalizedPriceHistory[normalizedPriceHistory.length - 2]
+          : normalizedPriceHistory[normalizedPriceHistory.length - 1];
+      const delta = marketPrice - previousPrice;
+      const priceTrend =
+        delta > PRICE_TREND_EPSILON
+          ? 'up'
+          : delta < -PRICE_TREND_EPSILON
+            ? 'down'
+            : 'flat';
       const suppliers = supplierCountries.get(resource.id)?.size ?? 0;
       const marketShare = worldMarketAmount > 0 ? (totalMarketStock / worldMarketAmount) * 100 : 0;
       const depositShare =
@@ -338,6 +402,8 @@ export default function MarketsModal({
         resourceName: resource.name,
         resourceColor: resource.color,
         marketPrice,
+        marketPriceHistory: normalizedPriceHistory,
+        priceTrend,
         marketValue: totalMarketStock * marketPrice,
         depositValue: deposits * marketPrice,
         marketDemand: demand,
@@ -792,7 +858,7 @@ export default function MarketsModal({
                               />
                               <ExchangeHeader
                                 label="Цена за единицу"
-                                help="Текущая рыночная цена 1 единицы ресурса в вашем рынке."
+                                help="Текущая рыночная цена 1 единицы ресурса в вашем рынке и динамика за 10 последних ходов."
                               />
                               <ExchangeHeader
                                 label="Цена рынка"
@@ -812,7 +878,7 @@ export default function MarketsModal({
                               />
                               <ExchangeHeader
                                 label="Объем рынка"
-                                help="Количество ресурса в обороте рынка (на складе рынка), без месторождений."
+                                help="Сумма ресурса на складах зданий, расположенных в провинциях стран вашего рынка."
                               />
                               <ExchangeHeader
                                 label="Объем месторождений"
@@ -824,7 +890,7 @@ export default function MarketsModal({
                               />
                               <ExchangeHeader
                                 label="Мировой объем"
-                                help="Суммарный объем этого ресурса в обороте всех рынков мира."
+                                help="Сумма ресурса на складах всех зданий мира."
                               />
                               <ExchangeHeader
                                 label="Доля рынка"
@@ -877,8 +943,46 @@ export default function MarketsModal({
                                     {row.resourceName}
                                   </span>
                                 </td>
-                                <td className="px-3 py-2 text-right text-emerald-200">
-                                  {row.marketPrice.toFixed(2)}
+                                <td className="px-3 py-2 text-right">
+                                  <div className="inline-flex flex-col items-end gap-1">
+                                    <span
+                                      className={`inline-flex items-center gap-1 tabular-nums ${
+                                        row.priceTrend === 'up'
+                                          ? 'text-emerald-200'
+                                          : row.priceTrend === 'down'
+                                            ? 'text-rose-200'
+                                            : 'text-white/90'
+                                      }`}
+                                    >
+                                      {row.priceTrend === 'up' ? (
+                                        <ArrowUp className="w-3 h-3" />
+                                      ) : row.priceTrend === 'down' ? (
+                                        <ArrowDown className="w-3 h-3" />
+                                      ) : (
+                                        <Minus className="w-3 h-3" />
+                                      )}
+                                      {row.marketPrice.toFixed(2)}
+                                    </span>
+                                    <svg
+                                      viewBox="0 0 84 22"
+                                      className="h-5 w-[84px]"
+                                      aria-label="График цены за 10 ходов"
+                                    >
+                                      <path
+                                        d={getSparklinePath(row.marketPriceHistory)}
+                                        fill="none"
+                                        stroke={
+                                          row.priceTrend === 'up'
+                                            ? '#34d399'
+                                            : row.priceTrend === 'down'
+                                              ? '#fb7185'
+                                              : '#f8fafc'
+                                        }
+                                        strokeWidth="1.8"
+                                        strokeLinecap="round"
+                                      />
+                                    </svg>
+                                  </div>
                                 </td>
                                 <td className="px-3 py-2 text-right text-amber-200">
                                   {row.marketValue.toFixed(2)}

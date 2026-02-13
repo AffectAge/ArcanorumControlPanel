@@ -152,6 +152,7 @@ export type Market = {
   memberCountryIds: string[];
   warehouseByResourceId?: Record<string, number>;
   priceByResourceId?: Record<string, number>;
+  priceHistoryByResourceId?: Record<string, number[]>;
   capitalProvinceId?: string;
   capitalLostSinceTurn?: number;
   createdTurn?: number;
