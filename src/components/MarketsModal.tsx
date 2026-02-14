@@ -5,11 +5,9 @@ import {
   BarChart3,
   Globe2,
   Minus,
-  Package,
   Plus,
   Save,
   Send,
-  ShoppingCart,
   Trash2,
   X,
 } from 'lucide-react';
@@ -137,7 +135,7 @@ export default function MarketsModal({
   onUpdateMarket,
   onDeleteMarket,
   onLeaveMarket,
-  onTradeWithWarehouse,
+  onTradeWithWarehouse: _onTradeWithWarehouse,
   onInviteByTreaty,
 }: MarketsModalProps) {
   const [tab, setTab] = useState<MarketsTab>('market');
@@ -145,10 +143,7 @@ export default function MarketsModal({
   const [marketNameDraft, setMarketNameDraft] = useState('');
   const [capitalProvinceIdDraft, setCapitalProvinceIdDraft] = useState('');
   const [marketColorDraft, setMarketColorDraft] = useState('#22c55e');
-  const [marketLogoDraft, setMarketLogoDraft] = useState<string | undefined>(
-    undefined,
-  );
-  const [warehouseTradeAmount, setWarehouseTradeAmount] = useState(10);
+  const [marketLogoDraft, setMarketLogoDraft] = useState<string | undefined>(undefined);
 
   const activeCountry = countries.find((country) => country.id === activeCountryId);
   const memberMarket = activeCountryId
@@ -252,7 +247,6 @@ export default function MarketsModal({
     const marketProductionMax = new Map<string, number>();
     const marketProductionFact = new Map<string, number>();
     const supplierCountries = new Map<string, Set<string>>();
-    const totalsByCountry = new Map<string, number>();
     const warehouse = memberMarket?.warehouseByResourceId ?? {};
     const definitionById = new Map(buildings.map((building) => [building.id, building]));
 
@@ -263,7 +257,6 @@ export default function MarketsModal({
         worldDeposits.set(resourceId, (worldDeposits.get(resourceId) ?? 0) + amount);
         if (!memberMarket || !owner || !memberSet.has(owner)) return;
         depositSupply.set(resourceId, (depositSupply.get(resourceId) ?? 0) + amount);
-        totalsByCountry.set(owner, (totalsByCountry.get(owner) ?? 0) + amount);
         const suppliers = supplierCountries.get(resourceId) ?? new Set<string>();
         suppliers.add(owner);
         supplierCountries.set(resourceId, suppliers);
@@ -344,7 +337,6 @@ export default function MarketsModal({
       const demand = marketDemand.get(resource.id) ?? 0;
       const supplyMax = marketProductionMax.get(resource.id) ?? 0;
       const supplyFact = marketProductionFact.get(resource.id) ?? 0;
-      const warehouseStock = Math.max(0, warehouse[resource.id] ?? 0);
       const totalMarketStock = Math.max(0, marketBuildingVolume.get(resource.id) ?? 0);
       const marketOffer = supplyFact + totalMarketStock;
       const marketPrice = Math.max(
@@ -381,28 +373,9 @@ export default function MarketsModal({
           : delta < -PRICE_TREND_EPSILON
             ? 'down'
             : 'flat';
-      const suppliers = supplierCountries.get(resource.id)?.size ?? 0;
       const marketShare = worldMarketAmount > 0 ? (totalMarketStock / worldMarketAmount) * 100 : 0;
       const depositShare =
         worldDepositsAmount > 0 ? (deposits / worldDepositsAmount) * 100 : 0;
-      const avgPerSupplier = suppliers > 0 ? deposits / suppliers : 0;
-      const liquidity =
-        totalMarketStock >= 1000
-          ? 'Высокая'
-          : totalMarketStock >= 300
-            ? 'Средняя'
-            : totalMarketStock > 0
-              ? 'Низкая'
-              : 'Нет';
-      const priceIndex = Math.max(
-        35,
-        Math.min(
-          260,
-          100 +
-            (worldMarketAmount - totalMarketStock) /
-              Math.max(20, worldMarketAmount * 0.1),
-        ),
-      );
       return {
         index: index + 1,
         resourceId: resource.id,
@@ -422,36 +395,17 @@ export default function MarketsModal({
         worldMarketSupply: worldMarketAmount,
         worldDeposits: worldDepositsAmount,
         depositShare,
-        warehouseStock,
-        suppliers,
         marketShare,
-        avgPerSupplier,
-        liquidity,
-        priceIndex,
       };
     });
-
-    const byCountry = Array.from(totalsByCountry.entries())
-      .map(([countryId, total]) => ({
-        countryId,
-        total,
-        countryName: countries.find((country) => country.id === countryId)?.name ?? countryId,
-      }))
-      .sort((a, b) => b.total - a.total);
 
     const warehouseTotal = Object.values(warehouse).reduce(
       (acc, value) => acc + (Number.isFinite(value) ? Math.max(0, value) : 0),
       0,
     );
 
-    return { rows, byCountry, warehouseTotal };
-  }, [memberMarket, provinces, resources, countries, buildings]);
-  const canTradeWarehouse = Boolean(
-    activeCountryId &&
-      memberMarket &&
-      memberMarket.memberCountryIds.includes(activeCountryId),
-  );
-
+    return { rows, warehouseTotal };
+  }, [memberMarket, provinces, resources, buildings]);
   if (!open) return null;
 
   return (
@@ -808,40 +762,6 @@ export default function MarketsModal({
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-                      <div className="rounded-xl border border-cyan-400/25 bg-gradient-to-br from-cyan-500/20 via-sky-500/10 to-black/30 p-4">
-                        <div className="text-white/60 text-[11px] uppercase tracking-wide">Позиции биржи</div>
-                        <div className="text-white text-2xl font-semibold mt-1">{goodsStats.rows.length}</div>
-                      </div>
-                      <div className="rounded-xl border border-emerald-400/25 bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-black/30 p-4">
-                        <div className="text-white/60 text-[11px] uppercase tracking-wide">Склад рынка</div>
-                        <div className="text-emerald-100 text-2xl font-semibold mt-1">
-                          {goodsStats.warehouseTotal.toFixed(0)}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-amber-400/25 bg-gradient-to-br from-amber-500/20 via-orange-500/10 to-black/30 p-4">
-                        <div className="text-white/60 text-[11px] uppercase tracking-wide">Участники</div>
-                        <div className="text-amber-100 text-2xl font-semibold mt-1">
-                          {memberMarket.memberCountryIds.length}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-white/10 bg-black/35 p-4 space-y-2">
-                        <div className="text-white/60 text-[11px] uppercase tracking-wide">Объем сделки</div>
-                        <input
-                          type="number"
-                          min={1}
-                          max={1000000}
-                          value={warehouseTradeAmount}
-                          onChange={(event) =>
-                            setWarehouseTradeAmount(
-                              Math.max(1, Math.floor(Number(event.target.value) || 1)),
-                            )
-                          }
-                          className="h-9 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-white text-sm focus:outline-none focus:border-cyan-400/55"
-                        />
-                      </div>
-                    </div>
-
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                       <div className="text-white/85 text-sm font-semibold mb-2 inline-flex items-center gap-2">
                         <BarChart3 className="w-4 h-4" />
@@ -915,27 +835,6 @@ export default function MarketsModal({
                               <ExchangeHeader
                                 label="Доля месторождений"
                                 help="Доля месторождений вашего рынка в мировых запасах ресурса."
-                              />
-                              <ExchangeHeader
-                                label="Поставщики"
-                                help="Количество стран вашего рынка, у которых есть месторождения этого ресурса."
-                              />
-                              <ExchangeHeader
-                                label="Индекс цены"
-                                help="Условный индекс дефицита/избытка: выше 100 при дефиците, ниже 100 при избытке."
-                              />
-                              <ExchangeHeader
-                                label="Склад"
-                                help="Текущий остаток ресурса на складе вашего рынка."
-                              />
-                              <ExchangeHeader
-                                align="center"
-                                label="Ликвидность"
-                                help="Качественная оценка доступности ресурса по объему на складе рынка."
-                              />
-                              <ExchangeHeader
-                                label="Операции"
-                                help="Ручная покупка и продажа ресурса через склад рынка."
                               />
                             </tr>
                           </thead>
@@ -1032,97 +931,10 @@ export default function MarketsModal({
                                 <td className="px-3 py-2 text-right text-fuchsia-200">
                                   {row.depositShare.toFixed(1)}%
                                 </td>
-                                <td className="px-3 py-2 text-right text-white/70">{row.suppliers}</td>
-                                <td className="px-3 py-2 text-right text-amber-200">
-                                  {row.priceIndex.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-cyan-200">
-                                  {row.warehouseStock.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-center">
-                                  <span
-                                    className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md border ${
-                                      row.liquidity === 'Высокая'
-                                        ? 'text-emerald-200 border-emerald-400/40 bg-emerald-500/15'
-                                        : row.liquidity === 'Средняя'
-                                          ? 'text-amber-200 border-amber-400/40 bg-amber-500/15'
-                                          : row.liquidity === 'Низкая'
-                                            ? 'text-orange-200 border-orange-400/40 bg-orange-500/15'
-                                            : 'text-rose-200 border-rose-400/40 bg-rose-500/15'
-                                    }`}
-                                  >
-                                    {row.liquidity}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <button
-                                      onClick={() =>
-                                        onTradeWithWarehouse({
-                                          marketId: memberMarket.id,
-                                          actorCountryId: activeCountryId,
-                                          resourceId: row.resourceId,
-                                          amount: warehouseTradeAmount,
-                                          action: 'sell',
-                                        })
-                                      }
-                                      disabled={!canTradeWarehouse}
-                                      className={`h-7 px-2 rounded-md border text-[11px] inline-flex items-center gap-1 ${
-                                        canTradeWarehouse
-                                          ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-100'
-                                          : 'border-white/10 bg-black/30 text-white/35 cursor-not-allowed'
-                                      }`}
-                                    >
-                                      <Package className="w-3.5 h-3.5" />
-                                      Продать
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        onTradeWithWarehouse({
-                                          marketId: memberMarket.id,
-                                          actorCountryId: activeCountryId,
-                                          resourceId: row.resourceId,
-                                          amount: warehouseTradeAmount,
-                                          action: 'buy',
-                                        })
-                                      }
-                                      disabled={!canTradeWarehouse || row.warehouseStock < warehouseTradeAmount}
-                                      className={`h-7 px-2 rounded-md border text-[11px] inline-flex items-center gap-1 ${
-                                        canTradeWarehouse && row.warehouseStock >= warehouseTradeAmount
-                                          ? 'border-sky-400/35 bg-sky-500/15 text-sky-100'
-                                          : 'border-white/10 bg-black/30 text-white/35 cursor-not-allowed'
-                                      }`}
-                                    >
-                                      <ShoppingCart className="w-3.5 h-3.5" />
-                                      Купить
-                                    </button>
-                                  </div>
-                                </td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <div className="text-white/85 text-sm font-semibold mb-2">
-                        Вклад стран в рынок
-                      </div>
-                      <div className="space-y-2">
-                        {goodsStats.byCountry.length > 0 ? (
-                          goodsStats.byCountry.map((entry) => (
-                            <div
-                              key={`country-trade:${entry.countryId}`}
-                              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between"
-                            >
-                              <span className="text-white/75 text-sm">{entry.countryName}</span>
-                              <span className="text-cyan-200 text-xs">{entry.total.toFixed(0)}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="text-white/50 text-sm">Нет данных по участникам рынка.</div>
-                        )}
                       </div>
                     </div>
                   </>
