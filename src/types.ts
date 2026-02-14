@@ -76,6 +76,7 @@ export type ProvinceData = {
   buildingsBuilt?: BuiltBuilding[];
   constructionProgress?: Record<string, ConstructionEntry[]>;
   logisticsPointsByCategory?: Record<string, number>;
+  lastLogisticsConsumedByCategory?: Record<string, number>;
 };
 
 export type LogisticsRouteType = {

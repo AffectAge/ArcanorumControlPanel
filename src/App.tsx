@@ -313,6 +313,9 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
     if (province.pollution == null) {
       province.pollution = 0;
     }
+    province.lastLogisticsConsumedByCategory = normalizeResourceMap(
+      province.lastLogisticsConsumedByCategory,
+    );
 
     if (!province.constructionProgress) {
       province.constructionProgress = {};
@@ -1805,11 +1808,26 @@ function App() {
       );
       if (!hasBuiltBuildings) {
         pendingMarketPriceMetricsRef.current = null;
-        return prev;
+        let changed = false;
+        const nextWithoutConsumption: ProvinceRecord = { ...prev };
+        Object.values(nextWithoutConsumption).forEach((province) => {
+          if (!province.lastLogisticsConsumedByCategory) return;
+          province.lastLogisticsConsumedByCategory = undefined;
+          changed = true;
+        });
+        return changed ? nextWithoutConsumption : prev;
       }
 
       const next: ProvinceRecord = {};
       const runtime: BuildingRuntime[] = [];
+      const remainingBuyerInfrastructureByProvinceIdAndCategory = new Map<
+        string,
+        Record<string, number>
+      >();
+      const consumedInfrastructureByProvinceIdAndCategory = new Map<
+        string,
+        Record<string, number>
+      >();
 
       Object.entries(prev).forEach(([provinceId, province]) => {
       const nextBuilt = (province.buildingsBuilt ?? []).map((entry) => {
@@ -1887,6 +1905,24 @@ function App() {
             purchaseNeedByResourceId[resourceId] = shortage;
           }
           if (shortage <= 0) return;
+          const resourceCategoryId = resourceById.get(resourceId)?.resourceCategoryId;
+          let buyerInfrastructureLeft = Number.POSITIVE_INFINITY;
+          if (resourceCategoryId) {
+            const currentInfrastructureByCategory =
+              remainingBuyerInfrastructureByProvinceIdAndCategory.get(buyer.provinceId) ??
+              {
+                ...(next[buyer.provinceId]?.logisticsPointsByCategory ?? {}),
+              };
+            remainingBuyerInfrastructureByProvinceIdAndCategory.set(
+              buyer.provinceId,
+              currentInfrastructureByCategory,
+            );
+            buyerInfrastructureLeft = Math.max(
+              0,
+              currentInfrastructureByCategory[resourceCategoryId] ?? 0,
+            );
+            if (buyerInfrastructureLeft <= 0) return;
+          }
 
           const prioritizedSellers = runtime
             .filter((seller) => seller !== buyer)
@@ -1924,7 +1960,12 @@ function App() {
             const affordable = Math.floor(buyerFunds / unitPrice);
             if (affordable <= 0) break;
 
-            const amount = Math.min(shortage, sellerStock, affordable);
+            const amount = Math.min(
+              shortage,
+              sellerStock,
+              affordable,
+              resourceCategoryId ? Math.floor(buyerInfrastructureLeft) : Number.POSITIVE_INFINITY,
+            );
             if (amount <= 0) continue;
 
             buyerWarehouse[resourceId] = Math.max(
@@ -1953,6 +1994,27 @@ function App() {
               (seller.entry.ducats ?? 0) + amount * unitPrice,
             );
             shortage -= amount;
+            if (resourceCategoryId) {
+              buyerInfrastructureLeft = Math.max(0, buyerInfrastructureLeft - amount);
+              const infrastructureByCategory =
+                remainingBuyerInfrastructureByProvinceIdAndCategory.get(
+                  buyer.provinceId,
+                );
+              if (infrastructureByCategory) {
+                infrastructureByCategory[resourceCategoryId] = buyerInfrastructureLeft;
+              }
+              const consumedByCategory =
+                consumedInfrastructureByProvinceIdAndCategory.get(buyer.provinceId) ?? {};
+              consumedByCategory[resourceCategoryId] = Math.max(
+                0,
+                (consumedByCategory[resourceCategoryId] ?? 0) + amount,
+              );
+              consumedInfrastructureByProvinceIdAndCategory.set(
+                buyer.provinceId,
+                consumedByCategory,
+              );
+              if (buyerInfrastructureLeft <= 0) break;
+            }
           }
         });
       }
@@ -2074,6 +2136,11 @@ function App() {
       collectMarketVolume();
       buyer.entry.lastExtractedByResourceId = normalizeResourceMap(actualExtractedByResourceId);
       buyer.entry.lastProducedByResourceId = normalizeResourceMap(actualProducedByResourceId);
+    });
+    Object.entries(next).forEach(([provinceId, province]) => {
+      province.lastLogisticsConsumedByCategory = normalizeResourceMap(
+        consumedInfrastructureByProvinceIdAndCategory.get(provinceId),
+      );
     });
     pendingMarketPriceMetricsRef.current = {
       demandByMarketAndResource,
@@ -3230,6 +3297,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       categoryColor?: string;
       status: 'available' | 'unavailable';
       points: number;
+      consumedLastTurn: number;
     }[]
     | undefined
   >(() => {
@@ -3244,6 +3312,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       categoryColor: category.color,
       status: 'unavailable' as const,
       points: 0,
+      consumedLastTurn: 0,
     }));
 
     const capitalId = activeCountryMarket?.capitalProvinceId;
@@ -3306,6 +3375,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         points: Math.max(
           0,
           provinces[selectedProvinceId]?.logisticsPointsByCategory?.[entry.categoryId] ?? 0,
+        ),
+        consumedLastTurn: Math.max(
+          0,
+          provinces[selectedProvinceId]?.lastLogisticsConsumedByCategory?.[entry.categoryId] ?? 0,
         ),
       };
     });

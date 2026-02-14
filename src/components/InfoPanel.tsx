@@ -45,6 +45,7 @@ interface InfoPanelProps {
     categoryColor?: string;
     status: 'available' | 'unavailable';
     points: number;
+    consumedLastTurn: number;
   }[];
 }
 
@@ -243,8 +244,8 @@ export default function InfoPanel({
                         }
                       >
                         {entry.status === 'available'
-                          ? `Есть (${entry.points})`
-                          : 'Нет'}
+                          ? `Есть (${entry.points}, -${entry.consumedLastTurn})`
+                          : `Нет (-${entry.consumedLastTurn})`}
                       </span>
                     </span>
                   </div>
