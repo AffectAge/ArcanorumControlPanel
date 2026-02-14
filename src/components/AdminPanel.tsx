@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import {
   X,
   Plus,
@@ -984,21 +984,21 @@ export default function AdminPanel({
     const getOperatorHint = (op: RequirementNode['op']) => {
       switch (op) {
         case 'and':
-          return 'AND — все условия должны быть истинны';
+          return 'AND вЂ” РІСЃРµ СѓСЃР»РѕРІРёСЏ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РёСЃС‚РёРЅРЅС‹';
         case 'or':
-          return 'OR — хотя бы одно условие истинно';
+          return 'OR вЂ” С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕ СѓСЃР»РѕРІРёРµ РёСЃС‚РёРЅРЅРѕ';
         case 'not':
-          return 'NOT — отрицание условий (ни одно не должно быть истинным)';
+          return 'NOT вЂ” РѕС‚СЂРёС†Р°РЅРёРµ СѓСЃР»РѕРІРёР№ (РЅРё РѕРґРЅРѕ РЅРµ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РёСЃС‚РёРЅРЅС‹Рј)';
         case 'xor':
-          return 'XOR — ровно одно условие истинно';
+          return 'XOR вЂ” СЂРѕРІРЅРѕ РѕРґРЅРѕ СѓСЃР»РѕРІРёРµ РёСЃС‚РёРЅРЅРѕ';
         case 'nand':
-          return 'NAND — НЕ (AND), хотя бы одно условие ложно';
+          return 'NAND вЂ” РќР• (AND), С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕ СѓСЃР»РѕРІРёРµ Р»РѕР¶РЅРѕ';
         case 'nor':
-          return 'NOR — НЕ (OR), ни одно условие не истинно';
+          return 'NOR вЂ” РќР• (OR), РЅРё РѕРґРЅРѕ СѓСЃР»РѕРІРёРµ РЅРµ РёСЃС‚РёРЅРЅРѕ';
         case 'implies':
-          return 'IMPLIES — если A, то B';
+          return 'IMPLIES вЂ” РµСЃР»Рё A, С‚Рѕ B';
         case 'eq':
-          return 'EQ — все условия имеют одинаковое значение';
+          return 'EQ вЂ” РІСЃРµ СѓСЃР»РѕРІРёСЏ РёРјРµСЋС‚ РѕРґРёРЅР°РєРѕРІРѕРµ Р·РЅР°С‡РµРЅРёРµ';
         default:
           return '';
       }
@@ -1006,26 +1006,26 @@ export default function AdminPanel({
 
     const getValidationMessage = (current: RequirementNode): string | null => {
       if (current.type === 'trait') {
-        return current.id ? null : 'Выберите значение';
+        return current.id ? null : 'Р’С‹Р±РµСЂРёС‚Рµ Р·РЅР°С‡РµРЅРёРµ';
       }
       const count = current.children.length;
       if (current.op === 'not') {
-        return count < 1 ? 'NOT требует минимум 1 условие' : null;
+        return count < 1 ? 'NOT С‚СЂРµР±СѓРµС‚ РјРёРЅРёРјСѓРј 1 СѓСЃР»РѕРІРёРµ' : null;
       }
       if (current.op === 'implies') {
-        return count < 2 ? 'IMPLIES требует минимум 2 условия' : null;
+        return count < 2 ? 'IMPLIES С‚СЂРµР±СѓРµС‚ РјРёРЅРёРјСѓРј 2 СѓСЃР»РѕРІРёСЏ' : null;
       }
       if (current.op === 'eq') {
-        return count < 2 ? 'EQ требует минимум 2 условия' : null;
+        return count < 2 ? 'EQ С‚СЂРµР±СѓРµС‚ РјРёРЅРёРјСѓРј 2 СѓСЃР»РѕРІРёСЏ' : null;
       }
       if (current.op === 'xor') {
-        return count < 2 ? 'XOR требует минимум 2 условия' : null;
+        return count < 2 ? 'XOR С‚СЂРµР±СѓРµС‚ РјРёРЅРёРјСѓРј 2 СѓСЃР»РѕРІРёСЏ' : null;
       }
       if (current.op === 'and' || current.op === 'or') {
-        return count < 1 ? 'Группа должна содержать условия' : null;
+        return count < 1 ? 'Р“СЂСѓРїРїР° РґРѕР»Р¶РЅР° СЃРѕРґРµСЂР¶Р°С‚СЊ СѓСЃР»РѕРІРёСЏ' : null;
       }
       if (current.op === 'nand' || current.op === 'nor') {
-        return count < 1 ? 'Группа должна содержать условия' : null;
+        return count < 1 ? 'Р“СЂСѓРїРїР° РґРѕР»Р¶РЅР° СЃРѕРґРµСЂР¶Р°С‚СЊ СѓСЃР»РѕРІРёСЏ' : null;
       }
       return null;
     };
@@ -1060,22 +1060,22 @@ export default function AdminPanel({
             className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
           >
             <option value="climate" className="bg-[#0b111b] text-white">
-              Климат
+              РљР»РёРјР°С‚
             </option>
             <option value="landscape" className="bg-[#0b111b] text-white">
-              Ландшафт
+              Р›Р°РЅРґС€Р°С„С‚
             </option>
             <option value="culture" className="bg-[#0b111b] text-white">
-              Культура
+              РљСѓР»СЊС‚СѓСЂР°
             </option>
             <option value="religion" className="bg-[#0b111b] text-white">
-              Религия
+              Р РµР»РёРіРёСЏ
             </option>
             <option value="continent" className="bg-[#0b111b] text-white">
-              Континент
+              РљРѕРЅС‚РёРЅРµРЅС‚
             </option>
             <option value="region" className="bg-[#0b111b] text-white">
-              Регион
+              Р РµРіРёРѕРЅ
             </option>
           </select>
           <select
@@ -1107,7 +1107,7 @@ export default function AdminPanel({
           >
             <Trash2 className="w-4 h-4 text-white/60" />
             <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-              Удалить условие
+              РЈРґР°Р»РёС‚СЊ СѓСЃР»РѕРІРёРµ
             </span>
           </button>
         </div>
@@ -1195,7 +1195,7 @@ export default function AdminPanel({
             }`}
           >
             <Plus className="w-3.5 h-3.5" />
-            Условие
+            РЈСЃР»РѕРІРёРµ
           </button>
           <button
             onClick={() =>
@@ -1215,7 +1215,7 @@ export default function AdminPanel({
             }`}
           >
             <Plus className="w-3.5 h-3.5" />
-            Группа
+            Р“СЂСѓРїРїР°
           </button>
           {!isRoot && (
             <button
@@ -1226,7 +1226,7 @@ export default function AdminPanel({
             >
               <Trash2 className="w-4 h-4 text-white/60" />
               <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                Удалить группу
+                РЈРґР°Р»РёС‚СЊ РіСЂСѓРїРїСѓ
               </span>
             </button>
           )}
@@ -1243,7 +1243,7 @@ export default function AdminPanel({
             ))
           ) : (
             <div className="text-white/40 text-xs">
-              Добавьте условия или группу.
+              Р”РѕР±Р°РІСЊС‚Рµ СѓСЃР»РѕРІРёСЏ РёР»Рё РіСЂСѓРїРїСѓ.
             </div>
           )}
         </div>
@@ -1257,7 +1257,7 @@ export default function AdminPanel({
       <div className="w-[100vw] h-[100vh] bg-[#0b111b] border border-white/10 rounded-none shadow-2xl overflow-hidden flex">
         <div className="w-84 border-r border-white/10 p-4 flex flex-col gap-2 overflow-y-auto legend-scroll">
           <div className="text-white text-lg font-semibold mb-2">
-            Панель администратора
+            РџР°РЅРµР»СЊ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°
           </div>
           <button
             onClick={() => setTab('provinces')}
@@ -1268,7 +1268,7 @@ export default function AdminPanel({
             }`}
           >
             <Shield className="w-4 h-4" />
-            Провинции
+            РџСЂРѕРІРёРЅС†РёРё
           </button>
           <button
             onClick={() => setTab('climates')}
@@ -1279,7 +1279,7 @@ export default function AdminPanel({
             }`}
           >
             <Cloud className="w-4 h-4" />
-            Климат
+            РљР»РёРјР°С‚
           </button>
           <button
             onClick={() => setTab('religions')}
@@ -1290,7 +1290,7 @@ export default function AdminPanel({
             }`}
           >
             <Landmark className="w-4 h-4" />
-            Религии
+            Р РµР»РёРіРёРё
           </button>
           <button
             onClick={() => setTab('landscapes')}
@@ -1301,7 +1301,7 @@ export default function AdminPanel({
             }`}
           >
             <Mountain className="w-4 h-4" />
-            Ландшафт
+            Р›Р°РЅРґС€Р°С„С‚
           </button>
           <button
             onClick={() => setTab('continents')}
@@ -1312,7 +1312,7 @@ export default function AdminPanel({
             }`}
           >
             <Globe2 className="w-4 h-4" />
-            Континенты
+            РљРѕРЅС‚РёРЅРµРЅС‚С‹
           </button>
           <button
             onClick={() => setTab('regions')}
@@ -1323,7 +1323,7 @@ export default function AdminPanel({
             }`}
           >
             <Map className="w-4 h-4" />
-            Регионы
+            Р РµРіРёРѕРЅС‹
           </button>
           <button
             onClick={() => setTab('cultures')}
@@ -1334,7 +1334,7 @@ export default function AdminPanel({
             }`}
           >
             <Palette className="w-4 h-4" />
-            Культуры
+            РљСѓР»СЊС‚СѓСЂС‹
           </button>
           <button
             onClick={() => setTab('resources')}
@@ -1345,7 +1345,7 @@ export default function AdminPanel({
             }`}
           >
             <Package className="w-4 h-4" />
-            Ресурсы
+            Р РµСЃСѓСЂСЃС‹
           </button>
           <button
             onClick={() => setTab('resourceCategories')}
@@ -1367,7 +1367,7 @@ export default function AdminPanel({
             }`}
           >
             <Building2 className="w-4 h-4" />
-            Здания
+            Р—РґР°РЅРёСЏ
           </button>
           <button
             onClick={() => setTab('industries')}
@@ -1378,7 +1378,7 @@ export default function AdminPanel({
             }`}
           >
             <Factory className="w-4 h-4" />
-            Отрасли
+            РћС‚СЂР°СЃР»Рё
           </button>
           <button
             onClick={() => setTab('companies')}
@@ -1389,7 +1389,7 @@ export default function AdminPanel({
             }`}
           >
             <Briefcase className="w-4 h-4" />
-            Компании
+            РљРѕРјРїР°РЅРёРё
           </button>
           <button
             onClick={() => setTab('routeTypes')}
@@ -1407,7 +1407,7 @@ export default function AdminPanel({
             className="mt-auto flex items-center gap-2 px-3 py-2 rounded-lg text-sm border bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30"
           >
             <X className="w-4 h-4" />
-            Закрыть
+            Р—Р°РєСЂС‹С‚СЊ
           </button>
         </div>
 
@@ -1415,21 +1415,21 @@ export default function AdminPanel({
           {tab === 'provinces' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Данные провинций</h2>
+                <h2 className="text-white text-xl font-semibold">Р”Р°РЅРЅС‹Рµ РїСЂРѕРІРёРЅС†РёР№</h2>
                 <p className="text-white/60 text-sm">
-                  Выберите провинцию и назначьте параметры.
+                  Р’С‹Р±РµСЂРёС‚Рµ РїСЂРѕРІРёРЅС†РёСЋ Рё РЅР°Р·РЅР°С‡СЊС‚Рµ РїР°СЂР°РјРµС‚СЂС‹.
                 </p>
               </div>
 
               <label className="flex flex-col gap-2 text-white/70 text-sm">
-                Провинция
+                РџСЂРѕРІРёРЅС†РёСЏ
                 <select
                   value={selectedProvince}
                   onChange={(event) => setSelectedProvince(event.target.value)}
                   className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                 >
                   <option value="" className="bg-[#0b111b] text-white">
-                    Выберите провинцию
+                    Р’С‹Р±РµСЂРёС‚Рµ РїСЂРѕРІРёРЅС†РёСЋ
                   </option>
                   {provinceIds.map((id) => (
                     <option key={id} value={id} className="bg-[#0b111b] text-white">
@@ -1442,7 +1442,7 @@ export default function AdminPanel({
               {activeProvince && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Владелец
+                    Р’Р»Р°РґРµР»РµС†
                     <select
                       value={activeProvince.ownerCountryId ?? ''}
                       onChange={(event) =>
@@ -1454,7 +1454,7 @@ export default function AdminPanel({
                       className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                     >
                       <option value="" className="bg-[#0b111b] text-white">
-                        Без владельца
+                        Р‘РµР· РІР»Р°РґРµР»СЊС†Р°
                       </option>
                       {countries.map((country) => (
                         <option
@@ -1469,7 +1469,7 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Климат
+                    РљР»РёРјР°С‚
                     <select
                       value={activeProvince.climateId ?? ''}
                       onChange={(event) =>
@@ -1481,7 +1481,7 @@ export default function AdminPanel({
                       className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                     >
                       <option value="" className="bg-[#0b111b] text-white">
-                        Не назначен
+                        РќРµ РЅР°Р·РЅР°С‡РµРЅ
                       </option>
                       {climates.map((climate) => (
                         <option
@@ -1496,7 +1496,7 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Религия
+                    Р РµР»РёРіРёСЏ
                     <select
                       value={activeProvince.religionId ?? ''}
                       onChange={(event) =>
@@ -1508,7 +1508,7 @@ export default function AdminPanel({
                       className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                     >
                       <option value="" className="bg-[#0b111b] text-white">
-                        Не назначена
+                        РќРµ РЅР°Р·РЅР°С‡РµРЅР°
                       </option>
                       {religions.map((religion) => (
                         <option
@@ -1523,7 +1523,7 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Ландшафт
+                    Р›Р°РЅРґС€Р°С„С‚
                     <select
                       value={activeProvince.landscapeId ?? ''}
                       onChange={(event) =>
@@ -1535,7 +1535,7 @@ export default function AdminPanel({
                       className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                     >
                       <option value="" className="bg-[#0b111b] text-white">
-                        Не назначен
+                        РќРµ РЅР°Р·РЅР°С‡РµРЅ
                       </option>
                       {landscapes.map((landscape) => (
                         <option
@@ -1550,7 +1550,7 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Континент
+                    РљРѕРЅС‚РёРЅРµРЅС‚
                     <select
                       value={activeProvince.continentId ?? ''}
                       onChange={(event) =>
@@ -1562,7 +1562,7 @@ export default function AdminPanel({
                       className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                     >
                       <option value="" className="bg-[#0b111b] text-white">
-                        Не назначен
+                        РќРµ РЅР°Р·РЅР°С‡РµРЅ
                       </option>
                       {continents.map((continent) => (
                         <option
@@ -1577,7 +1577,7 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Регион
+                    Р РµРіРёРѕРЅ
                     <select
                       value={activeProvince.regionId ?? ''}
                       onChange={(event) =>
@@ -1589,7 +1589,7 @@ export default function AdminPanel({
                       className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                     >
                       <option value="" className="bg-[#0b111b] text-white">
-                        Не назначен
+                        РќРµ РЅР°Р·РЅР°С‡РµРЅ
                       </option>
                       {regions.map((region) => (
                         <option
@@ -1604,7 +1604,7 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Культура
+                    РљСѓР»СЊС‚СѓСЂР°
                     <select
                       value={activeProvince.cultureId ?? ''}
                       onChange={(event) =>
@@ -1616,7 +1616,7 @@ export default function AdminPanel({
                       className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                     >
                       <option value="" className="bg-[#0b111b] text-white">
-                        Не назначена
+                        РќРµ РЅР°Р·РЅР°С‡РµРЅР°
                       </option>
                       {cultures.map((culture) => (
                         <option
@@ -1631,7 +1631,7 @@ export default function AdminPanel({
                   </label>
 
                   <div className="md:col-span-2">
-                    <div className="text-white/70 text-sm mb-2">Ресурсы</div>
+                    <div className="text-white/70 text-sm mb-2">Р РµСЃСѓСЂСЃС‹</div>
                     {resources.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {resources.map((resource) => (
@@ -1657,12 +1657,12 @@ export default function AdminPanel({
                         ))}
                       </div>
                     ) : (
-                      <div className="text-white/50 text-sm">Нет ресурсов</div>
+                      <div className="text-white/50 text-sm">РќРµС‚ СЂРµСЃСѓСЂСЃРѕРІ</div>
                     )}
                   </div>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Стоимость колонизации
+                    РЎС‚РѕРёРјРѕСЃС‚СЊ РєРѕР»РѕРЅРёР·Р°С†РёРё
                     <input
                       type="number"
                       min={1}
@@ -1689,11 +1689,11 @@ export default function AdminPanel({
                       }
                       className="w-4 h-4 accent-emerald-500"
                     />
-                    Запретить колонизацию
+                    Р—Р°РїСЂРµС‚РёС‚СЊ РєРѕР»РѕРЅРёР·Р°С†РёСЋ
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Радиация
+                    Р Р°РґРёР°С†РёСЏ
                     <input
                       type="number"
                       min={0}
@@ -1710,7 +1710,7 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Загрязнение
+                    Р—Р°РіСЂСЏР·РЅРµРЅРёРµ
                     <input
                       type="number"
                       min={0}
@@ -1727,7 +1727,7 @@ export default function AdminPanel({
                   </label>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Плодородность (%)
+                    РџР»РѕРґРѕСЂРѕРґРЅРѕСЃС‚СЊ (%)
                     <input
                       type="number"
                       min={0}
@@ -1744,7 +1744,7 @@ export default function AdminPanel({
                   </label>
 
                   <div className="md:col-span-2">
-                    <div className="text-white/70 text-sm mb-2">Здания</div>
+                    <div className="text-white/70 text-sm mb-2">Р—РґР°РЅРёСЏ</div>
                     {buildings.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {buildings.map((building) => {
@@ -1785,19 +1785,19 @@ export default function AdminPanel({
                                     {building.name}
                                   </div>
                                   <div className="text-white/50 text-xs">
-                                    Стоимость: {cost}
+                                    РЎС‚РѕРёРјРѕСЃС‚СЊ: {cost}
                                   </div>
                                 </div>
                               </div>
                               <div className="text-white/50 text-xs">
                                 {builtCount > 0 || inProgress
-                                  ? `Построено: ${builtCount}${
-                                      inProgress ? `, в стройке: ${inProgressCount}` : ''
+                                  ? `РџРѕСЃС‚СЂРѕРµРЅРѕ: ${builtCount}${
+                                      inProgress ? `, РІ СЃС‚СЂРѕР№РєРµ: ${inProgressCount}` : ''
                                     }`
-                                  : 'Не построено'}
+                                  : 'РќРµ РїРѕСЃС‚СЂРѕРµРЅРѕ'}
                                 {inProgress && (
                                   <span className="ml-2 text-white/40">
-                                    Ср. прогресс: {average}%
+                                    РЎСЂ. РїСЂРѕРіСЂРµСЃСЃ: {average}%
                                   </span>
                                 )}
                               </div>
@@ -1806,7 +1806,7 @@ export default function AdminPanel({
                         })}
                       </div>
                     ) : (
-                      <div className="text-white/50 text-sm">Нет зданий</div>
+                      <div className="text-white/50 text-sm">РќРµС‚ Р·РґР°РЅРёР№</div>
                     )}
                   </div>
                 </div>
@@ -1817,15 +1817,15 @@ export default function AdminPanel({
           {tab === 'climates' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Климат</h2>
+                <h2 className="text-white text-xl font-semibold">РљР»РёРјР°С‚</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте и редактируйте типы климата.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ Рё СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ С‚РёРїС‹ РєР»РёРјР°С‚Р°.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={climateName}
                     onChange={(event) => setClimateName(event.target.value)}
@@ -1833,7 +1833,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={climateColor}
@@ -1846,7 +1846,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -1885,15 +1885,15 @@ export default function AdminPanel({
           {tab === 'religions' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Религии</h2>
+                <h2 className="text-white text-xl font-semibold">Р РµР»РёРіРёРё</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте и редактируйте религии.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ Рё СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ СЂРµР»РёРіРёРё.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end flex-wrap">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={religionName}
                     onChange={(event) => setReligionName(event.target.value)}
@@ -1901,7 +1901,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={religionColor}
@@ -1910,7 +1910,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Логотип
+                  Р›РѕРіРѕС‚РёРї
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
@@ -1926,7 +1926,7 @@ export default function AdminPanel({
                       className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
                     >
                       <ImageIcon className="w-4 h-4" />
-                      Выбрать
+                      Р’С‹Р±СЂР°С‚СЊ
                     </label>
                     {religionIcon && (
                       <img
@@ -1942,7 +1942,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -1984,7 +1984,7 @@ export default function AdminPanel({
                           >
                             <Trash2 className="w-4 h-4 text-white/60" />
                             <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Удалить логотип
+                              РЈРґР°Р»РёС‚СЊ Р»РѕРіРѕС‚РёРї
                             </span>
                           </button>
                         )}
@@ -2004,7 +2004,7 @@ export default function AdminPanel({
                           />
                           <ImageIcon className="w-4 h-4" />
                           <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                            Изменить логотип
+                            РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
                           </span>
                         </label>
                       </div>
@@ -2024,15 +2024,15 @@ export default function AdminPanel({
           {tab === 'landscapes' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Ландшафт</h2>
+                <h2 className="text-white text-xl font-semibold">Р›Р°РЅРґС€Р°С„С‚</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте и редактируйте ландшафты.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ Рё СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ Р»Р°РЅРґС€Р°С„С‚С‹.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={landscapeName}
                     onChange={(event) => setLandscapeName(event.target.value)}
@@ -2040,7 +2040,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={landscapeColor}
@@ -2053,7 +2053,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -2092,15 +2092,15 @@ export default function AdminPanel({
           {tab === 'continents' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Континенты</h2>
+                <h2 className="text-white text-xl font-semibold">РљРѕРЅС‚РёРЅРµРЅС‚С‹</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте и редактируйте континенты.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ Рё СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ РєРѕРЅС‚РёРЅРµРЅС‚С‹.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={continentName}
                     onChange={(event) => setContinentName(event.target.value)}
@@ -2108,7 +2108,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={continentColor}
@@ -2121,7 +2121,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -2160,15 +2160,15 @@ export default function AdminPanel({
           {tab === 'regions' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Регионы</h2>
+                <h2 className="text-white text-xl font-semibold">Р РµРіРёРѕРЅС‹</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте и редактируйте регионы.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ Рё СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ СЂРµРіРёРѕРЅС‹.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={regionName}
                     onChange={(event) => setRegionName(event.target.value)}
@@ -2176,7 +2176,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={regionColor}
@@ -2189,7 +2189,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -2228,15 +2228,15 @@ export default function AdminPanel({
           {tab === 'cultures' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Культуры</h2>
+                <h2 className="text-white text-xl font-semibold">РљСѓР»СЊС‚СѓСЂС‹</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте и редактируйте культуры.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ Рё СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ РєСѓР»СЊС‚СѓСЂС‹.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end flex-wrap">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={cultureName}
                     onChange={(event) => setCultureName(event.target.value)}
@@ -2244,7 +2244,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={cultureColor}
@@ -2253,7 +2253,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Логотип
+                  Р›РѕРіРѕС‚РёРї
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
@@ -2269,7 +2269,7 @@ export default function AdminPanel({
                       className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
                     >
                       <ImageIcon className="w-4 h-4" />
-                      Выбрать
+                      Р’С‹Р±СЂР°С‚СЊ
                     </label>
                     {cultureIcon && (
                       <img
@@ -2285,7 +2285,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -2327,7 +2327,7 @@ export default function AdminPanel({
                           >
                             <Trash2 className="w-4 h-4 text-white/60" />
                             <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Удалить логотип
+                              РЈРґР°Р»РёС‚СЊ Р»РѕРіРѕС‚РёРї
                             </span>
                           </button>
                         )}
@@ -2347,7 +2347,7 @@ export default function AdminPanel({
                           />
                           <ImageIcon className="w-4 h-4" />
                           <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                            Изменить логотип
+                            РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
                           </span>
                         </label>
                       </div>
@@ -2438,15 +2438,15 @@ export default function AdminPanel({
           {tab === 'resources' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Ресурсы</h2>
+                <h2 className="text-white text-xl font-semibold">Р РµСЃСѓСЂСЃС‹</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте и редактируйте ресурсы.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ Рё СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ СЂРµСЃСѓСЂСЃС‹.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end flex-wrap">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={resourceName}
                     onChange={(event) => setResourceName(event.target.value)}
@@ -2454,7 +2454,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={resourceColor}
@@ -2463,7 +2463,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Логотип
+                  Р›РѕРіРѕС‚РёРї
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
@@ -2479,7 +2479,7 @@ export default function AdminPanel({
                       className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
                     >
                       <ImageIcon className="w-4 h-4" />
-                      Выбрать
+                      Р’С‹Р±СЂР°С‚СЊ
                     </label>
                     {resourceIcon && (
                       <img
@@ -2567,7 +2567,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -2682,7 +2682,7 @@ export default function AdminPanel({
                           >
                             <Trash2 className="w-4 h-4 text-white/60" />
                             <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Удалить логотип
+                              РЈРґР°Р»РёС‚СЊ Р»РѕРіРѕС‚РёРї
                             </span>
                           </button>
                         )}
@@ -2702,7 +2702,7 @@ export default function AdminPanel({
                           />
                           <ImageIcon className="w-4 h-4" />
                           <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                            Изменить логотип
+                            РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
                           </span>
                         </label>
                       </div>
@@ -2722,15 +2722,15 @@ export default function AdminPanel({
           {tab === 'buildings' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Здания</h2>
+                <h2 className="text-white text-xl font-semibold">Р—РґР°РЅРёСЏ</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте и редактируйте здания для строительства.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ Рё СЂРµРґР°РєС‚РёСЂСѓР№С‚Рµ Р·РґР°РЅРёСЏ РґР»СЏ СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР°.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end flex-wrap">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={buildingName}
                     onChange={(event) => setBuildingName(event.target.value)}
@@ -2738,7 +2738,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Стоимость
+                  РЎС‚РѕРёРјРѕСЃС‚СЊ
                   <input
                     type="number"
                     min={1}
@@ -2750,14 +2750,14 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
-                  Отрасль
+                  РћС‚СЂР°СЃР»СЊ
                   <select
                     value={buildingIndustryId}
                     onChange={(event) => setBuildingIndustryId(event.target.value)}
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   >
                     <option value="" className="bg-[#0b111b] text-white">
-                      Без отрасли
+                      Р‘РµР· РѕС‚СЂР°СЃР»Рё
                     </option>
                     {industries.map((industry) => (
                       <option
@@ -2787,7 +2787,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Логотип
+                  Р›РѕРіРѕС‚РёРї
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
@@ -2803,7 +2803,7 @@ export default function AdminPanel({
                       className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
                     >
                       <ImageIcon className="w-4 h-4" />
-                      Выбрать
+                      Р’С‹Р±СЂР°С‚СЊ
                     </label>
                     {buildingIcon && (
                       <img
@@ -2819,7 +2819,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
               {resources.length > 0 && (
@@ -2933,12 +2933,12 @@ export default function AdminPanel({
                             {building.name}
                           </div>
                           <div className="text-white/50 text-xs">
-                            Стоимость: {Math.max(1, building.cost ?? 1)}
+                            РЎС‚РѕРёРјРѕСЃС‚СЊ: {Math.max(1, building.cost ?? 1)}
                           </div>
                           <div className="text-white/40 text-xs">
-                            Отрасль:{' '}
+                            РћС‚СЂР°СЃР»СЊ:{' '}
                             {industries.find((i) => i.id === building.industryId)
-                              ?.name ?? '—'}
+                              ?.name ?? 'вЂ”'}
                           </div>
                           <div className="text-white/40 text-xs">
                             Экономика: старт {Math.max(0, building.startingDucats ?? 0)} / потр.{' '}
@@ -2960,7 +2960,7 @@ export default function AdminPanel({
                           className="h-7 rounded-lg bg-black/30 border border-white/10 px-2 text-white/70 text-[11px] focus:outline-none focus:border-emerald-400/40"
                         >
                           <option value="" className="bg-[#0b111b] text-white">
-                            Без отрасли
+                            Р‘РµР· РѕС‚СЂР°СЃР»Рё
                           </option>
                           {industries.map((industry) => (
                             <option
@@ -2982,7 +2982,7 @@ export default function AdminPanel({
                             >
                               <Trash2 className="w-4 h-4 text-white/60" />
                               <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                Удалить логотип
+                                РЈРґР°Р»РёС‚СЊ Р»РѕРіРѕС‚РёРї
                               </span>
                             </button>
                           )}
@@ -3003,7 +3003,7 @@ export default function AdminPanel({
                             />
                             <ImageIcon className="w-4 h-4" />
                             <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Изменить логотип
+                              РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
                             </span>
                           </label>
                           <button
@@ -3021,7 +3021,7 @@ export default function AdminPanel({
                           >
                             <Sliders className="w-4 h-4 text-white/60" />
                             <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Критерии
+                              РљСЂРёС‚РµСЂРёРё
                             </span>
                           </button>
                         </div>
@@ -3035,7 +3035,7 @@ export default function AdminPanel({
                     </div>
                   ))
                 ) : (
-                  <div className="text-white/50 text-sm">Нет зданий</div>
+                  <div className="text-white/50 text-sm">РќРµС‚ Р·РґР°РЅРёР№</div>
                 )}
               </div>
             </div>
@@ -3044,15 +3044,15 @@ export default function AdminPanel({
           {tab === 'industries' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Отрасли</h2>
+                <h2 className="text-white text-xl font-semibold">РћС‚СЂР°СЃР»Рё</h2>
                 <p className="text-white/60 text-sm">
-                  Добавляйте отрасли и логотипы для зданий.
+                  Р”РѕР±Р°РІР»СЏР№С‚Рµ РѕС‚СЂР°СЃР»Рё Рё Р»РѕРіРѕС‚РёРїС‹ РґР»СЏ Р·РґР°РЅРёР№.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end flex-wrap">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={industryName}
                     onChange={(event) => setIndustryName(event.target.value)}
@@ -3060,7 +3060,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={industryColor}
@@ -3069,7 +3069,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Логотип
+                  Р›РѕРіРѕС‚РёРї
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
@@ -3085,7 +3085,7 @@ export default function AdminPanel({
                       className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
                     >
                       <ImageIcon className="w-4 h-4" />
-                      Выбрать
+                      Р’С‹Р±СЂР°С‚СЊ
                     </label>
                     {industryIcon && (
                       <img
@@ -3101,7 +3101,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -3148,7 +3148,7 @@ export default function AdminPanel({
                             >
                               <Trash2 className="w-4 h-4 text-white/60" />
                               <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                Удалить логотип
+                                РЈРґР°Р»РёС‚СЊ Р»РѕРіРѕС‚РёРї
                               </span>
                             </button>
                           )}
@@ -3168,7 +3168,7 @@ export default function AdminPanel({
                             />
                             <ImageIcon className="w-4 h-4" />
                             <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Изменить логотип
+                              РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
                             </span>
                           </label>
                         </div>
@@ -3182,7 +3182,7 @@ export default function AdminPanel({
                     </div>
                   ))
                 ) : (
-                  <div className="text-white/50 text-sm">Нет отраслей</div>
+                  <div className="text-white/50 text-sm">РќРµС‚ РѕС‚СЂР°СЃР»РµР№</div>
                 )}
               </div>
             </div>
@@ -3190,15 +3190,15 @@ export default function AdminPanel({
           {tab === 'companies' && (
             <div className="space-y-4">
               <div>
-                <h2 className="text-white text-xl font-semibold">Компании</h2>
+                <h2 className="text-white text-xl font-semibold">РљРѕРјРїР°РЅРёРё</h2>
                 <p className="text-white/60 text-sm">
-                  Создавайте компании и назначайте их странам.
+                  РЎРѕР·РґР°РІР°Р№С‚Рµ РєРѕРјРїР°РЅРёРё Рё РЅР°Р·РЅР°С‡Р°Р№С‚Рµ РёС… СЃС‚СЂР°РЅР°Рј.
                 </p>
               </div>
 
               <div className="flex gap-3 items-end flex-wrap">
                 <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
-                  Название
+                  РќР°Р·РІР°РЅРёРµ
                   <input
                     value={companyName}
                     onChange={(event) => setCompanyName(event.target.value)}
@@ -3206,14 +3206,14 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[200px]">
-                  Страна
+                  РЎС‚СЂР°РЅР°
                   <select
                     value={companyCountryId}
                     onChange={(event) => setCompanyCountryId(event.target.value)}
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   >
                     <option value="" className="bg-[#0b111b] text-white">
-                      Выберите страну
+                      Р’С‹Р±РµСЂРёС‚Рµ СЃС‚СЂР°РЅСѓ
                     </option>
                     {countries.map((country) => (
                       <option
@@ -3227,7 +3227,7 @@ export default function AdminPanel({
                   </select>
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
+                  Р¦РІРµС‚
                   <input
                     type="color"
                     value={companyColor}
@@ -3236,7 +3236,7 @@ export default function AdminPanel({
                   />
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Логотип
+                  Р›РѕРіРѕС‚РёРї
                   <div className="flex items-center gap-2">
                     <input
                       type="file"
@@ -3252,7 +3252,7 @@ export default function AdminPanel({
                       className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
                     >
                       <ImageIcon className="w-4 h-4" />
-                      Выбрать
+                      Р’С‹Р±СЂР°С‚СЊ
                     </label>
                     {companyIcon && (
                       <img
@@ -3268,7 +3268,7 @@ export default function AdminPanel({
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  Добавить
+                  Р”РѕР±Р°РІРёС‚СЊ
                 </button>
               </div>
 
@@ -3299,7 +3299,7 @@ export default function AdminPanel({
                           <div>
                             <div className="text-white/80 text-sm">{company.name}</div>
                             <div className="text-white/50 text-xs">
-                              {country?.name ?? 'Без страны'}
+                              {country?.name ?? 'Р‘РµР· СЃС‚СЂР°РЅС‹'}
                             </div>
                           </div>
                         </div>
@@ -3320,7 +3320,7 @@ export default function AdminPanel({
                               >
                                 <Trash2 className="w-4 h-4 text-white/60" />
                                 <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                  Удалить логотип
+                                  РЈРґР°Р»РёС‚СЊ Р»РѕРіРѕС‚РёРї
                                 </span>
                               </button>
                             )}
@@ -3340,7 +3340,7 @@ export default function AdminPanel({
                               />
                               <ImageIcon className="w-4 h-4" />
                               <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                Изменить логотип
+                                РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
                               </span>
                             </label>
                           </div>
@@ -3355,7 +3355,7 @@ export default function AdminPanel({
                     );
                   })
                 ) : (
-                  <div className="text-white/50 text-sm">Нет компаний</div>
+                  <div className="text-white/50 text-sm">РќРµС‚ РєРѕРјРїР°РЅРёР№</div>
                 )}
               </div>
             </div>
@@ -4100,10 +4100,10 @@ export default function AdminPanel({
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
               <div>
                 <div className="text-white text-lg font-semibold">
-                  Критерии здания
+                  РљСЂРёС‚РµСЂРёРё Р·РґР°РЅРёСЏ
                 </div>
                 <div className="text-white/60 text-sm">
-                  {editingBuilding?.name ?? 'Здание'}
+                  {editingBuilding?.name ?? 'Р—РґР°РЅРёРµ'}
                 </div>
               </div>
               <button
@@ -4117,11 +4117,11 @@ export default function AdminPanel({
             <div className="flex-1 overflow-y-auto legend-scroll px-5 py-4 space-y-4">
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
                 <div className="text-white/80 text-sm font-semibold">
-                  Требования
+                  РўСЂРµР±РѕРІР°РЅРёСЏ
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Лимит на провинцию
+                    Р›РёРјРёС‚ РЅР° РїСЂРѕРІРёРЅС†РёСЋ
                     <input
                       type="number"
                       min={0}
@@ -4137,7 +4137,7 @@ export default function AdminPanel({
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Лимит на государство
+                    Р›РёРјРёС‚ РЅР° РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ
                     <input
                       type="number"
                       min={0}
@@ -4153,7 +4153,7 @@ export default function AdminPanel({
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Лимит на мир
+                    Р›РёРјРёС‚ РЅР° РјРёСЂ
                     <input
                       type="number"
                       min={0}
@@ -4172,19 +4172,19 @@ export default function AdminPanel({
 
                 <div className="space-y-2">
                   <div className="text-white/70 text-sm">
-                    Логические группы (климат/ландшафт/культура/религия)
+                    Р›РѕРіРёС‡РµСЃРєРёРµ РіСЂСѓРїРїС‹ (РєР»РёРјР°С‚/Р»Р°РЅРґС€Р°С„С‚/РєСѓР»СЊС‚СѓСЂР°/СЂРµР»РёРіРёСЏ)
                   </div>
                   {renderLogicNode(editReqLogic)}
                 </div>
 
                 <div className="space-y-2">
                   <div className="text-white/70 text-sm">
-                    Ограничение по владельцу
+                    РћРіСЂР°РЅРёС‡РµРЅРёРµ РїРѕ РІР»Р°РґРµР»СЊС†Сѓ
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <div className="text-white/50 text-xs">Страны</div>
+                        <div className="text-white/50 text-xs">РЎС‚СЂР°РЅС‹</div>
                         <select
                           value={editReqAllowedCountriesMode}
                           onChange={(event) =>
@@ -4195,10 +4195,10 @@ export default function AdminPanel({
                           className="h-7 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
                         >
                           <option value="allow" className="bg-[#0b111b] text-white">
-                            Белый список
+                            Р‘РµР»С‹Р№ СЃРїРёСЃРѕРє
                           </option>
                           <option value="deny" className="bg-[#0b111b] text-white">
-                            Черный список
+                            Р§РµСЂРЅС‹Р№ СЃРїРёСЃРѕРє
                           </option>
                         </select>
                       </div>
@@ -4227,12 +4227,12 @@ export default function AdminPanel({
                           ))}
                         </div>
                       ) : (
-                        <div className="text-white/50 text-sm">Нет стран</div>
+                        <div className="text-white/50 text-sm">РќРµС‚ СЃС‚СЂР°РЅ</div>
                       )}
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <div className="text-white/50 text-xs">Компании</div>
+                        <div className="text-white/50 text-xs">РљРѕРјРїР°РЅРёРё</div>
                         <select
                           value={editReqAllowedCompaniesMode}
                           onChange={(event) =>
@@ -4243,10 +4243,10 @@ export default function AdminPanel({
                           className="h-7 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
                         >
                           <option value="allow" className="bg-[#0b111b] text-white">
-                            Белый список
+                            Р‘РµР»С‹Р№ СЃРїРёСЃРѕРє
                           </option>
                           <option value="deny" className="bg-[#0b111b] text-white">
-                            Черный список
+                            Р§РµСЂРЅС‹Р№ СЃРїРёСЃРѕРє
                           </option>
                         </select>
                       </div>
@@ -4275,20 +4275,20 @@ export default function AdminPanel({
                           ))}
                         </div>
                       ) : (
-                        <div className="text-white/50 text-sm">Нет компаний</div>
+                        <div className="text-white/50 text-sm">РќРµС‚ РєРѕРјРїР°РЅРёР№</div>
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-white/70 text-sm">Радиация / Загрязнение</div>
+                  <div className="text-white/70 text-sm">Р Р°РґРёР°С†РёСЏ / Р—Р°РіСЂСЏР·РЅРµРЅРёРµ</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
-                      <div className="text-white/60 text-xs">Радиация</div>
+                      <div className="text-white/60 text-xs">Р Р°РґРёР°С†РёСЏ</div>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                          Мин
+                          РњРёРЅ
                           <input
                             type="number"
                             min={0}
@@ -4304,7 +4304,7 @@ export default function AdminPanel({
                           />
                         </label>
                         <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                          Макс
+                          РњР°РєСЃ
                           <input
                             type="number"
                             min={0}
@@ -4322,10 +4322,10 @@ export default function AdminPanel({
                       </div>
                     </div>
                     <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
-                      <div className="text-white/60 text-xs">Загрязнение</div>
+                      <div className="text-white/60 text-xs">Р—Р°РіСЂСЏР·РЅРµРЅРёРµ</div>
                       <div className="grid grid-cols-2 gap-2">
                         <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                          Мин
+                          РњРёРЅ
                           <input
                             type="number"
                             min={0}
@@ -4341,7 +4341,7 @@ export default function AdminPanel({
                           />
                         </label>
                         <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                          Макс
+                          РњР°РєСЃ
                           <input
                             type="number"
                             min={0}
@@ -4362,10 +4362,10 @@ export default function AdminPanel({
                 </div>
 
                 <div className="space-y-3">
-                  <div className="text-white/70 text-sm">Ресурсы</div>
+                  <div className="text-white/70 text-sm">Р РµСЃСѓСЂСЃС‹</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <div className="text-white/50 text-xs">Должны быть</div>
+                      <div className="text-white/50 text-xs">Р”РѕР»Р¶РЅС‹ Р±С‹С‚СЊ</div>
                       {resources.length > 0 ? (
                         resources.map((resource) => (
                           <label
@@ -4397,11 +4397,11 @@ export default function AdminPanel({
                           </label>
                         ))
                       ) : (
-                        <div className="text-white/50 text-sm">Нет ресурсов</div>
+                        <div className="text-white/50 text-sm">РќРµС‚ СЂРµСЃСѓСЂСЃРѕРІ</div>
                       )}
                     </div>
                     <div className="space-y-2">
-                      <div className="text-white/50 text-xs">Запрещены</div>
+                      <div className="text-white/50 text-xs">Р—Р°РїСЂРµС‰РµРЅС‹</div>
                       {resources.length > 0 ? (
                         resources.map((resource) => (
                           <label
@@ -4433,7 +4433,7 @@ export default function AdminPanel({
                           </label>
                         ))
                       ) : (
-                        <div className="text-white/50 text-sm">Нет ресурсов</div>
+                        <div className="text-white/50 text-sm">РќРµС‚ СЂРµСЃСѓСЂСЃРѕРІ</div>
                       )}
                     </div>
                   </div>
@@ -4441,7 +4441,7 @@ export default function AdminPanel({
 
                 <div className="space-y-2">
                   <div className="text-white/70 text-sm">
-                    Требования по зданиям
+                    РўСЂРµР±РѕРІР°РЅРёСЏ РїРѕ Р·РґР°РЅРёСЏРј
                   </div>
                   {buildings.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -4463,11 +4463,11 @@ export default function AdminPanel({
                               <div className="grid grid-cols-1 gap-3 text-xs">
                                 <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
                                   <div className="text-white/60 text-[11px]">
-                                    Провинция
+                                    РџСЂРѕРІРёРЅС†РёСЏ
                                   </div>
                                   <div className="grid grid-cols-1 gap-2">
                                     <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                                      Мин
+                                      РњРёРЅ
                                       <input
                                         type="number"
                                         min={0}
@@ -4491,7 +4491,7 @@ export default function AdminPanel({
                                       />
                                     </label>
                                     <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                                      Макс
+                                      РњР°РєСЃ
                                       <input
                                         type="number"
                                         min={0}
@@ -4518,11 +4518,11 @@ export default function AdminPanel({
                                 </div>
                                 <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
                                   <div className="text-white/60 text-[11px]">
-                                    Государство
+                                    Р“РѕСЃСѓРґР°СЂСЃС‚РІРѕ
                                   </div>
                                   <div className="grid grid-cols-1 gap-2">
                                     <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                                      Мин
+                                      РњРёРЅ
                                       <input
                                         type="number"
                                         min={0}
@@ -4546,7 +4546,7 @@ export default function AdminPanel({
                                       />
                                     </label>
                                     <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                                      Макс
+                                      РњР°РєСЃ
                                       <input
                                         type="number"
                                         min={0}
@@ -4573,11 +4573,11 @@ export default function AdminPanel({
                                 </div>
                                 <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
                                   <div className="text-white/60 text-[11px]">
-                                    Мир
+                                    РњРёСЂ
                                   </div>
                                   <div className="grid grid-cols-1 gap-2">
                                     <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                                      Мин
+                                      РњРёРЅ
                                       <input
                                         type="number"
                                         min={0}
@@ -4601,7 +4601,7 @@ export default function AdminPanel({
                                       />
                                     </label>
                                     <label className="flex flex-col gap-1 text-[10px] text-white/50">
-                                      Макс
+                                      РњР°РєСЃ
                                       <input
                                         type="number"
                                         min={0}
@@ -4632,7 +4632,7 @@ export default function AdminPanel({
                         })}
                     </div>
                   ) : (
-                    <div className="text-white/50 text-sm">Нет зданий</div>
+                    <div className="text-white/50 text-sm">РќРµС‚ Р·РґР°РЅРёР№</div>
                   )}
                 </div>
               </div>
@@ -4643,13 +4643,13 @@ export default function AdminPanel({
                 onClick={closeEditRequirements}
                 className="h-9 px-3 rounded-lg border border-white/10 bg-black/30 text-white/60 text-sm hover:border-emerald-400/40"
               >
-                Отмена
+                РћС‚РјРµРЅР°
               </button>
               <button
                 onClick={saveEditRequirements}
                 className="h-9 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm"
               >
-                Сохранить
+                РЎРѕС…СЂР°РЅРёС‚СЊ
               </button>
             </div>
           </div>

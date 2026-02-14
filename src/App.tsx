@@ -371,18 +371,18 @@ const defaultResourceCategories: ResourceCategory[] = [
 ];
 
 const initialMapLayers: MapLayer[] = [
-  { id: 'political', name: 'Политическая', visible: true },
-  { id: 'cultural', name: 'Культурная', visible: false },
-  { id: 'landscape', name: 'Ландшафт', visible: false },
-  { id: 'continent', name: 'Континент', visible: false },
-  { id: 'region', name: 'Регион', visible: false },
-  { id: 'climate', name: 'Климат', visible: false },
-  { id: 'religion', name: 'Религии', visible: false },
-  { id: 'resources', name: 'Ресурсы', visible: false },
-  { id: 'fertility', name: 'Плодородность', visible: false },
-  { id: 'radiation', name: 'Радиация', visible: false },
-  { id: 'pollution', name: 'Загрязнения', visible: false },
-  { id: 'colonization', name: 'Колонизация', visible: false },
+  { id: 'political', name: 'РџРѕР»РёС‚РёС‡РµСЃРєР°СЏ', visible: true },
+  { id: 'cultural', name: 'РљСѓР»СЊС‚СѓСЂРЅР°СЏ', visible: false },
+  { id: 'landscape', name: 'Р›Р°РЅРґС€Р°С„С‚', visible: false },
+  { id: 'continent', name: 'РљРѕРЅС‚РёРЅРµРЅС‚', visible: false },
+  { id: 'region', name: 'Р РµРіРёРѕРЅ', visible: false },
+  { id: 'climate', name: 'РљР»РёРјР°С‚', visible: false },
+  { id: 'religion', name: 'Р РµР»РёРіРёРё', visible: false },
+  { id: 'resources', name: 'Р РµСЃСѓСЂСЃС‹', visible: false },
+  { id: 'fertility', name: 'РџР»РѕРґРѕСЂРѕРґРЅРѕСЃС‚СЊ', visible: false },
+  { id: 'radiation', name: 'Р Р°РґРёР°С†РёСЏ', visible: false },
+  { id: 'pollution', name: 'Р—Р°РіСЂСЏР·РЅРµРЅРёСЏ', visible: false },
+  { id: 'colonization', name: 'РљРѕР»РѕРЅРёР·Р°С†РёСЏ', visible: false },
 ];
 
 function App() {
@@ -429,22 +429,22 @@ function App() {
   const [industryOpen, setIndustryOpen] = useState(false);
   const [diplomacyOpen, setDiplomacyOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>([
-    { id: createId(), name: 'Умеренный', color: '#38bdf8' },
-    { id: createId(), name: 'Засушливый', color: '#f59e0b' },
+    { id: createId(), name: 'РЈРјРµСЂРµРЅРЅС‹Р№', color: '#38bdf8' },
+    { id: createId(), name: 'Р—Р°СЃСѓС€Р»РёРІС‹Р№', color: '#f59e0b' },
   ]);
   const [religions, setReligions] = useState<Trait[]>([
-    { id: createId(), name: 'Солнечный культ', color: '#facc15' },
-    { id: createId(), name: 'Лунный культ', color: '#a855f7' },
+    { id: createId(), name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ РєСѓР»СЊС‚', color: '#facc15' },
+    { id: createId(), name: 'Р›СѓРЅРЅС‹Р№ РєСѓР»СЊС‚', color: '#a855f7' },
   ]);
   const [landscapes, setLandscapes] = useState<Trait[]>([
-    { id: createId(), name: 'Равнина', color: '#22c55e' },
-    { id: createId(), name: 'Горы', color: '#10b981' },
+    { id: createId(), name: 'Р Р°РІРЅРёРЅР°', color: '#22c55e' },
+    { id: createId(), name: 'Р“РѕСЂС‹', color: '#10b981' },
   ]);
   const [continents, setContinents] = useState<Trait[]>([]);
   const [regions, setRegions] = useState<Trait[]>([]);
   const [cultures, setCultures] = useState<Trait[]>([
-    { id: createId(), name: 'Северяне', color: '#fb7185' },
-    { id: createId(), name: 'Южане', color: '#f97316' },
+    { id: createId(), name: 'РЎРµРІРµСЂСЏРЅРµ', color: '#fb7185' },
+    { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
   ]);
   const [resources, setResources] = useState<Trait[]>([]);
   const [resourceCategories, setResourceCategories] = useState<ResourceCategory[]>(
@@ -1467,7 +1467,7 @@ function App() {
           province.colonizationProgress = {};
           addEvent({
             category: 'colonization',
-            message: `${country.name} завершила колонизацию провинции ${provinceId}.`,
+            message: `${country.name} Р·Р°РІРµСЂС€РёР»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
             countryId,
             priority: 'high',
           });
@@ -1490,25 +1490,13 @@ function App() {
     const country = countries.find((c) => c.id === countryId);
     const available = country?.constructionPoints ?? 0;
     if (!country || available <= 0) return;
-    const getConstructionOwnerCountryId = (
-      owner: BuildingOwner,
-      provinceOwnerCountryId?: string,
-    ): string | undefined =>
-      owner.type === 'state'
-        ? owner.countryId || provinceOwnerCountryId
-        : companies.find((company) => company.id === owner.companyId)?.countryId;
 
     let buildingTasksCount = 0;
     Object.values(provinces).forEach((province) => {
+      if (province.ownerCountryId !== countryId) return;
       const progress = province.constructionProgress ?? {};
       Object.values(progress).forEach((entries) => {
-        buildingTasksCount += entries.filter((entry) => {
-          const ownerCountryId = getConstructionOwnerCountryId(
-            entry.owner,
-            province.ownerCountryId,
-          );
-          return ownerCountryId === countryId;
-        }).length;
+        buildingTasksCount += entries.length;
       });
     });
 
@@ -1532,6 +1520,7 @@ function App() {
     setProvinces((prev) => {
       const next: ProvinceRecord = { ...prev };
       Object.values(next).forEach((province) => {
+        if (province.ownerCountryId !== countryId) return;
         const progress = { ...(province.constructionProgress ?? {}) };
         const builtList = [...(province.buildingsBuilt ?? [])];
         let progressChanged = false;
@@ -1543,18 +1532,8 @@ function App() {
             buildings.find((b) => b.id === buildingId)?.name ?? buildingId;
           const remaining: { progress: number; owner: BuildingOwner }[] = [];
           let completed = 0;
-          let touched = false;
 
           entries.forEach((entry) => {
-            const ownerCountryId = getConstructionOwnerCountryId(
-              entry.owner,
-              province.ownerCountryId,
-            );
-            if (ownerCountryId !== countryId) {
-              remaining.push(entry);
-              return;
-            }
-            touched = true;
             const updated = entry.progress + share;
             if (updated >= cost) {
               completed += 1;
@@ -1563,13 +1542,12 @@ function App() {
               remaining.push({ ...entry, progress: updated });
             }
           });
-          if (!touched) return;
 
           if (completed > 0) {
             builtChanged = true;
             addEvent({
               category: 'economy',
-              message: `Строительство завершено: ${buildingName} x${completed} в провинции ${province.id}.`,
+              message: `РЎС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ Р·Р°РІРµСЂС€РµРЅРѕ: ${buildingName} x${completed} РІ РїСЂРѕРІРёРЅС†РёРё ${province.id}.`,
               countryId,
               priority: 'medium',
             });
@@ -2037,7 +2015,7 @@ function App() {
       setTurn((prev) => prev + 1);
       addEvent({
         category: 'system',
-        message: `Начался глобальный ход ${turn + 1}`,
+        message: `РќР°С‡Р°Р»СЃСЏ РіР»РѕР±Р°Р»СЊРЅС‹Р№ С…РѕРґ ${turn + 1}`,
         priority: 'low',
       });
       countries.forEach((country) => {
@@ -2135,7 +2113,7 @@ function App() {
                 ?.name ?? proposal.toCountryId;
             addEvent({
               category: 'diplomacy',
-              message: `${toName} отклонила предложение договора от ${fromName} (истек срок).`,
+              message: `${toName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName} (РёСЃС‚РµРє СЃСЂРѕРє).`,
               countryId: proposal.toCountryId,
               priority: 'low',
             });
@@ -2603,7 +2581,7 @@ function App() {
       const now = new Date().toISOString();
       return {
         id: typeof entry.id === 'string' ? entry.id : createId(),
-        name: typeof entry.name === 'string' ? entry.name : 'Импорт',
+        name: typeof entry.name === 'string' ? entry.name : 'РРјРїРѕСЂС‚',
         createdAt: typeof entry.createdAt === 'string' ? entry.createdAt : now,
         updatedAt: typeof entry.updatedAt === 'string' ? entry.updatedAt : now,
         data: entry.data,
@@ -2626,7 +2604,7 @@ function App() {
     }
 
     if (incoming.length === 0) {
-      throw new Error('Файл не содержит корректных сохранений.');
+      throw new Error('Р¤Р°Р№Р» РЅРµ СЃРѕРґРµСЂР¶РёС‚ РєРѕСЂСЂРµРєС‚РЅС‹С… СЃРѕС…СЂР°РЅРµРЅРёР№.');
     }
 
     const existingIds = new Set(saves.map((save) => save.id));
@@ -2647,22 +2625,22 @@ function App() {
     setSelectedProvinceId(undefined);
     setProvinces({});
     setClimates([
-      { id: createId(), name: 'Умеренный', color: '#38bdf8' },
-      { id: createId(), name: 'Засушливый', color: '#f59e0b' },
+      { id: createId(), name: 'РЈРјРµСЂРµРЅРЅС‹Р№', color: '#38bdf8' },
+      { id: createId(), name: 'Р—Р°СЃСѓС€Р»РёРІС‹Р№', color: '#f59e0b' },
     ]);
     setReligions([
-      { id: createId(), name: 'Солнечный культ', color: '#facc15' },
-      { id: createId(), name: 'Лунный культ', color: '#a855f7' },
+      { id: createId(), name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ РєСѓР»СЊС‚', color: '#facc15' },
+      { id: createId(), name: 'Р›СѓРЅРЅС‹Р№ РєСѓР»СЊС‚', color: '#a855f7' },
     ]);
     setLandscapes([
-      { id: createId(), name: 'Равнина', color: '#22c55e' },
-      { id: createId(), name: 'Горы', color: '#10b981' },
+      { id: createId(), name: 'Р Р°РІРЅРёРЅР°', color: '#22c55e' },
+      { id: createId(), name: 'Р“РѕСЂС‹', color: '#10b981' },
     ]);
     setContinents([]);
     setRegions([]);
     setCultures([
-      { id: createId(), name: 'Северяне', color: '#fb7185' },
-      { id: createId(), name: 'Южане', color: '#f97316' },
+      { id: createId(), name: 'РЎРµРІРµСЂСЏРЅРµ', color: '#fb7185' },
+      { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
     ]);
     setResources([]);
     setResourceCategories(defaultResourceCategories);
@@ -3016,11 +2994,11 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     });
     legends.colonization = [
       ...colonizationLegend,
-      { label: 'Запрещено к колонизации', color: '#f87171' },
-      { label: 'Наши провинции', color: COLONIZATION_OWN_COLOR },
-      { label: 'Наши колонии', color: COLONIZATION_OWN_COLOR },
-      { label: 'Чужие провинции', color: COLONIZATION_OTHER_COLOR },
-      { label: 'Чужие колонии', color: COLONIZATION_OTHER_COLOR },
+      { label: 'Р—Р°РїСЂРµС‰РµРЅРѕ Рє РєРѕР»РѕРЅРёР·Р°С†РёРё', color: '#f87171' },
+      { label: 'РќР°С€Рё РїСЂРѕРІРёРЅС†РёРё', color: COLONIZATION_OWN_COLOR },
+      { label: 'РќР°С€Рё РєРѕР»РѕРЅРёРё', color: COLONIZATION_OWN_COLOR },
+      { label: 'Р§СѓР¶РёРµ РїСЂРѕРІРёРЅС†РёРё', color: COLONIZATION_OTHER_COLOR },
+      { label: 'Р§СѓР¶РёРµ РєРѕР»РѕРЅРёРё', color: COLONIZATION_OTHER_COLOR },
     ];
     legends.climate = climates.map((item) => ({
       label: item.name,
@@ -3059,7 +3037,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       color: item.color,
     }));
     if (countries.length > 5) {
-      legends.political.push({ label: 'Другие страны', color: '#94a3b8' });
+      legends.political.push({ label: 'Р”СЂСѓРіРёРµ СЃС‚СЂР°РЅС‹', color: '#94a3b8' });
     }
     const envSteps = [0, 20, 40, 60, 80, 100];
     legends.radiation = envSteps.slice(0, -1).map((from, index) => {
@@ -3523,7 +3501,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     if (activeLimit > 0 && activeCount >= activeLimit) {
       addEvent({
         category: 'colonization',
-        message: `${country?.name ?? 'Страна'} достигла лимита активных колонизаций (${activeLimit}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РґРѕСЃС‚РёРіР»Р° Р»РёРјРёС‚Р° Р°РєС‚РёРІРЅС‹С… РєРѕР»РѕРЅРёР·Р°С†РёР№ (${activeLimit}).`,
         countryId,
         priority: 'low',
       });
@@ -3539,7 +3517,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         progress[countryId] = 0;
         addEvent({
           category: 'colonization',
-          message: `${country?.name ?? 'Страна'} начала колонизацию провинции ${provinceId}.`,
+          message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РЅР°С‡Р°Р»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
           countryId,
           priority: 'medium',
         });
@@ -3564,7 +3542,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       delete progress[countryId];
       addEvent({
         category: 'colonization',
-        message: `${country?.name ?? 'Страна'} отменила колонизацию провинции ${provinceId}.`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° РєРѕР»РѕРЅРёР·Р°С†РёСЋ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
         countryId,
         priority: 'low',
       });
@@ -3796,7 +3774,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       payload.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${fromName} отправила предложение договора стране ${toName}.`,
+      message: `${fromName} РѕС‚РїСЂР°РІРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° СЃС‚СЂР°РЅРµ ${toName}.`,
       countryId: payload.fromCountryId,
       priority: 'low',
     });
@@ -3880,7 +3858,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           ?.name ?? proposal.agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `${voterName} подтвердила продление договора ${hostName} в†” ${guestName}.`,
+        message: `${voterName} РїРѕРґС‚РІРµСЂРґРёР»Р° РїСЂРѕРґР»РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° ${hostName} в†” ${guestName}.`,
         countryId: voterId,
         priority: 'low',
       });
@@ -3888,7 +3866,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         applyDiplomacyAgreement(renewedAgreement);
         addEvent({
           category: 'diplomacy',
-          message: `Договор ${hostName} в†” ${guestName} продлен.`,
+          message: `Р”РѕРіРѕРІРѕСЂ ${hostName} в†” ${guestName} РїСЂРѕРґР»РµРЅ.`,
           countryId: renewedAgreement.hostCountryId,
           priority: 'low',
         });
@@ -3942,7 +3920,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${toName} приняла предложение договора от ${fromName}.`,
+      message: `${toName} РїСЂРёРЅСЏР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName}.`,
       countryId: proposal.toCountryId,
       priority: 'low',
     });
@@ -3966,7 +3944,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           ?.name ?? proposal.agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `${deciderName} отклонила продление договора ${hostName} в†” ${guestName}.`,
+        message: `${deciderName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРѕРґР»РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° ${hostName} в†” ${guestName}.`,
         countryId: deciderId,
         priority: 'low',
       });
@@ -3980,7 +3958,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${toName} отклонила предложение договора от ${fromName}.`,
+      message: `${toName} РѕС‚РєР»РѕРЅРёР»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РѕС‚ ${fromName}.`,
       countryId: proposal.toCountryId,
       priority: 'low',
     });
@@ -4000,7 +3978,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       proposal.toCountryId;
     addEvent({
       category: 'diplomacy',
-      message: `${fromName} отозвала предложение договора для ${toName}.`,
+      message: `${fromName} РѕС‚РѕР·РІР°Р»Р° РїСЂРµРґР»РѕР¶РµРЅРёРµ РґРѕРіРѕРІРѕСЂР° РґР»СЏ ${toName}.`,
       countryId: proposal.fromCountryId,
       priority: 'low',
     });
@@ -4018,7 +3996,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         agreement.guestCountryId;
       addEvent({
         category: 'diplomacy',
-        message: `Договор ${hostName} в†’ ${guestName} отменён.`,
+        message: `Р”РѕРіРѕРІРѕСЂ ${hostName} в†’ ${guestName} РѕС‚РјРµРЅС‘РЅ.`,
         countryId: agreement.hostCountryId,
         priority: 'low',
       });
@@ -4112,9 +4090,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     const ownerLabel =
       owner.type === 'state'
         ? countries.find((item) => item.id === owner.countryId)?.name ??
-          'государство'
+          'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
         : companies.find((item) => item.id === owner.companyId)?.name ??
-          'компания';
+          'РєРѕРјРїР°РЅРёСЏ';
     setProvinces((prev) => {
       const province = prev[provinceId];
       if (!province || province.ownerCountryId == null) return prev;
@@ -4661,7 +4639,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       progress[buildingId] = entries;
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'Страна'} начала строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РЅР°С‡Р°Р»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -4692,9 +4670,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       const ownerLabel =
         removed?.owner.type === 'state'
           ? countries.find((item) => item.id === removed?.owner.countryId)?.name ??
-            'государство'
+            'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
           : companies.find((item) => item.id === removed?.owner.companyId)?.name ??
-            'компания';
+            'РєРѕРјРїР°РЅРёСЏ';
       if (entries.length > 0) {
         progress[buildingId] = entries;
       } else {
@@ -4702,7 +4680,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       }
       addEvent({
         category: 'economy',
-        message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+        message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
         countryId: province.ownerCountryId,
         priority: 'low',
       });
@@ -5397,17 +5375,17 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="w-[360px] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-white/10 text-white text-base font-semibold">
-              Предложение отправлено
+              РџСЂРµРґР»РѕР¶РµРЅРёРµ РѕС‚РїСЂР°РІР»РµРЅРѕ
             </div>
             <div className="px-5 py-4 text-white/70 text-sm">
-              Предложение направлено стране {diplomacySentNotice.toCountryName}.
+              РџСЂРµРґР»РѕР¶РµРЅРёРµ РЅР°РїСЂР°РІР»РµРЅРѕ СЃС‚СЂР°РЅРµ {diplomacySentNotice.toCountryName}.
             </div>
             <div className="px-5 py-4 border-t border-white/10 flex justify-end">
               <button
                 onClick={() => setDiplomacySentNotice({ open: false, toCountryName: '' })}
                 className="h-9 px-4 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm"
               >
-                Ок
+                РћРє
               </button>
             </div>
           </div>
@@ -5783,12 +5761,12 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             const ownerLabel =
               removed?.owner.type === 'state'
                 ? countries.find((item) => item.id === removed?.owner.countryId)
-                    ?.name ?? 'государство'
+                    ?.name ?? 'РіРѕСЃСѓРґР°СЂСЃС‚РІРѕ'
                 : companies.find((item) => item.id === removed?.owner.companyId)
-                    ?.name ?? 'компания';
+                    ?.name ?? 'РєРѕРјРїР°РЅРёСЏ';
             addEvent({
               category: 'economy',
-              message: `${country?.name ?? 'Страна'} отменила строительство ${buildingName} в провинции ${provinceId} (${ownerLabel}).`,
+              message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} РѕС‚РјРµРЅРёР»Р° СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІРѕ ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (${ownerLabel}).`,
               countryId: province.ownerCountryId,
               priority: 'low',
             });
@@ -5811,7 +5789,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           if (available < demolishCost) {
             addEvent({
               category: 'economy',
-              message: `Недостаточно очков строительства для сноса здания в провинции ${provinceId}.`,
+              message: `РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ РѕС‡РєРѕРІ СЃС‚СЂРѕРёС‚РµР»СЊСЃС‚РІР° РґР»СЏ СЃРЅРѕСЃР° Р·РґР°РЅРёСЏ РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId}.`,
               countryId: country?.id,
               priority: 'low',
             });
@@ -5844,7 +5822,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             const buildingName = building?.name ?? buildingId;
             addEvent({
               category: 'economy',
-              message: `${country?.name ?? 'Страна'} снесла ${buildingName} в провинции ${provinceId} (стоимость: ${demolishCost}).`,
+              message: `${country?.name ?? 'РЎС‚СЂР°РЅР°'} СЃРЅРµСЃР»Р° ${buildingName} РІ РїСЂРѕРІРёРЅС†РёРё ${provinceId} (СЃС‚РѕРёРјРѕСЃС‚СЊ: ${demolishCost}).`,
               countryId: province.ownerCountryId,
               priority: 'low',
             });
