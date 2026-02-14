@@ -1,4 +1,4 @@
-import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon, Plus } from 'lucide-react';
+import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon, Plus, Coins } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { expandDiplomacyAgreements } from '../diplomacyUtils';
 import type {
@@ -125,6 +125,13 @@ const getOwnerCountryId = (
   owner.type === 'state'
     ? owner.countryId
     : companies.find((c) => c.id === owner.companyId)?.countryId;
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+const getProductivityBarColor = (percent: number) => {
+  const safe = clamp01(percent / 100);
+  const hue = Math.round(120 * safe);
+  return `hsl(${hue} 85% 45%)`;
+};
 
 const isBuildingActiveForProvince = (
   building: BuildingDefinition | undefined,
@@ -947,6 +954,10 @@ export default function IndustryModal({
     () => new Map(resources.map((resource) => [resource.id, resource.name])),
     [resources],
   );
+  const resourceIconById = useMemo(
+    () => new Map(resources.map((resource) => [resource.id, resource.iconDataUrl])),
+    [resources],
+  );
 
   const getEconomyRows = (
     planned?: Record<string, number>,
@@ -960,6 +971,7 @@ export default function IndustryModal({
     return ids.map((id) => ({
       id,
       name: resourceNameById.get(id) ?? id,
+      iconDataUrl: resourceIconById.get(id),
       planned: Math.max(0, planned?.[id] ?? 0),
       actual: Math.max(0, actual?.[id] ?? 0),
     }));
@@ -1635,24 +1647,60 @@ export default function IndustryModal({
                                       Экономика
                                     </span>
                                     <div className="flex items-center gap-1.5 text-[10px]">
-                                      <span className="rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2 py-0.5 text-emerald-200">
-                                        {productivityPercent}% ПРД
-                                      </span>
-                                      <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums">
-                                        {(builtEntry?.ducats ?? 0).toFixed(2)} дк
+                                      <div className="relative group flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2 py-1">
+                                        <span className="text-white/75 tabular-nums">
+                                          Продуктивность: {productivityPercent}%
+                                        </span>
+                                        <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                          <div
+                                            className="h-full rounded-full transition-all"
+                                            style={{
+                                              width: `${productivityPercent}%`,
+                                              backgroundColor: getProductivityBarColor(
+                                                productivityPercent,
+                                              ),
+                                            }}
+                                          />
+                                        </div>
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                          Эффективность здания за ход.
+                                        </span>
+                                      </div>
+                                      <span className="relative group rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums inline-flex items-center gap-1.5">
+                                        <Coins className="w-3.5 h-3.5" />
+                                        {(builtEntry?.ducats ?? 0).toFixed(2)}
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                          Текущий запас дукатов здания.
+                                        </span>
                                       </span>
                                     </div>
                                   </div>
                                   <div className="space-y-2">
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                      <div className="text-white/50 text-[10px] uppercase tracking-wide">Склад</div>
+                                      <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                        Склад
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                          Ресурсы, доступные на складе здания.
+                                        </span>
+                                      </div>
                                       {warehouseRows.length > 0 ? (
                                         warehouseRows.map((row) => (
                                           <div
                                             key={`warehouse-${card.key}-${row.id}`}
                                             className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                           >
-                                            <span>{row.name}</span>
+                                            <span className="flex items-center gap-1.5">
+                                              {row.iconDataUrl ? (
+                                                <img
+                                                  src={row.iconDataUrl}
+                                                  alt=""
+                                                  className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                />
+                                              ) : (
+                                                <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                              )}
+                                              <span>{row.name}</span>
+                                            </span>
                                             <span>{row.actual.toFixed(2)}</span>
                                           </div>
                                         ))
@@ -1661,14 +1709,30 @@ export default function IndustryModal({
                                       )}
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                      <div className="text-white/50 text-[10px] uppercase tracking-wide">Потребление (макс / факт)</div>
+                                      <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                        Потребление (макс / факт)
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                          План и факт потребления ресурсов за ход.
+                                        </span>
+                                      </div>
                                       {consumptionRows.length > 0 ? (
                                         consumptionRows.map((row) => (
                                           <div
                                             key={`consume-${card.key}-${row.id}`}
                                             className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                           >
-                                            <span>{row.name}</span>
+                                            <span className="flex items-center gap-1.5">
+                                              {row.iconDataUrl ? (
+                                                <img
+                                                  src={row.iconDataUrl}
+                                                  alt=""
+                                                  className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                />
+                                              ) : (
+                                                <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                              )}
+                                              <span>{row.name}</span>
+                                            </span>
                                             <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
                                           </div>
                                         ))
@@ -1677,14 +1741,30 @@ export default function IndustryModal({
                                       )}
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                      <div className="text-white/50 text-[10px] uppercase tracking-wide">Добыча (макс / факт)</div>
+                                      <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                        Добыча (макс / факт)
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                          План и факт добычи ресурсов за ход.
+                                        </span>
+                                      </div>
                                       {extractionRows.length > 0 ? (
                                         extractionRows.map((row) => (
                                           <div
                                             key={`extract-${card.key}-${row.id}`}
                                             className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                           >
-                                            <span>{row.name}</span>
+                                            <span className="flex items-center gap-1.5">
+                                              {row.iconDataUrl ? (
+                                                <img
+                                                  src={row.iconDataUrl}
+                                                  alt=""
+                                                  className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                />
+                                              ) : (
+                                                <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                              )}
+                                              <span>{row.name}</span>
+                                            </span>
                                             <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
                                           </div>
                                         ))
@@ -1693,14 +1773,30 @@ export default function IndustryModal({
                                       )}
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                      <div className="text-white/50 text-[10px] uppercase tracking-wide">Производство (макс / факт)</div>
+                                      <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                        Производство (макс / факт)
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                          План и факт производства ресурсов за ход.
+                                        </span>
+                                      </div>
                                       {productionRows.length > 0 ? (
                                         productionRows.map((row) => (
                                           <div
                                             key={`produce-${card.key}-${row.id}`}
                                             className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                           >
-                                            <span>{row.name}</span>
+                                            <span className="flex items-center gap-1.5">
+                                              {row.iconDataUrl ? (
+                                                <img
+                                                  src={row.iconDataUrl}
+                                                  alt=""
+                                                  className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                />
+                                              ) : (
+                                                <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                              )}
+                                              <span>{row.name}</span>
+                                            </span>
                                             <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
                                           </div>
                                         ))
@@ -2100,27 +2196,66 @@ export default function IndustryModal({
                                 Экономика
                               </span>
                               <div className="flex items-center gap-1.5 text-[10px]">
-                                <span className="rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2 py-0.5 text-emerald-200">
-                                  {productivityPercent}% ПРД
+                                <div className="relative group flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2 py-1">
+                                  <span className="text-white/75 tabular-nums">
+                                    Продуктивность: {productivityPercent}%
+                                  </span>
+                                  <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full transition-all"
+                                      style={{
+                                        width: `${productivityPercent}%`,
+                                        backgroundColor: getProductivityBarColor(
+                                          productivityPercent,
+                                        ),
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Эффективность здания за ход.
+                                  </span>
+                                </div>
+                                <span className="relative group rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums inline-flex items-center gap-1.5">
+                                  <Coins className="w-3.5 h-3.5" />
+                                  {(builtEntry?.ducats ?? 0).toFixed(2)}
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Текущий запас дукатов здания.
+                                  </span>
                                 </span>
-                                <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums">
-                                  {(builtEntry?.ducats ?? 0).toFixed(2)} дк
-                                </span>
-                                <span className="rounded-full border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-cyan-200 tabular-nums">
+                                <span className="relative group rounded-full border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-cyan-200 tabular-nums">
                                   -{(builtEntry?.lastPurchaseCostDucats ?? 0).toFixed(2)} закуп
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                    Потрачено на закупки в этом ходу.
+                                  </span>
                                 </span>
                               </div>
                             </div>
                             <div className="space-y-2">
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Склад</div>
+                                <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                  Склад
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                    Ресурсы, доступные на складе здания.
+                                  </span>
+                                </div>
                                 {warehouseRows.length > 0 ? (
                                   warehouseRows.map((row) => (
                                     <div
                                       key={`warehouse-mobile-${card.key}-${row.id}`}
                                       className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                     >
-                                      <span>{row.name}</span>
+                                      <span className="flex items-center gap-1.5">
+                                        {row.iconDataUrl ? (
+                                          <img
+                                            src={row.iconDataUrl}
+                                            alt=""
+                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                          />
+                                        ) : (
+                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                        )}
+                                        <span>{row.name}</span>
+                                      </span>
                                       <span>{row.actual.toFixed(2)}</span>
                                     </div>
                                   ))
@@ -2129,14 +2264,30 @@ export default function IndustryModal({
                                 )}
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Потребление (макс / факт)</div>
+                                <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                  Потребление (макс / факт)
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                    План и факт потребления ресурсов за ход.
+                                  </span>
+                                </div>
                                 {consumptionRows.length > 0 ? (
                                   consumptionRows.map((row) => (
                                     <div
                                       key={`consume-mobile-${card.key}-${row.id}`}
                                       className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                     >
-                                      <span>{row.name}</span>
+                                      <span className="flex items-center gap-1.5">
+                                        {row.iconDataUrl ? (
+                                          <img
+                                            src={row.iconDataUrl}
+                                            alt=""
+                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                          />
+                                        ) : (
+                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                        )}
+                                        <span>{row.name}</span>
+                                      </span>
                                       <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
                                     </div>
                                   ))
@@ -2145,14 +2296,30 @@ export default function IndustryModal({
                                 )}
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Закуплено за ход (макс / факт)</div>
+                                <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                  Закуплено за ход (макс / факт)
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                    План и факт закупки ресурсов за ход.
+                                  </span>
+                                </div>
                                 {purchaseRows.length > 0 ? (
                                   purchaseRows.map((row) => (
                                     <div
                                       key={`purchase-${card.key}-${row.id}`}
                                       className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                     >
-                                      <span>{row.name}</span>
+                                      <span className="flex items-center gap-1.5">
+                                        {row.iconDataUrl ? (
+                                          <img
+                                            src={row.iconDataUrl}
+                                            alt=""
+                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                          />
+                                        ) : (
+                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                        )}
+                                        <span>{row.name}</span>
+                                      </span>
                                       <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
                                     </div>
                                   ))
@@ -2161,14 +2328,30 @@ export default function IndustryModal({
                                 )}
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Добыча (макс / факт)</div>
+                                <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                  Добыча (макс / факт)
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                    План и факт добычи ресурсов за ход.
+                                  </span>
+                                </div>
                                 {extractionRows.length > 0 ? (
                                   extractionRows.map((row) => (
                                     <div
                                       key={`extract-mobile-${card.key}-${row.id}`}
                                       className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                     >
-                                      <span>{row.name}</span>
+                                      <span className="flex items-center gap-1.5">
+                                        {row.iconDataUrl ? (
+                                          <img
+                                            src={row.iconDataUrl}
+                                            alt=""
+                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                          />
+                                        ) : (
+                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                        )}
+                                        <span>{row.name}</span>
+                                      </span>
                                       <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
                                     </div>
                                   ))
@@ -2177,14 +2360,30 @@ export default function IndustryModal({
                                 )}
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
-                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Производство (макс / факт)</div>
+                                <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                  Производство (макс / факт)
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                    План и факт производства ресурсов за ход.
+                                  </span>
+                                </div>
                                 {productionRows.length > 0 ? (
                                   productionRows.map((row) => (
                                     <div
                                       key={`produce-mobile-${card.key}-${row.id}`}
                                       className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
                                     >
-                                      <span>{row.name}</span>
+                                      <span className="flex items-center gap-1.5">
+                                        {row.iconDataUrl ? (
+                                          <img
+                                            src={row.iconDataUrl}
+                                            alt=""
+                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                          />
+                                        ) : (
+                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                        )}
+                                        <span>{row.name}</span>
+                                      </span>
                                       <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
                                     </div>
                                   ))
