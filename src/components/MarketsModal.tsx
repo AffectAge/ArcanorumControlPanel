@@ -65,40 +65,6 @@ type MarketsModalProps = {
 
 type MarketsTab = 'market' | 'goods';
 
-type ExchangeHeaderProps = {
-  label: string;
-  help: string;
-  align?: 'left' | 'right' | 'center';
-};
-
-function ExchangeHeader({ label, help, align = 'right' }: ExchangeHeaderProps) {
-  const alignClass =
-    align === 'left'
-      ? 'text-left'
-      : align === 'center'
-        ? 'text-center'
-        : 'text-right';
-  const contentAlignClass =
-    align === 'left'
-      ? 'justify-start'
-      : align === 'center'
-        ? 'justify-center'
-        : 'justify-end';
-  return (
-    <th className={`px-3 py-2 font-medium ${alignClass}`}>
-      <div className={`group relative inline-flex items-center gap-1.5 ${contentAlignClass}`}>
-        <span>{label}</span>
-        <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/20 bg-white/5 text-[10px] text-white/60">
-          ?
-        </span>
-        <span className="pointer-events-none absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100 z-20">
-          {help}
-        </span>
-      </div>
-    </th>
-  );
-}
-
 const PRICE_TREND_EPSILON = 0.0001;
 
 const getSparklinePath = (values: number[], width = 84, height = 22) => {
@@ -755,7 +721,7 @@ export default function MarketsModal({
                 )}
               </div>
             ) : (
-              <div className="max-w-6xl space-y-4">
+              <div className="w-full space-y-4">
                 {!memberMarket ? (
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white/60 text-sm">
                     Страна не состоит в рынке.
@@ -767,174 +733,118 @@ export default function MarketsModal({
                         <BarChart3 className="w-4 h-4" />
                         Биржа товаров
                       </div>
-                      <div className="text-white/55 text-xs mb-3">
-                        Ресурсы автоматически появляются на бирже. Склад - общий буфер рынка для покупок и продаж.
-                      </div>
-                      <div className="overflow-x-auto rounded-lg border border-white/10">
-                        <table className="min-w-[2060px] w-full text-xs">
-                          <thead className="bg-black/45 text-white/70">
-                            <tr>
-                              <ExchangeHeader
-                                align="left"
-                                label="#"
-                                help="Порядковый номер строки ресурса в таблице биржи."
-                              />
-                              <ExchangeHeader
-                                align="left"
-                                label="Товар"
-                                help="Название ресурса в текущей строке биржи."
-                              />
-                              <ExchangeHeader
-                                label="Цена за единицу"
-                                help="Текущая рыночная цена 1 единицы ресурса в вашем рынке и динамика за 10 последних ходов."
-                              />
-                              <ExchangeHeader
-                                label="Цена рынка"
-                                help="Оценка стоимости всего объема ресурса в рынке: цена за единицу x объем рынка."
-                              />
-                              <ExchangeHeader
-                                label="Спрос"
-                                help="Сумма максимального потребления этого ресурса зданиями рынка за ход."
-                              />
-                              <ExchangeHeader
-                                label="Предложение"
-                                help="Сумма Производства (факт) и Объема рынка. Это общее предложение, которое используется в расчете цены."
-                              />
-                              <ExchangeHeader
-                                label="Производство (факт)"
-                                help="Фактическая добыча и производство ресурса зданиями рынка за последний ход. Участвует в расчете цены как часть предложения."
-                              />
-                              <ExchangeHeader
-                                label="Производство (макс)"
-                                help="Максимально возможная добыча и производство по настройкам зданий рынка. В расчете цены не участвует."
-                              />
-                              <ExchangeHeader
-                                label="Объем рынка"
-                                help="Сумма ресурса на складах зданий, расположенных в провинциях стран вашего рынка. Участвует в расчете цены как часть предложения."
-                              />
-                              <ExchangeHeader
-                                label="Объем месторождений"
-                                help="Запасы ресурса в провинциях стран вашего рынка."
-                              />
-                              <ExchangeHeader
-                                label="Стоимость месторождений"
-                                help="Оценка запасов месторождений: объем месторождений x цена за единицу."
-                              />
-                              <ExchangeHeader
-                                label="Мировой объем"
-                                help="Сумма ресурса на складах всех зданий мира."
-                              />
-                              <ExchangeHeader
-                                label="Доля рынка"
-                                help="Доля вашего рынка в мировом объеме ресурса."
-                              />
-                              <ExchangeHeader
-                                label="Мировые запасы"
-                                help="Суммарные запасы ресурса в месторождениях всех провинций мира."
-                              />
-                              <ExchangeHeader
-                                label="Доля месторождений"
-                                help="Доля месторождений вашего рынка в мировых запасах ресурса."
-                              />
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {goodsStats.rows.map((row) => (
-                              <tr
-                                key={`exchange:${row.resourceId}`}
-                                className="border-t border-white/10 bg-black/20"
+                      <div className="space-y-2">
+                        {goodsStats.rows.map((row) => (
+                          <div
+                            key={`exchange:${row.resourceId}`}
+                            className="w-full rounded-xl border border-white/10 bg-black/30 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="inline-flex items-center gap-2 text-white/90">
+                                <span className="text-white/50 text-xs tabular-nums">
+                                  {row.index}.
+                                </span>
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: row.resourceColor }}
+                                />
+                                <span className="text-sm">{row.resourceName}</span>
+                              </div>
+                              <div
+                                className={`inline-flex flex-col items-end gap-1 rounded-md border px-2 py-1 ${
+                                  row.priceTrend === 'up'
+                                    ? 'text-emerald-200 border-emerald-400/40 bg-emerald-500/15'
+                                    : row.priceTrend === 'down'
+                                      ? 'text-rose-200 border-rose-400/40 bg-rose-500/15'
+                                      : 'text-white/90 border-white/25 bg-white/10'
+                                }`}
                               >
-                                <td className="px-3 py-2 text-white/55">{row.index}</td>
-                                <td className="px-3 py-2">
-                                  <span className="inline-flex items-center gap-2 text-white/80">
-                                    <span
-                                      className="w-2.5 h-2.5 rounded-full"
-                                      style={{ backgroundColor: row.resourceColor }}
-                                    />
-                                    {row.resourceName}
-                                  </span>
-                                </td>
-                                <td className="px-3 py-2 text-right">
-                                  <div className="inline-flex flex-col items-end gap-1">
-                                    <span
-                                      className={`inline-flex items-center gap-1 tabular-nums ${
+                                <span className="inline-flex items-center gap-1 text-sm tabular-nums">
+                                  {row.priceTrend === 'up' ? (
+                                    <ArrowUp className="w-3 h-3" />
+                                  ) : row.priceTrend === 'down' ? (
+                                    <ArrowDown className="w-3 h-3" />
+                                  ) : (
+                                    <Minus className="w-3 h-3" />
+                                  )}
+                                  Цена: {row.marketPrice.toFixed(2)}
+                                </span>
+                                <div className="rounded border border-white/15 bg-black/35 px-1.5 py-0.5">
+                                  <svg
+                                    viewBox="0 0 84 22"
+                                    className="h-5 w-[84px]"
+                                    aria-label="График цены за 10 ходов"
+                                  >
+                                    <path
+                                      d={getSparklinePath(row.marketPriceHistory)}
+                                      fill="none"
+                                      stroke={
                                         row.priceTrend === 'up'
-                                          ? 'text-emerald-200'
+                                          ? '#34d399'
                                           : row.priceTrend === 'down'
-                                            ? 'text-rose-200'
-                                            : 'text-white/90'
-                                      }`}
-                                    >
-                                      {row.priceTrend === 'up' ? (
-                                        <ArrowUp className="w-3 h-3" />
-                                      ) : row.priceTrend === 'down' ? (
-                                        <ArrowDown className="w-3 h-3" />
-                                      ) : (
-                                        <Minus className="w-3 h-3" />
-                                      )}
-                                      {row.marketPrice.toFixed(2)}
-                                    </span>
-                                    <svg
-                                      viewBox="0 0 84 22"
-                                      className="h-5 w-[84px]"
-                                      aria-label="График цены за 10 ходов"
-                                    >
-                                      <path
-                                        d={getSparklinePath(row.marketPriceHistory)}
-                                        fill="none"
-                                        stroke={
-                                          row.priceTrend === 'up'
-                                            ? '#34d399'
-                                            : row.priceTrend === 'down'
-                                              ? '#fb7185'
-                                              : '#f8fafc'
-                                        }
-                                        strokeWidth="1.8"
-                                        strokeLinecap="round"
-                                      />
-                                    </svg>
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2 text-right text-amber-200">
-                                  {row.marketValue.toFixed(2)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-rose-200">
-                                  {row.marketDemand.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-teal-200">
-                                  {row.marketOffer.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-teal-200">
-                                  {row.marketProductionFact.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-cyan-200">
-                                  {row.marketProductionMax.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-emerald-200">
-                                  {row.marketSupply.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-violet-200">
-                                  {row.depositSupply.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-fuchsia-200">
-                                  {row.depositValue.toFixed(2)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-white/70">
-                                  {row.worldMarketSupply.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-sky-200">
-                                  {row.marketShare.toFixed(1)}%
-                                </td>
-                                <td className="px-3 py-2 text-right text-violet-200">
-                                  {row.worldDeposits.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-fuchsia-200">
-                                  {row.depositShare.toFixed(1)}%
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                            ? '#fb7185'
+                                            : '#f8fafc'
+                                      }
+                                      strokeWidth="1.8"
+                                      strokeLinecap="round"
+                                    />
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 text-xs tabular-nums">
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Цена рынка</div>
+                                <div className="text-amber-200">{row.marketValue.toFixed(2)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Спрос</div>
+                                <div className="text-rose-200">{row.marketDemand.toFixed(0)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Предложение</div>
+                                <div className="text-teal-200">{row.marketOffer.toFixed(0)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Произв. факт</div>
+                                <div className="text-teal-200">{row.marketProductionFact.toFixed(0)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Произв. макс</div>
+                                <div className="text-cyan-200">{row.marketProductionMax.toFixed(0)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Объем рынка</div>
+                                <div className="text-emerald-200">{row.marketSupply.toFixed(0)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Месторождения</div>
+                                <div className="text-violet-200">{row.depositSupply.toFixed(0)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Стоимость мест.</div>
+                                <div className="text-fuchsia-200">{row.depositValue.toFixed(2)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Мировой объем</div>
+                                <div className="text-white/75">{row.worldMarketSupply.toFixed(0)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Доля рынка</div>
+                                <div className="text-sky-200">{row.marketShare.toFixed(1)}%</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Мировые запасы</div>
+                                <div className="text-violet-200">{row.worldDeposits.toFixed(0)}</div>
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
+                                <div className="text-white/45">Доля месторожд.</div>
+                                <div className="text-fuchsia-200">{row.depositShare.toFixed(1)}%</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </>
