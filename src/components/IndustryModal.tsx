@@ -1666,9 +1666,9 @@ export default function IndustryModal({
                                           Эффективность здания за ход.
                                         </span>
                                       </div>
-                                      <span className="relative group rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums inline-flex items-center gap-1.5">
+                                      <span className="relative group rounded-lg border border-white/15 bg-black/35 px-2 py-0.5 text-white-200 tabular-nums inline-flex items-center gap-1.5">
                                         <Coins className="w-3.5 h-3.5" />
-                                        {(builtEntry?.ducats ?? 0).toFixed(2)}
+                                        {(builtEntry?.ducats ?? 0).toFixed(1)}
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                                           Текущий запас дукатов здания.
                                         </span>
@@ -1702,7 +1702,7 @@ export default function IndustryModal({
                                                 )}
                                                 <span>{row.name}</span>
                                               </span>
-                                              <span className="text-cyan-200">{row.actual.toFixed(2)}</span>
+                                              <span className="text-white-200">{row.actual.toFixed(1)}</span>
                                             </div>
                                           </div>
                                         ))
@@ -1714,7 +1714,7 @@ export default function IndustryModal({
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
                                         Потребление
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
-                                          План и факт потребления ресурсов за ход.
+                                          План и фактическое потребление ресурсов за ход.
                                         </span>
                                       </div>
                                       {consumptionRows.length > 0 ? (
@@ -1738,10 +1738,10 @@ export default function IndustryModal({
                                               </span>
                                               <span className="inline-flex items-center gap-1">
                                                 <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
-                                                  факт {row.actual.toFixed(2)}
+                                                  Фактически {row.actual.toFixed(1)}
                                                 </span>
                                                 <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
-                                                  макс {row.planned.toFixed(2)}
+                                                  Максимально {row.planned.toFixed(1)}
                                                 </span>
                                               </span>
                                             </div>
@@ -1755,7 +1755,7 @@ export default function IndustryModal({
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
                                         Добыча
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
-                                          План и факт добычи ресурсов за ход.
+                                          План и фактическая добыча ресурсов за ход.
                                         </span>
                                       </div>
                                       {extractionRows.length > 0 ? (
@@ -1779,10 +1779,10 @@ export default function IndustryModal({
                                               </span>
                                               <span className="inline-flex items-center gap-1">
                                                 <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
-                                                  факт {row.actual.toFixed(2)}
+                                                  Фактически {row.actual.toFixed(1)}
                                                 </span>
                                                 <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
-                                                  макс {row.planned.toFixed(2)}
+                                                  Максимально {row.planned.toFixed(1)}
                                                 </span>
                                               </span>
                                             </div>
@@ -1796,7 +1796,7 @@ export default function IndustryModal({
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
                                         Производство 
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
-                                          План и факт производства ресурсов за ход.
+                                          План и фактическое производство ресурсов за ход.
                                         </span>
                                       </div>
                                       {productionRows.length > 0 ? (
@@ -1820,10 +1820,10 @@ export default function IndustryModal({
                                               </span>
                                               <span className="inline-flex items-center gap-1">
                                                 <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
-                                                  факт {row.actual.toFixed(2)}
+                                                  фактическое {row.actual.toFixed(1)}
                                                 </span>
                                                 <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
-                                                  макс {row.planned.toFixed(2)}
+                                                  Максимально {row.planned.toFixed(1)}
                                                 </span>
                                               </span>
                                             </div>
@@ -2246,13 +2246,13 @@ export default function IndustryModal({
                                 </div>
                                 <span className="relative group rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums inline-flex items-center gap-1.5">
                                   <Coins className="w-3.5 h-3.5" />
-                                  {(builtEntry?.ducats ?? 0).toFixed(2)}
+                                  {(builtEntry?.ducats ?? 0).toFixed(1)}
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                                     Текущий запас дукатов здания.
                                   </span>
                                 </span>
                                 <span className="relative group rounded-full border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-cyan-200 tabular-nums">
-                                  -{(builtEntry?.lastPurchaseCostDucats ?? 0).toFixed(2)} закуп
+                                  -{(builtEntry?.lastPurchaseCostDucats ?? 0).toFixed(1)} закуп
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                                     Потрачено на закупки в этом ходу.
                                   </span>
@@ -2286,7 +2286,7 @@ export default function IndustryModal({
                                           )}
                                           <span>{row.name}</span>
                                         </span>
-                                        <span className="text-cyan-200">{row.actual.toFixed(2)}</span>
+                                        <span className="text-cyan-200">{row.actual.toFixed(1)}</span>
                                       </div>
                                     </div>
                                   ))
@@ -2298,7 +2298,7 @@ export default function IndustryModal({
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
                                   Потребление
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
-                                    План и факт потребления ресурсов за ход.
+                                    План и фактическое потребление ресурсов за ход.
                                   </span>
                                 </div>
                                 {consumptionRows.length > 0 ? (
@@ -2322,10 +2322,10 @@ export default function IndustryModal({
                                         </span>
                                         <span className="inline-flex items-center gap-1">
                                           <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
-                                            факт {row.actual.toFixed(2)}
+                                            фактическое {row.actual.toFixed(1)}
                                           </span>
                                           <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
-                                            макс {row.planned.toFixed(2)}
+                                            Максимально {row.planned.toFixed(1)}
                                           </span>
                                         </span>
                                       </div>
@@ -2339,7 +2339,7 @@ export default function IndustryModal({
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
                                   Закуплено за ход
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
-                                    План и факт закупки ресурсов за ход.
+                                    План и фактические закупки ресурсов за ход.
                                   </span>
                                 </div>
                                 {purchaseRows.length > 0 ? (
@@ -2362,10 +2362,10 @@ export default function IndustryModal({
                                       </span>
                                       <span className="inline-flex items-center gap-1">
                                         <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
-                                          факт {row.actual.toFixed(2)}
+                                          Фактически {row.actual.toFixed(1)}
                                         </span>
                                         <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
-                                          макс {row.planned.toFixed(2)}
+                                          Максимально {row.planned.toFixed(1)}
                                         </span>
                                       </span>
                                     </div>
@@ -2378,7 +2378,7 @@ export default function IndustryModal({
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
                                   Добыча
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
-                                    План и факт добычи ресурсов за ход.
+                                    План и фактическая добыча ресурсов за ход.
                                   </span>
                                 </div>
                                 {extractionRows.length > 0 ? (
@@ -2402,10 +2402,10 @@ export default function IndustryModal({
                                         </span>
                                         <span className="inline-flex items-center gap-1">
                                           <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
-                                            факт {row.actual.toFixed(2)}
+                                            Фактически {row.actual.toFixed(1)}
                                           </span>
                                           <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
-                                            макс {row.planned.toFixed(2)}
+                                            Максимально {row.planned.toFixed(1)}
                                           </span>
                                         </span>
                                       </div>
@@ -2419,7 +2419,7 @@ export default function IndustryModal({
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
                                   Производство 
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
-                                    План и факт производства ресурсов за ход.
+                                    План и фактическое производство ресурсов за ход.
                                   </span>
                                 </div>
                                 {productionRows.length > 0 ? (
@@ -2443,10 +2443,10 @@ export default function IndustryModal({
                                         </span>
                                         <span className="inline-flex items-center gap-1">
                                           <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
-                                            факт {row.actual.toFixed(2)}
+                                            Фактически {row.actual.toFixed(1)}
                                           </span>
                                           <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
-                                            макс {row.planned.toFixed(2)}
+                                            Максимально {row.planned.toFixed(1)}
                                           </span>
                                         </span>
                                       </div>

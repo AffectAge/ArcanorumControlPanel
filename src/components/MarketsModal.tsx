@@ -926,9 +926,6 @@ export default function MarketsModal({
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="inline-flex items-center gap-2 text-white/90">
-                                <span className="text-white/50 text-xs tabular-nums">
-                                  {row.index}.
-                                </span>
                                 {row.resourceIconDataUrl ? (
                                   <img
                                     src={row.resourceIconDataUrl}
