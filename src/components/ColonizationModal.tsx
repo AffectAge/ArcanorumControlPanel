@@ -41,6 +41,13 @@ export default function ColonizationModal({
   const leader = progressEntries[0];
   const activeProgress = activeCountryId ? progress[activeCountryId] : undefined;
   const hasActive = activeCountryId ? activeCountryId in progress : false;
+  const isBlockedByOwner = Boolean(province.ownerCountryId);
+  const isBlockedByRule = Boolean(province.colonizationDisabled);
+  const canStart =
+    Boolean(activeCountryId) &&
+    !hasActive &&
+    !isBlockedByOwner &&
+    !isBlockedByRule;
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -99,7 +106,7 @@ export default function ColonizationModal({
           <div className="flex items-center gap-3 pt-2">
             <button
               onClick={onStart}
-              disabled={!activeCountryId || hasActive}
+              disabled={!canStart}
               className="h-11 px-4 rounded-lg flex items-center gap-2 bg-emerald-500/20 border border-emerald-400/50 text-emerald-200 hover:bg-emerald-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Flag className="w-4 h-4" />
@@ -116,6 +123,13 @@ export default function ColonizationModal({
             {activeCountryId && (
               <div className="text-white/50 text-xs">
                 Ваш прогресс: {activeProgress ? activeProgress.toFixed(1) : 0}
+              </div>
+            )}
+            {(isBlockedByOwner || isBlockedByRule) && (
+              <div className="text-amber-200 text-xs">
+                {isBlockedByOwner
+                  ? 'Провинция уже имеет владельца.'
+                  : 'Колонизация этой провинции отключена.'}
               </div>
             )}
           </div>

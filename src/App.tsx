@@ -1454,8 +1454,9 @@ function App() {
     setProvinces((prev) => {
       const next: ProvinceRecord = { ...prev };
       activeProvinceIds.forEach((provinceId) => {
-        const province = next[provinceId];
-        if (!province || province.ownerCountryId) return;
+        const sourceProvince = next[provinceId];
+        if (!sourceProvince || sourceProvince.ownerCountryId) return;
+        const province: ProvinceData = { ...sourceProvince };
         const progress = { ...(province.colonizationProgress ?? {}) };
         const current = progress[countryId] ?? 0;
         const updated = current + share;
@@ -1474,6 +1475,7 @@ function App() {
         } else {
           province.colonizationProgress = progress;
         }
+        next[provinceId] = province;
       });
       return next;
     });
@@ -1531,7 +1533,8 @@ function App() {
 
     setProvinces((prev) => {
       const next: ProvinceRecord = { ...prev };
-      Object.values(next).forEach((province) => {
+      Object.entries(next).forEach(([provinceId, sourceProvince]) => {
+        const province: ProvinceData = { ...sourceProvince };
         const progress = { ...(province.constructionProgress ?? {}) };
         const builtList = [...(province.buildingsBuilt ?? [])];
         let progressChanged = false;
@@ -1588,6 +1591,9 @@ function App() {
         }
         if (builtChanged) {
           province.buildingsBuilt = builtList;
+        }
+        if (progressChanged || builtChanged) {
+          next[provinceId] = province;
         }
       });
       return next;
@@ -3531,19 +3537,44 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     }
     setProvinces((prev) => {
       const province = prev[provinceId];
-      if (!province || province.ownerCountryId || province.colonizationDisabled) {
+      if (!province) {
+        return prev;
+      }
+      if (province.ownerCountryId) {
+        addEvent({
+          category: 'colonization',
+          message: `Колонизация невозможна: провинция ${provinceId} уже принадлежит стране.`,
+          countryId,
+          priority: 'low',
+        });
+        return prev;
+      }
+      if (province.colonizationDisabled) {
+        addEvent({
+          category: 'colonization',
+          message: `Колонизация провинции ${provinceId} запрещена настройками.`,
+          countryId,
+          priority: 'low',
+        });
         return prev;
       }
       const progress = { ...(province.colonizationProgress ?? {}) };
-      if (!(countryId in progress)) {
-        progress[countryId] = 0;
+      if (countryId in progress) {
         addEvent({
           category: 'colonization',
-          message: `${country?.name ?? 'Страна'} начала колонизацию провинции ${provinceId}.`,
+          message: `${country?.name ?? 'Страна'} уже колонизирует провинцию ${provinceId}.`,
           countryId,
-          priority: 'medium',
+          priority: 'low',
         });
+        return prev;
       }
+      progress[countryId] = 0;
+      addEvent({
+        category: 'colonization',
+        message: `${country?.name ?? 'Страна'} начала колонизацию провинции ${provinceId}.`,
+        countryId,
+        priority: 'medium',
+      });
       return {
         ...prev,
         [provinceId]: {
