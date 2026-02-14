@@ -66,6 +66,19 @@ const PRICE_TREND_EPSILON = 0.0001;
 const GRAPH_WIDTH = 84;
 const GRAPH_HEIGHT = 24;
 
+const formatCompactNumber = (value: number, smallDigits = 1) => {
+  if (!Number.isFinite(value)) return '0';
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  const trim = (input: string) =>
+    input.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
+  if (abs >= 1_000_000_000) return `${sign}${trim((abs / 1_000_000_000).toFixed(2))}b`;
+  if (abs >= 1_000_000) return `${sign}${trim((abs / 1_000_000).toFixed(2))}m`;
+  if (abs >= 1_000) return `${sign}${trim((abs / 1_000).toFixed(2))}k`;
+  if (Number.isInteger(value)) return `${value}`;
+  return trim(value.toFixed(smallDigits));
+};
+
 const getSparklinePath = (values: number[], width = GRAPH_WIDTH, height = GRAPH_HEIGHT) => {
   if (values.length === 0) return '';
   if (values.length === 1) {
@@ -81,7 +94,7 @@ const getSparklinePath = (values: number[], width = GRAPH_WIDTH, height = GRAPH_
       const x = index * step;
       const normalizedY = range <= PRICE_TREND_EPSILON ? 0.5 : (value - min) / range;
       const y = height - normalizedY * height;
-      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
     })
     .join(' ');
 };
@@ -175,15 +188,15 @@ const ShareDonut = ({
       </div>
       <span className="text-[10px] text-white/60 leading-none">{label}</span>
       <span className="text-[10px] text-white/85 tabular-nums leading-none">
-        {amountLabel}: {amount.toFixed(0)}
+        {amountLabel}: {formatCompactNumber(amount, 0)}
       </span>
       <span className="text-[9px] text-white/50 tabular-nums leading-none">
-        {secondaryAmountLabel}: {secondaryAmount.toFixed(0)}
+        {secondaryAmountLabel}: {formatCompactNumber(secondaryAmount, 0)}
       </span>
       <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-60 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
         {description}
         <br />
-        {amountLabel}: {amount.toFixed(0)} | {secondaryAmountLabel}: {secondaryAmount.toFixed(0)}
+        {amountLabel}: {formatCompactNumber(amount, 0)} | {secondaryAmountLabel}: {formatCompactNumber(secondaryAmount, 0)}
         {' '}({normalized.toFixed(1)}%)
       </span>
     </div>
@@ -933,7 +946,7 @@ export default function MarketsModal({
                               <div className="flex flex-wrap items-center justify-end gap-2">
                                 <MiniGraphCard
                                   title="Цена за ед."
-                                  value={row.marketPrice.toFixed(2)}
+                                  value={formatCompactNumber(row.marketPrice, 1)}
                                   valueClassName="text-yellow-200"
                                   borderClassName="border-yellow-400/35"
                                   bgClassName="bg-yellow-500/10"
@@ -950,7 +963,7 @@ export default function MarketsModal({
                                 />
                                 <MiniGraphCard
                                   title="Цена рынка"
-                                  value={row.marketValue.toFixed(2)}
+                                  value={formatCompactNumber(row.marketValue, 1)}
                                   valueClassName="text-amber-200"
                                   borderClassName="border-amber-400/35"
                                   bgClassName="bg-amber-500/10"
@@ -961,7 +974,7 @@ export default function MarketsModal({
                                 />
                                 <MiniGraphCard
                                   title="Стоимость мест."
-                                  value={row.depositValue.toFixed(2)}
+                                  value={formatCompactNumber(row.depositValue, 1)}
                                   valueClassName="text-fuchsia-200"
                                   borderClassName="border-fuchsia-400/35"
                                   bgClassName="bg-fuchsia-500/10"
@@ -972,7 +985,7 @@ export default function MarketsModal({
                                 />
                                 <MiniGraphCard
                                   title="Спрос"
-                                  value={row.marketDemand.toFixed(0)}
+                                  value={formatCompactNumber(row.marketDemand, 0)}
                                   valueClassName="text-rose-200"
                                   borderClassName="border-rose-400/35"
                                   bgClassName="bg-rose-500/10"
@@ -983,7 +996,7 @@ export default function MarketsModal({
                                 />
                                 <MiniGraphCard
                                   title="Предложение"
-                                  value={row.marketOffer.toFixed(0)}
+                                  value={formatCompactNumber(row.marketOffer, 0)}
                                   valueClassName="text-teal-200"
                                   borderClassName="border-teal-400/35"
                                   bgClassName="bg-teal-500/10"
@@ -994,7 +1007,7 @@ export default function MarketsModal({
                                 />
                                 <MiniGraphCard
                                   title="Произв. факт"
-                                  value={row.marketProductionFact.toFixed(0)}
+                                  value={formatCompactNumber(row.marketProductionFact, 0)}
                                   valueClassName="text-emerald-200"
                                   borderClassName="border-emerald-400/35"
                                   bgClassName="bg-emerald-500/10"
@@ -1005,7 +1018,7 @@ export default function MarketsModal({
                                 />
                                 <MiniGraphCard
                                   title="Произв. макс"
-                                  value={row.marketProductionMax.toFixed(0)}
+                                  value={formatCompactNumber(row.marketProductionMax, 0)}
                                   valueClassName="text-cyan-200"
                                   borderClassName="border-cyan-400/35"
                                   bgClassName="bg-cyan-500/10"
