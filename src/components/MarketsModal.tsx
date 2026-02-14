@@ -346,7 +346,6 @@ export default function MarketsModal({
       const supplyFact = marketProductionFact.get(resource.id) ?? 0;
       const warehouseStock = Math.max(0, warehouse[resource.id] ?? 0);
       const totalMarketStock = Math.max(0, marketBuildingVolume.get(resource.id) ?? 0);
-      const marketOffer = supplyFact + totalMarketStock;
       const marketPrice = Math.max(
         0.01,
         Number(
@@ -416,7 +415,6 @@ export default function MarketsModal({
         marketDemand: demand,
         marketProductionFact: supplyFact,
         marketProductionMax: supplyMax,
-        marketOffer,
         marketSupply: totalMarketStock,
         depositSupply: deposits,
         worldMarketSupply: worldMarketAmount,
@@ -851,7 +849,7 @@ export default function MarketsModal({
                         Ресурсы автоматически появляются на бирже. Склад - общий буфер рынка для покупок и продаж.
                       </div>
                       <div className="overflow-x-auto rounded-lg border border-white/10">
-                        <table className="min-w-[2060px] w-full text-xs">
+                        <table className="min-w-[1960px] w-full text-xs">
                           <thead className="bg-black/45 text-white/70">
                             <tr>
                               <ExchangeHeader
@@ -877,15 +875,11 @@ export default function MarketsModal({
                                 help="Сумма максимального потребления этого ресурса зданиями рынка за ход."
                               />
                               <ExchangeHeader
-                                label="Предложение"
-                                help="Сумма Производства (факт) и Объема рынка. Это общее предложение, которое используется в расчете цены."
-                              />
-                              <ExchangeHeader
-                                label="Производство (факт)"
+                                label="Предложение (факт)"
                                 help="Фактическая добыча и производство ресурса зданиями рынка за последний ход. Участвует в расчете цены как часть предложения."
                               />
                               <ExchangeHeader
-                                label="Производство (макс)"
+                                label="Предложение (макс)"
                                 help="Максимально возможная добыча и производство по настройкам зданий рынка. В расчете цены не участвует."
                               />
                               <ExchangeHeader
@@ -1001,9 +995,6 @@ export default function MarketsModal({
                                 </td>
                                 <td className="px-3 py-2 text-right text-rose-200">
                                   {row.marketDemand.toFixed(0)}
-                                </td>
-                                <td className="px-3 py-2 text-right text-teal-200">
-                                  {row.marketOffer.toFixed(0)}
                                 </td>
                                 <td className="px-3 py-2 text-right text-teal-200">
                                   {row.marketProductionFact.toFixed(0)}

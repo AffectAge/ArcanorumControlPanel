@@ -1649,16 +1649,37 @@ function App() {
     const demandByMarketAndResource = new Map<string, Record<string, number>>();
     const factualSupplyCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
     const marketVolumeCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
+    Object.values(provinces).forEach((province) => {
+      if (!province.ownerCountryId) return;
+      const market = marketByCountry.get(province.ownerCountryId);
+      if (!market) return;
+      const demand = demandByMarketAndResource.get(market.id) ?? {};
+      (province.buildingsBuilt ?? []).forEach((entry) => {
+        const inactiveByProductivity =
+          Number.isFinite(entry.lastProductivity) &&
+          Number(entry.lastProductivity) <= 0;
+        if (inactiveByProductivity) return;
+        const definition = definitionById.get(entry.buildingId);
+        Object.entries(definition?.consumptionByResourceId ?? {}).forEach(
+          ([resourceId, amount]) => {
+            if (!Number.isFinite(amount) || amount <= 0) return;
+            demand[resourceId] = Math.max(0, (demand[resourceId] ?? 0) + amount);
+          },
+        );
+      });
+      demandByMarketAndResource.set(market.id, demand);
+    });
 
-    const hasBuiltBuildings = Object.values(provinces).some(
-      (province) => (province.buildingsBuilt?.length ?? 0) > 0,
-    );
-    if (!hasBuiltBuildings) return;
+    setProvinces((prev) => {
+      const hasBuiltBuildings = Object.values(prev).some(
+        (province) => (province.buildingsBuilt?.length ?? 0) > 0,
+      );
+      if (!hasBuiltBuildings) return prev;
 
-    const next: ProvinceRecord = {};
-    const runtime: BuildingRuntime[] = [];
+      const next: ProvinceRecord = {};
+      const runtime: BuildingRuntime[] = [];
 
-    Object.entries(provinces).forEach(([provinceId, province]) => {
+      Object.entries(prev).forEach(([provinceId, province]) => {
         const nextBuilt = (province.buildingsBuilt ?? []).map((entry) => {
           const definition = definitionById.get(entry.buildingId);
           const startingDucats = normalizePositiveNumber(definition?.startingDucats) ?? 0;
@@ -1711,14 +1732,14 @@ function App() {
         });
       });
 
-    runtime.forEach((buyer) => {
+      runtime.forEach((buyer) => {
         const consumption = normalizeResourceMap(buyer.definition?.consumptionByResourceId);
         const extraction = normalizeResourceMap(buyer.definition?.extractionByResourceId);
         const production = normalizeResourceMap(buyer.definition?.productionByResourceId);
         const consumptionEntries = Object.entries(consumption ?? {});
         const buyerWarehouse = buyer.entry.warehouseByResourceId ?? {};
-        const buyerMarket = buyer.provinceOwnerCountryId
-          ? marketByCountry.get(buyer.provinceOwnerCountryId)
+        const buyerMarket = buyer.ownerCountryId
+          ? marketByCountry.get(buyer.ownerCountryId)
           : undefined;
         const purchaseNeedByResourceId: Record<string, number> = {};
         const actualPurchasedByResourceId: Record<string, number> = {};
@@ -1839,8 +1860,8 @@ function App() {
         buyer.entry.lastPurchaseCostDucats = Math.max(0, purchaseCostDucats);
         buyer.entry.lastConsumedByResourceId = normalizeResourceMap(actualConsumedByResourceId);
         buyer.entry.warehouseByResourceId = buyerWarehouse;
-        const buyerMarketId = buyer.provinceOwnerCountryId
-          ? marketByCountry.get(buyer.provinceOwnerCountryId)?.id
+        const buyerMarketId = buyer.ownerCountryId
+          ? marketByCountry.get(buyer.ownerCountryId)?.id
           : undefined;
         if (buyerMarketId) {
           const marketVolume =
@@ -1858,17 +1879,6 @@ function App() {
           buyer.entry.lastExtractedByResourceId = undefined;
           buyer.entry.lastProducedByResourceId = undefined;
           return;
-        }
-        if (buyerMarketId && consumptionEntries.length > 0) {
-          const marketDemand = demandByMarketAndResource.get(buyerMarketId) ?? {};
-          consumptionEntries.forEach(([resourceId, requiredAmount]) => {
-            if (!Number.isFinite(requiredAmount) || requiredAmount <= 0) return;
-            marketDemand[resourceId] = Math.max(
-              0,
-              (marketDemand[resourceId] ?? 0) + requiredAmount,
-            );
-          });
-          demandByMarketAndResource.set(buyerMarketId, marketDemand);
         }
 
         const provinceForExtraction = next[buyer.provinceId];
@@ -1930,7 +1940,9 @@ function App() {
         buyer.entry.lastExtractedByResourceId = normalizeResourceMap(actualExtractedByResourceId);
         buyer.entry.lastProducedByResourceId = normalizeResourceMap(actualProducedByResourceId);
       });
-    setProvinces(next);
+
+      return next;
+    });
     const nextMarketPricesByMarketId = new Map<string, Record<string, number>>();
     markets.forEach((market) => {
       const demand = demandByMarketAndResource.get(market.id) ?? {};
@@ -1948,10 +1960,10 @@ function App() {
         const resourceDemand = Math.max(0, demand[resource.id] ?? 0);
         const resourceSupplyFact = Math.max(0, factualSupply[resource.id] ?? 0);
         const resourceMarketVolume = Math.max(0, marketVolume[resource.id] ?? 0);
-        const resourceOffer = resourceSupplyFact + resourceMarketVolume;
-        const ratio = (resourceDemand + 1) / (resourceOffer + 1);
+        const resourceSupplyForPrice = resourceSupplyFact + resourceMarketVolume;
+        const ratio = (resourceDemand + 1) / (resourceSupplyForPrice + 1);
         let targetPrice =
-          Math.abs(resourceDemand - resourceOffer) < 0.0001
+          Math.abs(resourceDemand - resourceSupplyForPrice) < 0.0001
             ? basePrice
             : currentPrice * ratio;
         if (resource.minMarketPrice != null) {
