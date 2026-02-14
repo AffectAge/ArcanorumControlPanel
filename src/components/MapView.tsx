@@ -10,6 +10,7 @@ import {
   Leaf,
   Globe2,
   Map as MapIcon,
+  Route,
 } from 'lucide-react';
 import svgPanZoom from 'svg-pan-zoom';
 import mapUrl from '../assets/world-states-provinces.svg';
@@ -67,6 +68,7 @@ const layerTone: Record<string, string> = {
   radiation: 'from-lime-300/25 via-red-400/10 to-transparent',
   pollution: 'from-slate-300/25 via-amber-400/10 to-transparent',
   colonization: 'from-emerald-400/20 via-emerald-500/10 to-transparent',
+  routes: 'from-cyan-300/25 via-sky-400/10 to-transparent',
 };
 
 const layerIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -83,6 +85,7 @@ const layerIconMap: Record<string, React.ComponentType<{ className?: string }>> 
   radiation: CloudSun,
   pollution: Mountain,
   colonization: MapPinned,
+  routes: Route,
 };
 
 const stripeIdFromColor = (color: string) =>
@@ -461,120 +464,123 @@ export default function MapView({
     const byNodeId = new Map(logisticsNodes.map((node) => [node.id, node]));
     const routeTypeById = new Map(logisticsRouteTypes.map((item) => [item.id, item]));
 
-    logisticsEdges.forEach((edge) => {
-      const fromNode = byNodeId.get(edge.fromNodeId);
-      const toNode = byNodeId.get(edge.toNodeId);
-      if (!fromNode || !toNode) return;
-      const from = nodePoint(fromNode);
-      const to = nodePoint(toNode);
-      if (!from || !to) return;
-      const isOpen = edge.active !== false;
+    const routesLayerVisible = activeLayerIds.includes('routes');
+    if (routesLayerVisible) {
+      logisticsEdges.forEach((edge) => {
+        const fromNode = byNodeId.get(edge.fromNodeId);
+        const toNode = byNodeId.get(edge.toNodeId);
+        if (!fromNode || !toNode) return;
+        const from = nodePoint(fromNode);
+        const to = nodePoint(toNode);
+        if (!from || !to) return;
+        const isOpen = edge.active !== false;
 
-      const routeType = edge.routeTypeId
-        ? routeTypeById.get(edge.routeTypeId)
-        : logisticsRouteTypes[0];
-      const color = routeType?.color ?? '#f59e0b';
-      const dash = routeType?.dashPattern;
-      const width = Math.max(0.8, routeType?.lineWidth ?? 1.2);
+        const routeType = edge.routeTypeId
+          ? routeTypeById.get(edge.routeTypeId)
+          : logisticsRouteTypes[0];
+        const color = routeType?.color ?? '#f59e0b';
+        const dash = routeType?.dashPattern;
+        const width = Math.max(0.8, routeType?.lineWidth ?? 1.2);
 
-      const casing = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      casing.setAttribute('x1', `${from.x}`);
-      casing.setAttribute('y1', `${from.y}`);
-      casing.setAttribute('x2', `${to.x}`);
-      casing.setAttribute('y2', `${to.y}`);
-      casing.setAttribute('stroke', 'rgba(8, 15, 30, 0.96)');
-      casing.setAttribute('stroke-width', `${width + 1.1}`);
-      casing.setAttribute('stroke-linecap', 'round');
-      casing.setAttribute('opacity', isOpen ? '0.95' : '0.78');
-      overlay?.appendChild(casing);
+        const casing = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        casing.setAttribute('x1', `${from.x}`);
+        casing.setAttribute('y1', `${from.y}`);
+        casing.setAttribute('x2', `${to.x}`);
+        casing.setAttribute('y2', `${to.y}`);
+        casing.setAttribute('stroke', 'rgba(8, 15, 30, 0.96)');
+        casing.setAttribute('stroke-width', `${width + 1.1}`);
+        casing.setAttribute('stroke-linecap', 'round');
+        casing.setAttribute('opacity', isOpen ? '0.95' : '0.78');
+        overlay?.appendChild(casing);
 
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', `${from.x}`);
-      line.setAttribute('y1', `${from.y}`);
-      line.setAttribute('x2', `${to.x}`);
-      line.setAttribute('y2', `${to.y}`);
-      line.setAttribute('stroke', color);
-      line.setAttribute('stroke-width', `${width}`);
-      line.setAttribute('stroke-linecap', 'round');
-      line.setAttribute('opacity', isOpen ? '0.9' : '0.45');
-      if (dash) {
-        line.setAttribute('stroke-dasharray', dash);
-      }
-      overlay?.appendChild(line);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', `${from.x}`);
+        line.setAttribute('y1', `${from.y}`);
+        line.setAttribute('x2', `${to.x}`);
+        line.setAttribute('y2', `${to.y}`);
+        line.setAttribute('stroke', color);
+        line.setAttribute('stroke-width', `${width}`);
+        line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('opacity', isOpen ? '0.9' : '0.45');
+        if (dash) {
+          line.setAttribute('stroke-dasharray', dash);
+        }
+        overlay?.appendChild(line);
 
-      const centerLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      centerLine.setAttribute('x1', `${from.x}`);
-      centerLine.setAttribute('y1', `${from.y}`);
-      centerLine.setAttribute('x2', `${to.x}`);
-      centerLine.setAttribute('y2', `${to.y}`);
-      centerLine.setAttribute('stroke', 'rgba(255,255,255,0.78)');
-      centerLine.setAttribute('stroke-width', `${Math.max(0.45, width * 0.34)}`);
-      centerLine.setAttribute('stroke-linecap', 'round');
-      centerLine.setAttribute('opacity', isOpen ? '0.75' : '0.35');
-      if (dash) {
-        centerLine.setAttribute('stroke-dasharray', dash);
-      }
-      overlay?.appendChild(centerLine);
+        const centerLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        centerLine.setAttribute('x1', `${from.x}`);
+        centerLine.setAttribute('y1', `${from.y}`);
+        centerLine.setAttribute('x2', `${to.x}`);
+        centerLine.setAttribute('y2', `${to.y}`);
+        centerLine.setAttribute('stroke', 'rgba(255,255,255,0.78)');
+        centerLine.setAttribute('stroke-width', `${Math.max(0.45, width * 0.34)}`);
+        centerLine.setAttribute('stroke-linecap', 'round');
+        centerLine.setAttribute('opacity', isOpen ? '0.75' : '0.35');
+        if (dash) {
+          centerLine.setAttribute('stroke-dasharray', dash);
+        }
+        overlay?.appendChild(centerLine);
 
-      const drawNode = (x: number, y: number) => {
-        const nodeOuter = document.createElementNS(
-          'http://www.w3.org/2000/svg',
-          'circle',
-        );
-        nodeOuter.setAttribute('cx', `${x}`);
-        nodeOuter.setAttribute('cy', `${y}`);
-        nodeOuter.setAttribute('r', `${Math.max(1.4, width * 0.45)}`);
-        nodeOuter.setAttribute('fill', 'rgba(8, 15, 30, 0.96)');
-        overlay?.appendChild(nodeOuter);
+        const drawNode = (x: number, y: number) => {
+          const nodeOuter = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'circle',
+          );
+          nodeOuter.setAttribute('cx', `${x}`);
+          nodeOuter.setAttribute('cy', `${y}`);
+          nodeOuter.setAttribute('r', `${Math.max(1.4, width * 0.45)}`);
+          nodeOuter.setAttribute('fill', 'rgba(8, 15, 30, 0.96)');
+          overlay?.appendChild(nodeOuter);
 
-        const nodeInner = document.createElementNS(
-          'http://www.w3.org/2000/svg',
-          'circle',
-        );
-        nodeInner.setAttribute('cx', `${x}`);
-        nodeInner.setAttribute('cy', `${y}`);
-        nodeInner.setAttribute('r', `${Math.max(0.8, width * 0.22)}`);
-        nodeInner.setAttribute('fill', isOpen ? '#22c55e' : '#ef4444');
-        overlay?.appendChild(nodeInner);
-      };
-      drawNode(from.x, from.y);
-      drawNode(to.x, to.y);
-    });
+          const nodeInner = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'circle',
+          );
+          nodeInner.setAttribute('cx', `${x}`);
+          nodeInner.setAttribute('cy', `${y}`);
+          nodeInner.setAttribute('r', `${Math.max(0.8, width * 0.22)}`);
+          nodeInner.setAttribute('fill', isOpen ? '#22c55e' : '#ef4444');
+          overlay?.appendChild(nodeInner);
+        };
+        drawNode(from.x, from.y);
+        drawNode(to.x, to.y);
+      });
 
-    if (logisticsRouteProvinceIds.length > 1) {
-      for (let i = 0; i < logisticsRouteProvinceIds.length - 1; i += 1) {
-        const from = provinceCenters.get(logisticsRouteProvinceIds[i]);
-        const to = provinceCenters.get(logisticsRouteProvinceIds[i + 1]);
-        if (!from || !to) continue;
+      if (logisticsRouteProvinceIds.length > 1) {
+        for (let i = 0; i < logisticsRouteProvinceIds.length - 1; i += 1) {
+          const from = provinceCenters.get(logisticsRouteProvinceIds[i]);
+          const to = provinceCenters.get(logisticsRouteProvinceIds[i + 1]);
+          if (!from || !to) continue;
 
-        const previewCasing = document.createElementNS(
-          'http://www.w3.org/2000/svg',
-          'line',
-        );
-        previewCasing.setAttribute('x1', `${from.x}`);
-        previewCasing.setAttribute('y1', `${from.y}`);
-        previewCasing.setAttribute('x2', `${to.x}`);
-        previewCasing.setAttribute('y2', `${to.y}`);
-        previewCasing.setAttribute('stroke', 'rgba(8, 15, 30, 0.95)');
-        previewCasing.setAttribute('stroke-width', '2');
-        previewCasing.setAttribute('stroke-linecap', 'round');
-        previewCasing.setAttribute('opacity', '0.95');
-        overlay?.appendChild(previewCasing);
+          const previewCasing = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'line',
+          );
+          previewCasing.setAttribute('x1', `${from.x}`);
+          previewCasing.setAttribute('y1', `${from.y}`);
+          previewCasing.setAttribute('x2', `${to.x}`);
+          previewCasing.setAttribute('y2', `${to.y}`);
+          previewCasing.setAttribute('stroke', 'rgba(8, 15, 30, 0.95)');
+          previewCasing.setAttribute('stroke-width', '2');
+          previewCasing.setAttribute('stroke-linecap', 'round');
+          previewCasing.setAttribute('opacity', '0.95');
+          overlay?.appendChild(previewCasing);
 
-        const previewLine = document.createElementNS(
-          'http://www.w3.org/2000/svg',
-          'line',
-        );
-        previewLine.setAttribute('x1', `${from.x}`);
-        previewLine.setAttribute('y1', `${from.y}`);
-        previewLine.setAttribute('x2', `${to.x}`);
-        previewLine.setAttribute('y2', `${to.y}`);
-        previewLine.setAttribute('stroke', '#22d3ee');
-        previewLine.setAttribute('stroke-width', '1.05');
-        previewLine.setAttribute('stroke-linecap', 'round');
-        previewLine.setAttribute('stroke-dasharray', '5 3');
-        previewLine.setAttribute('opacity', '0.95');
-        overlay?.appendChild(previewLine);
+          const previewLine = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'line',
+          );
+          previewLine.setAttribute('x1', `${from.x}`);
+          previewLine.setAttribute('y1', `${from.y}`);
+          previewLine.setAttribute('x2', `${to.x}`);
+          previewLine.setAttribute('y2', `${to.y}`);
+          previewLine.setAttribute('stroke', '#22d3ee');
+          previewLine.setAttribute('stroke-width', '1.05');
+          previewLine.setAttribute('stroke-linecap', 'round');
+          previewLine.setAttribute('stroke-dasharray', '5 3');
+          previewLine.setAttribute('opacity', '0.95');
+          overlay?.appendChild(previewLine);
+        }
       }
     }
 

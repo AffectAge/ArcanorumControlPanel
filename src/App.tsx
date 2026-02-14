@@ -493,6 +493,7 @@ const initialMapLayers: MapLayer[] = [
   { id: 'radiation', name: 'Радиация', visible: false },
   { id: 'pollution', name: 'Загрязнения', visible: false },
   { id: 'colonization', name: 'Колонизация', visible: false },
+  { id: 'routes', name: 'Маршруты', visible: true },
 ];
 
 function App() {
@@ -637,17 +638,20 @@ function App() {
     productionMaxByMarketAndResource: Map<string, Record<string, number>>;
   } | null>(null);
 
-  const ensureMarketsMapLayer = useCallback((layers: MapLayer[]) => {
-    if (layers.some((layer) => layer.id === 'markets')) return layers;
-    return [
-      ...layers,
-      { id: 'markets', name: 'Рынки', visible: false },
-    ];
+  const ensureAdditionalMapLayers = useCallback((layers: MapLayer[]) => {
+    const nextLayers = [...layers];
+    if (!nextLayers.some((layer) => layer.id === 'markets')) {
+      nextLayers.push({ id: 'markets', name: 'Рынки', visible: false });
+    }
+    if (!nextLayers.some((layer) => layer.id === 'routes')) {
+      nextLayers.push({ id: 'routes', name: 'Маршруты', visible: true });
+    }
+    return nextLayers;
   }, []);
 
   useEffect(() => {
-    setMapLayers((prev) => ensureMarketsMapLayer(prev));
-  }, [ensureMarketsMapLayer]);
+    setMapLayers((prev) => ensureAdditionalMapLayers(prev));
+  }, [ensureAdditionalMapLayers]);
 
   useEffect(() => {
     setLogistics((prev) => {
@@ -2716,7 +2720,7 @@ function App() {
     setActiveCountryId(
       save.data.activeCountryId ?? save.data.countries[0]?.id ?? undefined,
     );
-    setMapLayers(ensureMarketsMapLayer(save.data.mapLayers ?? initialMapLayers));
+    setMapLayers(ensureAdditionalMapLayers(save.data.mapLayers ?? initialMapLayers));
     setSelectedProvinceId(save.data.selectedProvinceId);
     setProvinces(normalizeProvinceRecord(save.data.provinces ?? {}));
     setClimates(save.data.climates ?? climates);
@@ -3026,7 +3030,7 @@ function App() {
     setTurn(1);
     setCountries([]);
     setActiveCountryId(undefined);
-    setMapLayers(ensureMarketsMapLayer(initialMapLayers));
+    setMapLayers(ensureAdditionalMapLayers(initialMapLayers));
     setSelectedProvinceId(undefined);
     setProvinces({});
     setClimates(cloneTraits(startingData.climates));
@@ -3735,10 +3739,19 @@ const layerPaint: MapLayerPaint = useMemo(() => {
 
   const toggleLayer = (id: string) => {
     setMapLayers((prev) => {
-      const next = prev.map((layer) => ({
-        ...layer,
-        visible: layer.id === id,
-      }));
+      const next =
+        id === 'routes'
+          ? prev.map((layer) =>
+              layer.id === 'routes' ? { ...layer, visible: !layer.visible } : layer,
+            )
+          : prev.map((layer) =>
+              layer.id === 'routes'
+                ? layer
+                : {
+                    ...layer,
+                    visible: layer.id === id,
+                  },
+            );
       if (id === 'resources') {
         const resourcesLayer = next.find((layer) => layer.id === id);
         if (resourcesLayer?.visible && !selectedResourceId && resources.length > 0) {
