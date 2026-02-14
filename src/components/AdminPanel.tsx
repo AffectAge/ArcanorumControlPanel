@@ -402,6 +402,13 @@ export default function AdminPanel({
   const [resourceMaxMarketPrice, setResourceMaxMarketPrice] = useState<number | ''>(0);
   const [resourceInfrastructureCostPerUnit, setResourceInfrastructureCostPerUnit] =
     useState<number | ''>(1);
+  const [resourcePricingModalOpen, setResourcePricingModalOpen] = useState(false);
+  const [resourcePricingTargetId, setResourcePricingTargetId] = useState<string | null>(null);
+  const [pricingBasePrice, setPricingBasePrice] = useState<number | ''>(1);
+  const [pricingMinMarketPrice, setPricingMinMarketPrice] = useState<number | ''>(0);
+  const [pricingMaxMarketPrice, setPricingMaxMarketPrice] = useState<number | ''>(0);
+  const [pricingInfrastructureCostPerUnit, setPricingInfrastructureCostPerUnit] =
+    useState<number | ''>(1);
   const [routeTypeName, setRouteTypeName] = useState('');
   const [routeTypeColor, setRouteTypeColor] = useState('#38bdf8');
   const [routeTypeWidth, setRouteTypeWidth] = useState<number | ''>(1.2);
@@ -515,6 +522,58 @@ export default function AdminPanel({
     setResourceMinMarketPrice(0);
     setResourceMaxMarketPrice(0);
     setResourceInfrastructureCostPerUnit(1);
+  };
+
+  const openCreateResourcePricing = () => {
+    setResourcePricingTargetId(null);
+    setPricingBasePrice(resourceBasePrice);
+    setPricingMinMarketPrice(resourceMinMarketPrice);
+    setPricingMaxMarketPrice(resourceMaxMarketPrice);
+    setPricingInfrastructureCostPerUnit(resourceInfrastructureCostPerUnit);
+    setResourcePricingModalOpen(true);
+  };
+
+  const openEditResourcePricing = (resource: Trait) => {
+    setResourcePricingTargetId(resource.id);
+    setPricingBasePrice(resource.basePrice ?? 1);
+    setPricingMinMarketPrice(resource.minMarketPrice ?? 0);
+    setPricingMaxMarketPrice(resource.maxMarketPrice ?? 0);
+    setPricingInfrastructureCostPerUnit(resource.infrastructureCostPerUnit ?? 1);
+    setResourcePricingModalOpen(true);
+  };
+
+  const closeResourcePricingModal = () => {
+    setResourcePricingModalOpen(false);
+    setResourcePricingTargetId(null);
+  };
+
+  const saveResourcePricing = () => {
+    const nextBasePrice =
+      pricingBasePrice === '' ? 1 : Math.max(0.01, Number(pricingBasePrice) || 1);
+    const nextMinPrice =
+      pricingMinMarketPrice === '' ? 0 : Math.max(0, Number(pricingMinMarketPrice) || 0);
+    const nextMaxPrice =
+      pricingMaxMarketPrice === '' ? 0 : Math.max(0, Number(pricingMaxMarketPrice) || 0);
+    const nextInfra =
+      pricingInfrastructureCostPerUnit === ''
+        ? 1
+        : Math.max(0.01, Number(pricingInfrastructureCostPerUnit) || 1);
+
+    if (resourcePricingTargetId) {
+      onUpdateResourcePricing(resourcePricingTargetId, {
+        basePrice: nextBasePrice,
+        minMarketPrice: nextMinPrice,
+        maxMarketPrice: nextMaxPrice,
+        infrastructureCostPerUnit: nextInfra,
+      });
+    } else {
+      setResourceBasePrice(nextBasePrice);
+      setResourceMinMarketPrice(nextMinPrice);
+      setResourceMaxMarketPrice(nextMaxPrice);
+      setResourceInfrastructureCostPerUnit(nextInfra);
+    }
+
+    closeResourcePricingModal();
   };
 
   const handleAddResourceCategory = () => {
@@ -1841,22 +1900,24 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
-                  <input
-                    type="color"
-                    value={climateColor}
-                    onChange={(event) => setClimateColor(event.target.value)}
-                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
-                  />
-                </label>
-                <button
-                  onClick={handleAddClimate}
-                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить
-                </button>
+                <div className="ml-auto flex items-end gap-2">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Цвет
+                    <input
+                      type="color"
+                      value={climateColor}
+                      onChange={(event) => setClimateColor(event.target.value)}
+                      className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                    />
+                  </label>
+                  <button
+                    onClick={handleAddClimate}
+                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -1872,20 +1933,22 @@ export default function AdminPanel({
                       />
                       <span className="text-white/80 text-sm">{climate.name}</span>
                     </div>
-                    <input
-                      type="color"
-                      value={climate.color}
-                      onChange={(event) =>
-                        onUpdateClimateColor(climate.id, event.target.value)
-                      }
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
-                    />
-                    <button
-                      onClick={() => onDeleteClimate(climate.id)}
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                    >
-                      <Trash2 className="w-4 h-4 text-white/60" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={climate.color}
+                        onChange={(event) =>
+                          onUpdateClimateColor(climate.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <button
+                        onClick={() => onDeleteClimate(climate.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2017,13 +2080,13 @@ export default function AdminPanel({
                           </span>
                         </label>
                       </div>
+                      <button
+                        onClick={() => onDeleteReligion(religion.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => onDeleteReligion(religion.id)}
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                    >
-                      <Trash2 className="w-4 h-4 text-white/60" />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -2048,22 +2111,24 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
-                  <input
-                    type="color"
-                    value={landscapeColor}
-                    onChange={(event) => setLandscapeColor(event.target.value)}
-                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
-                  />
-                </label>
-                <button
-                  onClick={handleAddLandscape}
-                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить
-                </button>
+                <div className="ml-auto flex items-end gap-2">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Цвет
+                    <input
+                      type="color"
+                      value={landscapeColor}
+                      onChange={(event) => setLandscapeColor(event.target.value)}
+                      className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                    />
+                  </label>
+                  <button
+                    onClick={handleAddLandscape}
+                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2079,20 +2144,22 @@ export default function AdminPanel({
                       />
                       <span className="text-white/80 text-sm">{landscape.name}</span>
                     </div>
-                    <input
-                      type="color"
-                      value={landscape.color}
-                      onChange={(event) =>
-                        onUpdateLandscapeColor(landscape.id, event.target.value)
-                      }
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
-                    />
-                    <button
-                      onClick={() => onDeleteLandscape(landscape.id)}
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                    >
-                      <Trash2 className="w-4 h-4 text-white/60" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={landscape.color}
+                        onChange={(event) =>
+                          onUpdateLandscapeColor(landscape.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <button
+                        onClick={() => onDeleteLandscape(landscape.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2116,22 +2183,24 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
-                  <input
-                    type="color"
-                    value={continentColor}
-                    onChange={(event) => setContinentColor(event.target.value)}
-                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
-                  />
-                </label>
-                <button
-                  onClick={handleAddContinent}
-                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить
-                </button>
+                <div className="ml-auto flex items-end gap-2">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Цвет
+                    <input
+                      type="color"
+                      value={continentColor}
+                      onChange={(event) => setContinentColor(event.target.value)}
+                      className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                    />
+                  </label>
+                  <button
+                    onClick={handleAddContinent}
+                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2147,20 +2216,22 @@ export default function AdminPanel({
                       />
                       <span className="text-white/80 text-sm">{continent.name}</span>
                     </div>
-                    <input
-                      type="color"
-                      value={continent.color}
-                      onChange={(event) =>
-                        onUpdateContinentColor(continent.id, event.target.value)
-                      }
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
-                    />
-                    <button
-                      onClick={() => onDeleteContinent(continent.id)}
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                    >
-                      <Trash2 className="w-4 h-4 text-white/60" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={continent.color}
+                        onChange={(event) =>
+                          onUpdateContinentColor(continent.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <button
+                        onClick={() => onDeleteContinent(continent.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2184,22 +2255,24 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
-                  <input
-                    type="color"
-                    value={regionColor}
-                    onChange={(event) => setRegionColor(event.target.value)}
-                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
-                  />
-                </label>
-                <button
-                  onClick={handleAddRegion}
-                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить
-                </button>
+                <div className="ml-auto flex items-end gap-2">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Цвет
+                    <input
+                      type="color"
+                      value={regionColor}
+                      onChange={(event) => setRegionColor(event.target.value)}
+                      className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                    />
+                  </label>
+                  <button
+                    onClick={handleAddRegion}
+                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2215,20 +2288,22 @@ export default function AdminPanel({
                       />
                       <span className="text-white/80 text-sm">{region.name}</span>
                     </div>
-                    <input
-                      type="color"
-                      value={region.color}
-                      onChange={(event) =>
-                        onUpdateRegionColor(region.id, event.target.value)
-                      }
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
-                    />
-                    <button
-                      onClick={() => onDeleteRegion(region.id)}
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                    >
-                      <Trash2 className="w-4 h-4 text-white/60" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={region.color}
+                        onChange={(event) =>
+                          onUpdateRegionColor(region.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <button
+                        onClick={() => onDeleteRegion(region.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2360,13 +2435,13 @@ export default function AdminPanel({
                           </span>
                         </label>
                       </div>
+                      <button
+                        onClick={() => onDeleteCulture(culture.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => onDeleteCulture(culture.id)}
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                    >
-                      <Trash2 className="w-4 h-4 text-white/60" />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -2391,22 +2466,24 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
-                  <input
-                    type="color"
-                    value={resourceCategoryColor}
-                    onChange={(event) => setResourceCategoryColor(event.target.value)}
-                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
-                  />
-                </label>
-                <button
-                  onClick={handleAddResourceCategory}
-                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить
-                </button>
+                <div className="ml-auto flex items-end gap-2">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Цвет
+                    <input
+                      type="color"
+                      value={resourceCategoryColor}
+                      onChange={(event) => setResourceCategoryColor(event.target.value)}
+                      className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                    />
+                  </label>
+                  <button
+                    onClick={handleAddResourceCategory}
+                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2520,81 +2597,22 @@ export default function AdminPanel({
                     ))}
                   </select>
                 </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
-                  База
-                  <input
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    value={resourceBasePrice}
-                    onChange={(event) =>
-                      setResourceBasePrice(
-                        event.target.value === ''
-                          ? ''
-                          : Math.max(0.01, Number(event.target.value) || 0.01),
-                      )
-                    }
-                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
-                  Мин
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={resourceMinMarketPrice}
-                    onChange={(event) =>
-                      setResourceMinMarketPrice(
-                        event.target.value === ''
-                          ? ''
-                          : Math.max(0, Number(event.target.value) || 0),
-                      )
-                    }
-                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
-                  Макс
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={resourceMaxMarketPrice}
-                    onChange={(event) =>
-                      setResourceMaxMarketPrice(
-                        event.target.value === ''
-                          ? ''
-                          : Math.max(0, Number(event.target.value) || 0),
-                      )
-                    }
-                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
-                  Инфр/ед
-                  <input
-                    type="number"
-                    min={0.01}
-                    step={0.01}
-                    value={resourceInfrastructureCostPerUnit}
-                    onChange={(event) =>
-                      setResourceInfrastructureCostPerUnit(
-                        event.target.value === ''
-                          ? ''
-                          : Math.max(0.01, Number(event.target.value) || 0.01),
-                      )
-                    }
-                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
-                  />
-                </label>
-                <button
-                  onClick={handleAddResource}
-                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить
-                </button>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={openCreateResourcePricing}
+                    className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs hover:border-emerald-400/40 flex items-center gap-2"
+                  >
+                    <Sliders className="w-4 h-4" />
+                    Цены
+                  </button>
+                  <button
+                    onClick={handleAddResource}
+                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2655,108 +2673,48 @@ export default function AdminPanel({
                         }
                         className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                       />
-                      <label className="flex items-center gap-1 text-[10px] text-white/60">
-                        Б
+                      <button
+                        onClick={() => openEditResourcePricing(resource)}
+                        className="h-8 px-3 rounded-lg border border-white/10 bg-black/30 text-white/70 text-xs hover:border-emerald-400/40 flex items-center gap-1.5"
+                      >
+                        <Sliders className="w-3.5 h-3.5" />
+                        Цены
+                      </button>
+                      <label className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group">
                         <input
-                          type="number"
-                          min={0.01}
-                          step={0.01}
-                          value={resource.basePrice ?? 1}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
                           onChange={(event) =>
-                            onUpdateResourcePricing(resource.id, {
-                              basePrice: Math.max(0.01, Number(event.target.value) || 1),
-                            })
+                            handleIconUpload(
+                              event.target.files?.[0],
+                              (value) => onUpdateResourceIcon(resource.id, value),
+                            )
                           }
-                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
                         />
+                        <ImageIcon className="w-4 h-4" />
+                        <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                          Изменить логотип
+                        </span>
                       </label>
-                      <label className="flex items-center gap-1 text-[10px] text-white/60">
-                        Мин
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          value={resource.minMarketPrice ?? 0}
-                          onChange={(event) =>
-                            onUpdateResourcePricing(resource.id, {
-                              minMarketPrice: Math.max(0, Number(event.target.value) || 0),
-                            })
-                          }
-                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
-                        />
-                      </label>
-                      <label className="flex items-center gap-1 text-[10px] text-white/60">
-                        Макс
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          value={resource.maxMarketPrice ?? 0}
-                          onChange={(event) =>
-                            onUpdateResourcePricing(resource.id, {
-                              maxMarketPrice: Math.max(0, Number(event.target.value) || 0),
-                            })
-                          }
-                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
-                        />
-                      </label>
-                      <label className="flex items-center gap-1 text-[10px] text-white/60">
-                        Инфр
-                        <input
-                          type="number"
-                          min={0.01}
-                          step={0.01}
-                          value={resource.infrastructureCostPerUnit ?? 1}
-                          onChange={(event) =>
-                            onUpdateResourcePricing(resource.id, {
-                              infrastructureCostPerUnit: Math.max(
-                                0.01,
-                                Number(event.target.value) || 1,
-                              ),
-                            })
-                          }
-                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
-                        />
-                      </label>
-                      <div className="flex items-center gap-2 flex-row-reverse">
-                        {resource.iconDataUrl && (
-                          <button
-                            onClick={() => onUpdateResourceIcon(resource.id, undefined)}
-                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
-                          >
-                            <Trash2 className="w-4 h-4 text-white/60" />
-                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                              Удалить логотип
-                            </span>
-                          </button>
-                        )}
-                        <label
-                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group"
+                      {resource.iconDataUrl && (
+                        <button
+                          onClick={() => onUpdateResourceIcon(resource.id, undefined)}
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
                         >
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              handleIconUpload(
-                                event.target.files?.[0],
-                                (value) => onUpdateResourceIcon(resource.id, value),
-                              )
-                            }
-                          />
-                          <ImageIcon className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 text-white/60" />
                           <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                            РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
+                            Удалить логотип
                           </span>
-                        </label>
-                      </div>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onDeleteResource(resource.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => onDeleteResource(resource.id)}
-                      className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                    >
-                      <Trash2 className="w-4 h-4 text-white/60" />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -3270,50 +3228,52 @@ export default function AdminPanel({
                     ))}
                   </select>
                 </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Цвет
-                  <input
-                    type="color"
-                    value={companyColor}
-                    onChange={(event) => setCompanyColor(event.target.value)}
-                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-white/70 text-sm">
-                  Логотип
-                  <div className="flex items-center gap-2">
+                <div className="ml-auto flex items-end gap-2">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Цвет
                     <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(event) =>
-                        handleIconUpload(event.target.files?.[0], setCompanyIcon)
-                      }
-                      className="hidden"
-                      id="company-icon"
+                      type="color"
+                      value={companyColor}
+                      onChange={(event) => setCompanyColor(event.target.value)}
+                      className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
                     />
-                    <label
-                      htmlFor="company-icon"
-                      className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      Выбрать
-                    </label>
-                    {companyIcon && (
-                      <img
-                        src={companyIcon}
-                        alt=""
-                        className="w-8 h-8 rounded-lg object-cover border border-white/10"
+                  </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Логотип
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(event) =>
+                          handleIconUpload(event.target.files?.[0], setCompanyIcon)
+                        }
+                        className="hidden"
+                        id="company-icon"
                       />
-                    )}
-                  </div>
-                </label>
-                <button
-                  onClick={handleAddCompany}
-                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Добавить
-                </button>
+                      <label
+                        htmlFor="company-icon"
+                        className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                        Выбрать
+                      </label>
+                      {companyIcon && (
+                        <img
+                          src={companyIcon}
+                          alt=""
+                          className="w-8 h-8 rounded-lg object-cover border border-white/10"
+                        />
+                      )}
+                    </div>
+                  </label>
+                  <button
+                    onClick={handleAddCompany}
+                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -3356,45 +3316,41 @@ export default function AdminPanel({
                             }
                             className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                           />
-                          <div className="flex items-center gap-2 flex-row-reverse">
-                            {company.iconDataUrl && (
-                              <button
-                                onClick={() => onUpdateCompanyIcon(company.id, undefined)}
-                                className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
-                              >
-                                <Trash2 className="w-4 h-4 text-white/60" />
-                                <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                  Удалить логотип
-                                </span>
-                              </button>
-                            )}
-                            <label
-                              className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group"
+                          <label className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) =>
+                                handleIconUpload(
+                                  event.target.files?.[0],
+                                  (value) => onUpdateCompanyIcon(company.id, value),
+                                )
+                              }
+                            />
+                            <ImageIcon className="w-4 h-4" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Изменить логотип
+                            </span>
+                          </label>
+                          {company.iconDataUrl && (
+                            <button
+                              onClick={() => onUpdateCompanyIcon(company.id, undefined)}
+                              className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
                             >
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(event) =>
-                                  handleIconUpload(
-                                    event.target.files?.[0],
-                                    (value) => onUpdateCompanyIcon(company.id, value),
-                                  )
-                                }
-                              />
-                              <ImageIcon className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4 text-white/60" />
                               <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                РР·РјРµРЅРёС‚СЊ Р»РѕРіРѕС‚РёРї
+                                Удалить логотип
                               </span>
-                            </label>
-                          </div>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => onDeleteCompany(company.id)}
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                          >
+                            <Trash2 className="w-4 h-4 text-white/60" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => onDeleteCompany(company.id)}
-                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                        >
-                          <Trash2 className="w-4 h-4 text-white/60" />
-                        </button>
                       </div>
                     );
                   })
@@ -3977,6 +3933,120 @@ export default function AdminPanel({
         </div>
       </div>
     </div>
+
+    {resourcePricingModalOpen && (
+      <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm animate-fadeIn">
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <div className="text-white text-lg font-semibold">Цены ресурса</div>
+                <div className="text-white/60 text-sm">
+                  {resourcePricingTargetId
+                    ? resources.find((item) => item.id === resourcePricingTargetId)?.name ??
+                      'Ресурс'
+                    : 'Новый ресурс'}
+                </div>
+              </div>
+              <button
+                onClick={closeResourcePricingModal}
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/70 flex items-center justify-center hover:border-emerald-400/40"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="px-5 py-4 space-y-3">
+              <label className="flex flex-col gap-2 text-white/70 text-sm">
+                Базовая цена
+                <input
+                  type="number"
+                  min={0.01}
+                  step={0.01}
+                  value={pricingBasePrice}
+                  onChange={(event) =>
+                    setPricingBasePrice(
+                      event.target.value === ''
+                        ? ''
+                        : Math.max(0.01, Number(event.target.value) || 0.01),
+                    )
+                  }
+                  className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                />
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Минимальная цена
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={pricingMinMarketPrice}
+                    onChange={(event) =>
+                      setPricingMinMarketPrice(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Максимальная цена
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={pricingMaxMarketPrice}
+                    onChange={(event) =>
+                      setPricingMaxMarketPrice(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+              </div>
+              <label className="flex flex-col gap-2 text-white/70 text-sm">
+                Инфраструктура за единицу
+                <input
+                  type="number"
+                  min={0.01}
+                  step={0.01}
+                  value={pricingInfrastructureCostPerUnit}
+                  onChange={(event) =>
+                    setPricingInfrastructureCostPerUnit(
+                      event.target.value === ''
+                        ? ''
+                        : Math.max(0.01, Number(event.target.value) || 0.01),
+                    )
+                  }
+                  className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                />
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-white/10">
+              <button
+                onClick={closeResourcePricingModal}
+                className="h-9 px-3 rounded-lg border border-white/10 bg-black/30 text-white/60 text-sm hover:border-emerald-400/40"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={saveResourcePricing}
+                className="h-9 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     {editingEconomyBuildingId && (
         <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm animate-fadeIn">
