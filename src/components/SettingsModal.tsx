@@ -10,6 +10,7 @@ import {
   Atom,
   Feather,
   Cross,
+  Map,
 } from 'lucide-react';
 import type { GameSettings } from '../types';
 
@@ -17,6 +18,8 @@ type SettingsModalProps = {
   open: boolean;
   settings: GameSettings;
   onChange: (next: GameSettings) => void;
+  onRecomputeAdjacency?: () => void;
+  adjacencyNeedsComputation?: boolean;
   onClose: () => void;
 };
 
@@ -24,6 +27,8 @@ export default function SettingsModal({
   open,
   settings,
   onChange,
+  onRecomputeAdjacency,
+  adjacencyNeedsComputation = false,
   onClose,
 }: SettingsModalProps) {
   const [tab, setTab] = useState<
@@ -35,6 +40,7 @@ export default function SettingsModal({
     | 'economy'
     | 'log'
     | 'diplomacy'
+    | 'map'
   >('colonization');
   if (!open) return null;
 
@@ -133,6 +139,17 @@ export default function SettingsModal({
           >
             <Handshake className="w-4 h-4" />
             Дипломатия
+          </button>
+          <button
+            onClick={() => setTab('map')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'map'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Map className="w-4 h-4" />
+            Карта
           </button>
         </div>
 
@@ -292,11 +309,11 @@ export default function SettingsModal({
                 </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
                   <span className="flex items-center gap-2">
-                    Стоимость сноса (% от цены здания)
+                    Стоимость сноса (% от стоимости)
                     <span className="relative group text-white/50 text-xs cursor-default">
                       ⓘ
                       <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                        Доля стоимости здания, которую нужно заплатить очками строительства при сносе.
+                        Доля стоимости здания или маршрута, которую нужно заплатить очками строительства при сносе.
                       </span>
                     </span>
                   </span>
@@ -659,7 +676,62 @@ export default function SettingsModal({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <span className="flex items-center gap-2">
+                    Ходов без столицы рынка до удаления
+                    <span className="relative group text-white/50 text-xs cursor-default">
+                      ⓘ
+                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                        Если столица рынка потеряна, за это число ходов нужно назначить новую.
+                      </span>
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={settings.marketCapitalGraceTurns ?? 3}
+                    onChange={(event) =>
+                      onChange({
+                        ...settings,
+                        marketCapitalGraceTurns: Math.max(
+                          1,
+                          Number(event.target.value) || 1,
+                        ),
+                      })
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
               </>
+            )}
+
+            {tab === 'map' && (
+              <div className="rounded-xl border border-white/10 bg-black/25 p-4 space-y-3">
+                <div className="text-white/85 text-sm font-medium">
+                  Соседи провинций
+                </div>
+                <div className="text-white/60 text-sm leading-relaxed">
+                  Ручной запуск пересчета пригодится после замены карты или
+                  изменений геометрии провинций.
+                </div>
+                <div
+                  className={`text-xs ${
+                    adjacencyNeedsComputation
+                      ? 'text-amber-200/90'
+                      : 'text-emerald-200/90'
+                  }`}
+                >
+                  {adjacencyNeedsComputation
+                    ? 'Обнаружены провинции без соседей: рекомендуется пересчет.'
+                    : 'Данные соседей уже рассчитаны.'}
+                </div>
+                <button
+                  onClick={onRecomputeAdjacency}
+                  className="h-10 px-4 rounded-lg border border-cyan-400/40 bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/25 transition-colors text-sm"
+                >
+                  Запустить пересчет соседей
+                </button>
+              </div>
             )}
           </div>
         </div>

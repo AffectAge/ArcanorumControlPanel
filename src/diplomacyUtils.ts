@@ -1,11 +1,21 @@
 import type { DiplomacyAgreement } from './types';
 
 export type DiplomacyAgreementTerms = {
+  agreementCategory?: 'construction' | 'logistics' | 'market_invite' | 'market';
+  marketLeaderCountryId?: string;
   kind?: 'company' | 'state';
   allowState?: boolean;
   allowCompanies?: boolean;
-  companyIds?: string[];
+  companyIds?: string[]; 
   buildingIds?: string[];
+  routeTypeIds?: string[];
+  logisticsRouteLimits?: Record<
+    string,
+    {
+      maxRoutes?: number;
+      maxSegments?: number;
+    }
+  >;
   provinceIds?: string[];
   industries?: string[];
   limits?: {
@@ -25,11 +35,15 @@ export const resolveAgreementTerms = (
     agreement.guestCountryId === guestCountryId
   ) {
     return {
+      agreementCategory: agreement.agreementCategory,
+      marketLeaderCountryId: agreement.marketLeaderCountryId,
       kind: agreement.kind,
       allowState: agreement.allowState,
       allowCompanies: agreement.allowCompanies,
       companyIds: agreement.companyIds,
       buildingIds: agreement.buildingIds,
+      routeTypeIds: agreement.routeTypeIds,
+      logisticsRouteLimits: agreement.logisticsRouteLimits,
       provinceIds: agreement.provinceIds,
       industries: agreement.industries,
       limits: agreement.limits,
@@ -59,10 +73,14 @@ export const expandDiplomacyAgreements = (
       hostCountryId: agreement.guestCountryId,
       guestCountryId: agreement.hostCountryId,
       kind: agreement.counterTerms.kind,
+      agreementCategory: agreement.counterTerms.agreementCategory,
+      marketLeaderCountryId: agreement.counterTerms.marketLeaderCountryId,
       allowState: agreement.counterTerms.allowState,
       allowCompanies: agreement.counterTerms.allowCompanies,
       companyIds: agreement.counterTerms.companyIds,
       buildingIds: agreement.counterTerms.buildingIds,
+      routeTypeIds: agreement.counterTerms.routeTypeIds,
+      logisticsRouteLimits: agreement.counterTerms.logisticsRouteLimits,
       provinceIds: agreement.counterTerms.provinceIds,
       industries: agreement.counterTerms.industries,
       limits: agreement.counterTerms.limits,

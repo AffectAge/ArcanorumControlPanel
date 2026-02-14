@@ -1,5 +1,5 @@
 import { X, Hammer, Ban } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { expandDiplomacyAgreements } from '../diplomacyUtils';
 import type {
   BuildingDefinition,
@@ -52,6 +52,14 @@ export default function ConstructionModal({
   const [companyId, setCompanyId] = useState('');
   const [stateCountryId, setStateCountryId] = useState('');
   const [hoveredBuildingId, setHoveredBuildingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setOwnerType('state');
+    setCompanyId('');
+    setStateCountryId(activeCountryId ?? '');
+  }, [open, activeCountryId]);
+
   const availableCompanies = useMemo(
     () => companies.filter((company) => company.countryId === activeCountryId),
     [companies, activeCountryId],

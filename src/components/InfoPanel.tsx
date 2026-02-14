@@ -34,6 +34,18 @@ interface InfoPanelProps {
   onClose: () => void;
   colonizationCost?: number;
   colonizationAllowed?: boolean;
+  routeConstructionProgress?: {
+    routeName: string;
+    progressPoints: number;
+    requiredPoints: number;
+  }[];
+  marketAccessByCategory?: {
+    categoryId: string;
+    categoryName: string;
+    categoryColor?: string;
+    status: 'available' | 'unavailable';
+    points: number;
+  }[];
 }
 
 export default function InfoPanel({
@@ -55,6 +67,8 @@ export default function InfoPanel({
   onClose,
   colonizationCost,
   colonizationAllowed,
+  routeConstructionProgress = [],
+  marketAccessByCategory,
 }: InfoPanelProps) {
   return (
     <div className="fixed left-4 bottom-4 z-40 w-72 rounded-xl bg-black/45 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden animate-fadeIn">
@@ -197,6 +211,75 @@ export default function InfoPanel({
                 : 'Колонизация запрещена'}
             </span>
           </div>
+          {marketAccessByCategory && marketAccessByCategory.length > 0 && (
+            <div className="mt-2">
+              <div className="text-white/70 text-xs font-semibold">
+                Доступ к рынку по категориям
+              </div>
+              <div className="mt-1 space-y-1">
+                {marketAccessByCategory.map((entry) => (
+                  <div
+                    key={entry.categoryId}
+                    className="flex items-center justify-between rounded-md border border-white/10 bg-black/25 px-2 py-1"
+                  >
+                    <span className="inline-flex items-center gap-2 text-white/70">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-white/20"
+                        style={{ backgroundColor: entry.categoryColor ?? '#64748b' }}
+                      />
+                      {entry.categoryName}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      {entry.status === 'available' ? (
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                      ) : (
+                        <ShieldX className="w-3.5 h-3.5 text-red-300" />
+                      )}
+                      <span
+                        className={
+                          entry.status === 'available'
+                            ? 'text-emerald-200'
+                            : 'text-rose-200'
+                        }
+                      >
+                        {entry.status === 'available'
+                          ? `Есть (${entry.points})`
+                          : 'Нет'}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {routeConstructionProgress.length > 0 && (
+            <div className="mt-2">
+              <div className="text-white/70 text-xs font-semibold flex items-center gap-2">
+                <Factory className="w-3.5 h-3.5 text-white/60" />
+                Строительство маршрутов
+              </div>
+              <div className="mt-1 space-y-1">
+                {routeConstructionProgress.map((entry) => {
+                  const safeRequired = Math.max(1, entry.requiredPoints);
+                  const percent = Math.min(
+                    100,
+                    Math.round((entry.progressPoints / safeRequired) * 100),
+                  );
+                  return (
+                    <div
+                      key={entry.routeName}
+                      className="rounded-md border border-white/10 bg-black/25 px-2 py-1"
+                    >
+                      <div className="text-white/75 text-xs">{entry.routeName}</div>
+                      <div className="text-white/50 text-[11px]">
+                        {Math.floor(entry.progressPoints)} / {entry.requiredPoints} ({percent}%)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

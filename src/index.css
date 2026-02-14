@@ -111,15 +111,21 @@ body {
 }
 
 .map-svg path:hover {
-  stroke: rgba(255, 255, 255, 0.7);
+  fill: rgba(20, 184, 166, 0.42) !important;
+  stroke: rgba(45, 212, 191, 0.9);
   stroke-width: 0.25px;
-  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.6));
 }
 
 .map-path-selected {
-  stroke: rgba(255, 255, 255, 0.9) !important;
+  fill: rgba(34, 211, 238, 0.45) !important;
+  stroke: rgba(34, 211, 238, 0.95) !important;
   stroke-width: 0.35px !important;
-  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.6));
+}
+
+.map-path-route {
+  stroke: rgba(34, 211, 238, 0.95) !important;
+  stroke-width: 0.42px !important;
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.65));
 }
 
 .map-loading {

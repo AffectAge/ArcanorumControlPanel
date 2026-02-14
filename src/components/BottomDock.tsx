@@ -18,7 +18,7 @@ const dockItems = [
   { id: 'industry', icon: Factory, label: 'Industry' },
   { id: 'defense', icon: Shield, label: 'Defense' },
   { id: 'science', icon: Atom, label: 'Science' },
-  { id: 'world', icon: Globe, label: 'World' },
+  { id: 'markets', icon: Globe, label: 'Рынки' },
   { id: 'research', icon: Microscope, label: 'Research', active: true },
   { id: 'culture', icon: Palette, label: 'Culture' },
   { id: 'government', icon: Landmark, label: 'Government' },
@@ -31,12 +31,14 @@ type BottomDockProps = {
   onOpenSettings: () => void;
   onOpenIndustry: () => void;
   onOpenDiplomacy: () => void;
+  onOpenMarkets: () => void;
 };
 
 export default function BottomDock({
   onOpenSettings,
   onOpenIndustry,
   onOpenDiplomacy,
+  onOpenMarkets,
 }: BottomDockProps) {
   const [activeItem, setActiveItem] = useState('research');
 
@@ -50,6 +52,7 @@ export default function BottomDock({
             if (item.id === 'settings') onOpenSettings();
             if (item.id === 'industry') onOpenIndustry();
             if (item.id === 'diplomacy') onOpenDiplomacy();
+            if (item.id === 'markets') onOpenMarkets();
           }}
           className={`
             w-11 h-11 rounded-xl border transition-all duration-200 flex items-center justify-center group relative

@@ -943,6 +943,27 @@ export default function IndustryModal({
     countryId: string;
     companyId: string;
   } | null>(null);
+  const resourceNameById = useMemo(
+    () => new Map(resources.map((resource) => [resource.id, resource.name])),
+    [resources],
+  );
+
+  const getEconomyRows = (
+    planned?: Record<string, number>,
+    actual?: Record<string, number>,
+  ) => {
+    const ids = Array.from(
+      new Set([...Object.keys(planned ?? {}), ...Object.keys(actual ?? {})]),
+    ).sort((a, b) =>
+      (resourceNameById.get(a) ?? a).localeCompare(resourceNameById.get(b) ?? b),
+    );
+    return ids.map((id) => ({
+      id,
+      name: resourceNameById.get(id) ?? id,
+      planned: Math.max(0, planned?.[id] ?? 0),
+      actual: Math.max(0, actual?.[id] ?? 0),
+    }));
+  };
 
   const cards = useMemo(() => {
     const builtCards = rows.flatMap((province) =>
@@ -1426,6 +1447,33 @@ export default function IndustryModal({
                         const industry = industries.find(
                           (item) => item.id === building?.industryId,
                         );
+                        const builtEntry =
+                          card.kind === 'built'
+                            ? provinces[card.provinceId]?.buildingsBuilt?.[card.index]
+                            : undefined;
+                        const productivityPercent = Math.round(
+                          Math.max(0, Math.min(1, builtEntry?.lastProductivity ?? 0)) * 100,
+                        );
+                        const warehouseRows = getEconomyRows(
+                          builtEntry?.warehouseByResourceId,
+                          builtEntry?.warehouseByResourceId,
+                        );
+                        const consumptionRows = getEconomyRows(
+                          building?.consumptionByResourceId,
+                          builtEntry?.lastConsumedByResourceId,
+                        );
+                        const purchaseRows = getEconomyRows(
+                          builtEntry?.lastPurchaseNeedByResourceId,
+                          builtEntry?.lastPurchasedByResourceId,
+                        );
+                        const extractionRows = getEconomyRows(
+                          building?.extractionByResourceId,
+                          builtEntry?.lastExtractedByResourceId,
+                        );
+                        const productionRows = getEconomyRows(
+                          building?.productionByResourceId,
+                          builtEntry?.lastProducedByResourceId,
+                        );
 
                         return (
                           <div
@@ -1580,6 +1628,89 @@ export default function IndustryModal({
                                   {ownerLabel}
                                 </button>
                               </div>
+                              {card.kind === 'built' && (
+                                <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-white/60 text-[11px] uppercase tracking-wide">
+                                      Экономика
+                                    </span>
+                                    <div className="flex items-center gap-1.5 text-[10px]">
+                                      <span className="rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2 py-0.5 text-emerald-200">
+                                        {productivityPercent}% ПРД
+                                      </span>
+                                      <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums">
+                                        {(builtEntry?.ducats ?? 0).toFixed(2)} дк
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                      <div className="text-white/50 text-[10px] uppercase tracking-wide">Склад</div>
+                                      {warehouseRows.length > 0 ? (
+                                        warehouseRows.map((row) => (
+                                          <div
+                                            key={`warehouse-${card.key}-${row.id}`}
+                                            className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                          >
+                                            <span>{row.name}</span>
+                                            <span>{row.actual.toFixed(2)}</span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-white/45 text-[11px]">пусто</div>
+                                      )}
+                                    </div>
+                                    <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                      <div className="text-white/50 text-[10px] uppercase tracking-wide">Потребление (макс / факт)</div>
+                                      {consumptionRows.length > 0 ? (
+                                        consumptionRows.map((row) => (
+                                          <div
+                                            key={`consume-${card.key}-${row.id}`}
+                                            className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                          >
+                                            <span>{row.name}</span>
+                                            <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-white/45 text-[11px]">не настроено</div>
+                                      )}
+                                    </div>
+                                    <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                      <div className="text-white/50 text-[10px] uppercase tracking-wide">Добыча (макс / факт)</div>
+                                      {extractionRows.length > 0 ? (
+                                        extractionRows.map((row) => (
+                                          <div
+                                            key={`extract-${card.key}-${row.id}`}
+                                            className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                          >
+                                            <span>{row.name}</span>
+                                            <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-white/45 text-[11px]">не настроено</div>
+                                      )}
+                                    </div>
+                                    <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                      <div className="text-white/50 text-[10px] uppercase tracking-wide">Производство (макс / факт)</div>
+                                      {productionRows.length > 0 ? (
+                                        productionRows.map((row) => (
+                                          <div
+                                            key={`produce-${card.key}-${row.id}`}
+                                            className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                          >
+                                            <span>{row.name}</span>
+                                            <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-white/45 text-[11px]">не настроено</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                             {isEditing && ownerEditor && (
                               <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-3 text-xs text-white/70">
@@ -1736,6 +1867,33 @@ export default function IndustryModal({
                   const building = buildings.find((b) => b.id === card.buildingId);
                   const industry = industries.find(
                     (item) => item.id === building?.industryId,
+                  );
+                  const builtEntry =
+                    card.kind === 'built'
+                      ? provinces[card.provinceId]?.buildingsBuilt?.[card.index]
+                      : undefined;
+                  const productivityPercent = Math.round(
+                    Math.max(0, Math.min(1, builtEntry?.lastProductivity ?? 0)) * 100,
+                  );
+                  const warehouseRows = getEconomyRows(
+                    builtEntry?.warehouseByResourceId,
+                    builtEntry?.warehouseByResourceId,
+                  );
+                  const consumptionRows = getEconomyRows(
+                    building?.consumptionByResourceId,
+                    builtEntry?.lastConsumedByResourceId,
+                  );
+                  const purchaseRows = getEconomyRows(
+                    builtEntry?.lastPurchaseNeedByResourceId,
+                    builtEntry?.lastPurchasedByResourceId,
+                  );
+                  const extractionRows = getEconomyRows(
+                    building?.extractionByResourceId,
+                    builtEntry?.lastExtractedByResourceId,
+                  );
+                  const productionRows = getEconomyRows(
+                    building?.productionByResourceId,
+                    builtEntry?.lastProducedByResourceId,
                   );
                   const country = countries.find((c) => c.id === card.countryId);
                   const ownerCountry =
@@ -1935,6 +2093,108 @@ export default function IndustryModal({
                             {ownerLabel}
                           </button>
                         </div>
+                        {card.kind === 'built' && (
+                          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-white/60 text-[11px] uppercase tracking-wide">
+                                Экономика
+                              </span>
+                              <div className="flex items-center gap-1.5 text-[10px]">
+                                <span className="rounded-full border border-emerald-400/35 bg-emerald-500/15 px-2 py-0.5 text-emerald-200">
+                                  {productivityPercent}% ПРД
+                                </span>
+                                <span className="rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums">
+                                  {(builtEntry?.ducats ?? 0).toFixed(2)} дк
+                                </span>
+                                <span className="rounded-full border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-cyan-200 tabular-nums">
+                                  -{(builtEntry?.lastPurchaseCostDucats ?? 0).toFixed(2)} закуп
+                                </span>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Склад</div>
+                                {warehouseRows.length > 0 ? (
+                                  warehouseRows.map((row) => (
+                                    <div
+                                      key={`warehouse-mobile-${card.key}-${row.id}`}
+                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                    >
+                                      <span>{row.name}</span>
+                                      <span>{row.actual.toFixed(2)}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-white/45 text-[11px]">пусто</div>
+                                )}
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Потребление (макс / факт)</div>
+                                {consumptionRows.length > 0 ? (
+                                  consumptionRows.map((row) => (
+                                    <div
+                                      key={`consume-mobile-${card.key}-${row.id}`}
+                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                    >
+                                      <span>{row.name}</span>
+                                      <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-white/45 text-[11px]">не настроено</div>
+                                )}
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Закуплено за ход (макс / факт)</div>
+                                {purchaseRows.length > 0 ? (
+                                  purchaseRows.map((row) => (
+                                    <div
+                                      key={`purchase-${card.key}-${row.id}`}
+                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                    >
+                                      <span>{row.name}</span>
+                                      <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-white/45 text-[11px]">не требуется</div>
+                                )}
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Добыча (макс / факт)</div>
+                                {extractionRows.length > 0 ? (
+                                  extractionRows.map((row) => (
+                                    <div
+                                      key={`extract-mobile-${card.key}-${row.id}`}
+                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                    >
+                                      <span>{row.name}</span>
+                                      <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-white/45 text-[11px]">не настроено</div>
+                                )}
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                <div className="text-white/50 text-[10px] uppercase tracking-wide">Производство (макс / факт)</div>
+                                {productionRows.length > 0 ? (
+                                  productionRows.map((row) => (
+                                    <div
+                                      key={`produce-mobile-${card.key}-${row.id}`}
+                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                    >
+                                      <span>{row.name}</span>
+                                      <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="text-white/45 text-[11px]">не настроено</div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       {isEditing && ownerEditor && (
                         <div className="rounded-xl border border-white/10 bg-black/40 p-3 space-y-3 text-xs text-white/70">

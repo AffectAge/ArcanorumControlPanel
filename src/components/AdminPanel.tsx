@@ -16,6 +16,7 @@ import {
   Building2,
   Briefcase,
   Factory,
+  Route,
 } from 'lucide-react';
 import type {
   Country,
@@ -24,8 +25,10 @@ import type {
   BuildingDefinition,
   Company,
   Industry,
+  LogisticsRouteType,
   TraitCriteria,
   RequirementNode,
+  ResourceCategory,
 } from '../types';
 
 type AdminTab =
@@ -36,10 +39,12 @@ type AdminTab =
   | 'continents'
   | 'regions'
   | 'cultures'
+  | 'resourceCategories'
   | 'resources'
   | 'buildings'
   | 'companies'
-  | 'industries';
+  | 'industries'
+  | 'routeTypes';
 
 type AdminPanelProps = {
   open: boolean;
@@ -52,9 +57,11 @@ type AdminPanelProps = {
   continents: Trait[];
   regions: Trait[];
   cultures: Trait[];
+  resourceCategories: ResourceCategory[];
   resources: Trait[];
   buildings: BuildingDefinition[];
   industries: Industry[];
+  routeTypes: LogisticsRouteType[];
   companies: Company[];
   onClose: () => void;
   onAssignOwner: (provinceId: string, ownerId?: string) => void;
@@ -80,12 +87,25 @@ type AdminPanelProps = {
   onAddContinent: (name: string, color: string) => void;
   onAddRegion: (name: string, color: string) => void;
   onAddCulture: (name: string, color: string, iconDataUrl?: string) => void;
-  onAddResource: (name: string, color: string, iconDataUrl?: string) => void;
+  onAddResource: (
+    name: string,
+    color: string,
+    iconDataUrl?: string,
+    resourceCategoryId?: string,
+    basePrice?: number,
+    minMarketPrice?: number,
+    maxMarketPrice?: number,
+  ) => void;
+  onAddResourceCategory: (name: string, color?: string) => void;
   onAddBuilding: (
     name: string,
     cost: number,
     iconDataUrl?: string,
     industryId?: string,
+    startingDucats?: number,
+    consumptionByResourceId?: Record<string, number>,
+    extractionByResourceId?: Record<string, number>,
+    productionByResourceId?: Record<string, number>,
     requirements?: BuildingDefinition['requirements'],
   ) => void;
   onAddIndustry: (name: string, iconDataUrl?: string, color?: string) => void;
@@ -95,6 +115,43 @@ type AdminPanelProps = {
     iconDataUrl?: string,
     color?: string,
   ) => void;
+  onAddRouteType: (
+    name: string,
+    color: string,
+    lineWidth: number,
+    dashPattern?: string,
+    constructionCostPerSegment?: number,
+    allowProvinceSkipping?: boolean,
+    requiredBuildingIds?: string[],
+    landscape?: TraitCriteria,
+    requiredBuildingsMode?: 'all' | 'any',
+    allowAllLandscapes?: boolean,
+    marketAccessCategoryIds?: string[],
+    allowAllMarketCategories?: boolean,
+    transportCapacityPerLevelByCategory?: Record<string, number>,
+  ) => void;
+  onUpdateRouteType: (
+    id: string,
+    patch: Partial<
+      Pick<
+        LogisticsRouteType,
+        | 'name'
+        | 'color'
+        | 'lineWidth'
+        | 'dashPattern'
+        | 'constructionCostPerSegment'
+        | 'allowProvinceSkipping'
+        | 'requiredBuildingIds'
+        | 'requiredBuildingsMode'
+        | 'landscape'
+        | 'allowAllLandscapes'
+        | 'marketAccessCategoryIds'
+        | 'allowAllMarketCategories'
+        | 'transportCapacityPerLevelByCategory'
+      >
+    >,
+  ) => void;
+  onDeleteRouteType: (id: string) => void;
   onUpdateCompanyIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateReligionIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateCultureIcon: (id: string, iconDataUrl?: string) => void;
@@ -106,6 +163,16 @@ type AdminPanelProps = {
     id: string,
     requirements?: BuildingDefinition['requirements'],
   ) => void;
+  onUpdateBuildingEconomy: (
+    id: string,
+    patch: Pick<
+      BuildingDefinition,
+      | 'startingDucats'
+      | 'consumptionByResourceId'
+      | 'extractionByResourceId'
+      | 'productionByResourceId'
+    >,
+  ) => void;
   onUpdateIndustryColor: (id: string, color: string) => void;
   onUpdateCompanyColor: (id: string, color: string) => void;
   onUpdateClimateColor: (id: string, color: string) => void;
@@ -115,12 +182,23 @@ type AdminPanelProps = {
   onUpdateRegionColor: (id: string, color: string) => void;
   onUpdateCultureColor: (id: string, color: string) => void;
   onUpdateResourceColor: (id: string, color: string) => void;
+  onUpdateResourceCategoryColor: (id: string, color: string) => void;
+  onUpdateResourcePricing: (
+    resourceId: string,
+    patch: {
+      basePrice?: number;
+      minMarketPrice?: number;
+      maxMarketPrice?: number;
+    },
+  ) => void;
+  onUpdateResourceCategory: (resourceId: string, categoryId?: string) => void;
   onDeleteClimate: (id: string) => void;
   onDeleteReligion: (id: string) => void;
   onDeleteLandscape: (id: string) => void;
   onDeleteContinent: (id: string) => void;
   onDeleteRegion: (id: string) => void;
   onDeleteCulture: (id: string) => void;
+  onDeleteResourceCategory: (id: string) => void;
   onDeleteResource: (id: string) => void;
   onDeleteBuilding: (id: string) => void;
   onDeleteIndustry: (id: string) => void;
@@ -128,6 +206,26 @@ type AdminPanelProps = {
 };
 
 const emptyColor = '#4ade80';
+type BuildingEconomyMap = Record<string, number>;
+
+const normalizeBuildingEconomyMap = (
+  value?: Record<string, number>,
+): BuildingEconomyMap =>
+  Object.fromEntries(
+    Object.entries(value ?? {}).filter(
+      ([resourceId, amount]) =>
+        Boolean(resourceId) &&
+        Number.isFinite(amount) &&
+        Number(amount) > 0,
+    ),
+  );
+
+const sanitizeOptionalEconomyMap = (
+  value: BuildingEconomyMap,
+): BuildingEconomyMap | undefined => {
+  const next = normalizeBuildingEconomyMap(value);
+  return Object.keys(next).length > 0 ? next : undefined;
+};
 
 export default function AdminPanel({
   open,
@@ -140,9 +238,11 @@ export default function AdminPanel({
   continents,
   regions,
   cultures,
+  resourceCategories,
   resources,
   buildings,
   industries,
+  routeTypes,
   companies,
   onClose,
   onAssignOwner,
@@ -164,10 +264,14 @@ export default function AdminPanel({
   onAddContinent,
   onAddRegion,
   onAddCulture,
+  onAddResourceCategory,
   onAddResource,
   onAddBuilding,
   onAddIndustry,
   onAddCompany,
+  onAddRouteType,
+  onUpdateRouteType,
+  onDeleteRouteType,
   onUpdateCompanyIcon,
   onUpdateReligionIcon,
   onUpdateCultureIcon,
@@ -176,6 +280,7 @@ export default function AdminPanel({
   onUpdateIndustryIcon,
   onUpdateBuildingIndustry,
   onUpdateBuildingRequirements,
+  onUpdateBuildingEconomy,
   onUpdateIndustryColor,
   onUpdateCompanyColor,
   onUpdateClimateColor,
@@ -185,12 +290,16 @@ export default function AdminPanel({
   onUpdateRegionColor,
   onUpdateCultureColor,
   onUpdateResourceColor,
+  onUpdateResourceCategoryColor,
+  onUpdateResourcePricing,
+  onUpdateResourceCategory,
   onDeleteClimate,
   onDeleteReligion,
   onDeleteLandscape,
   onDeleteContinent,
   onDeleteRegion,
   onDeleteCulture,
+  onDeleteResourceCategory,
   onDeleteResource,
   onDeleteBuilding,
   onDeleteIndustry,
@@ -213,10 +322,28 @@ export default function AdminPanel({
   const [cultureColor, setCultureColor] = useState('#fb7185');
   const [cultureIcon, setCultureIcon] = useState<string | undefined>(undefined);
   const [resourceName, setResourceName] = useState('');
+  const [resourceCategoryName, setResourceCategoryName] = useState('');
+  const [resourceCategoryColor, setResourceCategoryColor] = useState('#38bdf8');
+  const [resourceCategoryId, setResourceCategoryId] = useState('');
   const [buildingName, setBuildingName] = useState('');
   const [buildingCost, setBuildingCost] = useState(100);
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
   const [buildingIndustryId, setBuildingIndustryId] = useState<string>('');
+  const [buildingStartingDucats, setBuildingStartingDucats] = useState<number | ''>(0);
+  const [buildingConsumptionByResourceId, setBuildingConsumptionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [buildingExtractionByResourceId, setBuildingExtractionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [buildingProductionByResourceId, setBuildingProductionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [editingEconomyBuildingId, setEditingEconomyBuildingId] = useState<string | null>(null);
+  const [editEconomyStartingDucats, setEditEconomyStartingDucats] = useState<number | ''>(0);
+  const [editEconomyConsumptionByResourceId, setEditEconomyConsumptionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [editEconomyExtractionByResourceId, setEditEconomyExtractionByResourceId] =
+    useState<BuildingEconomyMap>({});
+  const [editEconomyProductionByResourceId, setEditEconomyProductionByResourceId] =
+    useState<BuildingEconomyMap>({});
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
   const [editReqMaxPerProvince, setEditReqMaxPerProvince] = useState<number | ''>(0);
   const [editReqMaxPerCountry, setEditReqMaxPerCountry] = useState<number | ''>(0);
@@ -267,6 +394,32 @@ export default function AdminPanel({
   const [companyColor, setCompanyColor] = useState('#a855f7');
   const [resourceColor, setResourceColor] = useState('#22c55e');
   const [resourceIcon, setResourceIcon] = useState<string | undefined>(undefined);
+  const [resourceBasePrice, setResourceBasePrice] = useState<number | ''>(1);
+  const [resourceMinMarketPrice, setResourceMinMarketPrice] = useState<number | ''>(0);
+  const [resourceMaxMarketPrice, setResourceMaxMarketPrice] = useState<number | ''>(0);
+  const [routeTypeName, setRouteTypeName] = useState('');
+  const [routeTypeColor, setRouteTypeColor] = useState('#38bdf8');
+  const [routeTypeWidth, setRouteTypeWidth] = useState<number | ''>(1.2);
+  const [routeTypeDash, setRouteTypeDash] = useState('');
+  const [routeTypeCostPerSegment, setRouteTypeCostPerSegment] = useState<
+    number | ''
+  >(0);
+  const [routeTypeAllowSkip, setRouteTypeAllowSkip] = useState(false);
+  const [routeTypeRequiredBuildingIds, setRouteTypeRequiredBuildingIds] = useState<
+    string[]
+  >([]);
+  const [routeTypeRequiredBuildingsMode, setRouteTypeRequiredBuildingsMode] =
+    useState<'all' | 'any'>('all');
+  const [routeTypeLandscapeAny, setRouteTypeLandscapeAny] = useState<string[]>([]);
+  const [routeTypeLandscapeNone, setRouteTypeLandscapeNone] = useState<string[]>([]);
+  const [routeTypeAllowAllLandscapes, setRouteTypeAllowAllLandscapes] =
+    useState(true);
+  const [routeTypeMarketAccessCategoryIds, setRouteTypeMarketAccessCategoryIds] =
+    useState<string[]>([]);
+  const [routeTypeAllowAllMarketCategories, setRouteTypeAllowAllMarketCategories] =
+    useState(true);
+  const [routeTypeTransportCapacityByCategory, setRouteTypeTransportCapacityByCategory] =
+    useState<Record<string, number>>({});
 
   const provinceIds = useMemo(() => Object.keys(provinces).sort(), [provinces]);
   const activeProvince = selectedProvince ? provinces[selectedProvince] : undefined;
@@ -282,6 +435,9 @@ export default function AdminPanel({
 
   const editingBuilding = editingBuildingId
     ? buildings.find((building) => building.id === editingBuildingId)
+    : undefined;
+  const editingEconomyBuilding = editingEconomyBuildingId
+    ? buildings.find((building) => building.id === editingEconomyBuildingId)
     : undefined;
 
   const handleAddClimate = () => {
@@ -331,9 +487,70 @@ export default function AdminPanel({
   const handleAddResource = () => {
     const name = resourceName.trim();
     if (!name) return;
-    onAddResource(name, resourceColor, resourceIcon);
+    onAddResource(
+      name,
+      resourceColor,
+      resourceIcon,
+      resourceCategoryId || undefined,
+      resourceBasePrice === '' ? undefined : Math.max(0.01, Number(resourceBasePrice) || 1),
+      resourceMinMarketPrice === '' || Number(resourceMinMarketPrice) <= 0
+        ? undefined
+        : Math.max(0.01, Number(resourceMinMarketPrice)),
+      resourceMaxMarketPrice === '' || Number(resourceMaxMarketPrice) <= 0
+        ? undefined
+        : Math.max(0.01, Number(resourceMaxMarketPrice)),
+    );
     setResourceName('');
     setResourceIcon(undefined);
+    setResourceCategoryId('');
+    setResourceBasePrice(1);
+    setResourceMinMarketPrice(0);
+    setResourceMaxMarketPrice(0);
+  };
+
+  const handleAddResourceCategory = () => {
+    const name = resourceCategoryName.trim();
+    if (!name) return;
+    onAddResourceCategory(name, resourceCategoryColor);
+    setResourceCategoryName('');
+  };
+
+  const handleAddRouteType = () => {
+    const name = routeTypeName.trim();
+    if (!name) return;
+    onAddRouteType(
+      name,
+      routeTypeColor,
+      routeTypeWidth === '' ? 1.2 : Math.max(0.4, Number(routeTypeWidth) || 1.2),
+      routeTypeDash.trim() || undefined,
+      routeTypeCostPerSegment === ''
+        ? 0
+        : Math.max(0, Math.floor(Number(routeTypeCostPerSegment) || 0)),
+      routeTypeAllowSkip,
+      routeTypeRequiredBuildingIds,
+      {
+        anyOf: routeTypeLandscapeAny,
+        noneOf: routeTypeLandscapeNone,
+      },
+      routeTypeRequiredBuildingsMode,
+      routeTypeAllowAllLandscapes,
+      routeTypeMarketAccessCategoryIds,
+      routeTypeAllowAllMarketCategories,
+      routeTypeTransportCapacityByCategory,
+    );
+    setRouteTypeName('');
+    setRouteTypeDash('');
+    setRouteTypeWidth(1.2);
+    setRouteTypeCostPerSegment(0);
+    setRouteTypeAllowSkip(false);
+    setRouteTypeRequiredBuildingIds([]);
+    setRouteTypeRequiredBuildingsMode('all');
+    setRouteTypeLandscapeAny([]);
+    setRouteTypeLandscapeNone([]);
+    setRouteTypeAllowAllLandscapes(true);
+    setRouteTypeMarketAccessCategoryIds([]);
+    setRouteTypeAllowAllMarketCategories(true);
+    setRouteTypeTransportCapacityByCategory({});
   };
 
 
@@ -346,11 +563,57 @@ export default function AdminPanel({
       Math.max(1, Number(buildingCost) || 1),
       buildingIcon,
       buildingIndustryId || undefined,
+      buildingStartingDucats === '' ? undefined : Math.max(0, Number(buildingStartingDucats) || 0),
+      sanitizeOptionalEconomyMap(buildingConsumptionByResourceId),
+      sanitizeOptionalEconomyMap(buildingExtractionByResourceId),
+      sanitizeOptionalEconomyMap(buildingProductionByResourceId),
     );
     setBuildingName('');
     setBuildingCost(100);
     setBuildingIcon(undefined);
     setBuildingIndustryId('');
+    setBuildingStartingDucats(0);
+    setBuildingConsumptionByResourceId({});
+    setBuildingExtractionByResourceId({});
+    setBuildingProductionByResourceId({});
+  };
+
+  const openEditEconomy = (building: BuildingDefinition) => {
+    setEditingEconomyBuildingId(building.id);
+    setEditEconomyStartingDucats(building.startingDucats ?? 0);
+    setEditEconomyConsumptionByResourceId(
+      normalizeBuildingEconomyMap(building.consumptionByResourceId),
+    );
+    setEditEconomyExtractionByResourceId(
+      normalizeBuildingEconomyMap(building.extractionByResourceId),
+    );
+    setEditEconomyProductionByResourceId(
+      normalizeBuildingEconomyMap(building.productionByResourceId),
+    );
+  };
+
+  const closeEditEconomy = () => {
+    setEditingEconomyBuildingId(null);
+  };
+
+  const saveEditEconomy = () => {
+    if (!editingEconomyBuildingId) return;
+    onUpdateBuildingEconomy(editingEconomyBuildingId, {
+      startingDucats:
+        editEconomyStartingDucats === ''
+          ? undefined
+          : Math.max(0, Number(editEconomyStartingDucats) || 0),
+      consumptionByResourceId: sanitizeOptionalEconomyMap(
+        editEconomyConsumptionByResourceId,
+      ),
+      extractionByResourceId: sanitizeOptionalEconomyMap(
+        editEconomyExtractionByResourceId,
+      ),
+      productionByResourceId: sanitizeOptionalEconomyMap(
+        editEconomyProductionByResourceId,
+      ),
+    });
+    closeEditEconomy();
   };
 
   const openEditRequirements = (building: BuildingDefinition) => {
@@ -991,8 +1254,8 @@ export default function AdminPanel({
   return (
     <>
       <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
-      <div className="w-[980px] max-w-[96vw] h-[620px] max-h-[92vh] bg-[#0b111b] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex">
-        <div className="w-56 border-r border-white/10 p-4 flex flex-col gap-2">
+      <div className="w-[100vw] h-[100vh] bg-[#0b111b] border border-white/10 rounded-none shadow-2xl overflow-hidden flex">
+        <div className="w-84 border-r border-white/10 p-4 flex flex-col gap-2 overflow-y-auto legend-scroll">
           <div className="text-white text-lg font-semibold mb-2">
             Панель администратора
           </div>
@@ -1085,6 +1348,17 @@ export default function AdminPanel({
             Ресурсы
           </button>
           <button
+            onClick={() => setTab('resourceCategories')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'resourceCategories'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            Категории товаров
+          </button>
+          <button
             onClick={() => setTab('buildings')}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
               tab === 'buildings'
@@ -1117,7 +1391,18 @@ export default function AdminPanel({
             <Briefcase className="w-4 h-4" />
             Компании
           </button>
-                    <button
+          <button
+            onClick={() => setTab('routeTypes')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
+              tab === 'routeTypes'
+                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
+                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
+            }`}
+          >
+            <Route className="w-4 h-4" />
+            Типы маршрутов
+          </button>
+          <button
             onClick={onClose}
             className="mt-auto flex items-center gap-2 px-3 py-2 rounded-lg text-sm border bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30"
           >
@@ -2079,6 +2364,77 @@ export default function AdminPanel({
             </div>
           )}
 
+          {tab === 'resourceCategories' && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Категории товаров</h2>
+                <p className="text-white/60 text-sm">
+                  Создавайте категории ресурсов для рынка и маршрутов.
+                </p>
+              </div>
+
+              <div className="flex gap-3 items-end flex-wrap">
+                <label className="flex-1 flex flex-col gap-2 text-white/70 text-sm min-w-[220px]">
+                  Название категории
+                  <input
+                    value={resourceCategoryName}
+                    onChange={(event) => setResourceCategoryName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цвет
+                  <input
+                    type="color"
+                    value={resourceCategoryColor}
+                    onChange={(event) => setResourceCategoryColor(event.target.value)}
+                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                  />
+                </label>
+                <button
+                  onClick={handleAddResourceCategory}
+                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {resourceCategories.map((category) => (
+                  <div
+                    key={category.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="w-4 h-4 rounded-full border border-white/10"
+                        style={{ backgroundColor: category.color ?? '#38bdf8' }}
+                      />
+                      <span className="text-white/80 text-sm">{category.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={category.color ?? '#38bdf8'}
+                        onChange={(event) =>
+                          onUpdateResourceCategoryColor(category.id, event.target.value)
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <button
+                        onClick={() => onDeleteResourceCategory(category.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {tab === 'resources' && (
             <div className="space-y-4">
               <div>
@@ -2134,6 +2490,78 @@ export default function AdminPanel({
                     )}
                   </div>
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[220px]">
+                  Категория
+                  <select
+                    value={resourceCategoryId}
+                    onChange={(event) => setResourceCategoryId(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  >
+                    <option value="" className="bg-[#0b111b] text-white">
+                      Без категории
+                    </option>
+                    {resourceCategories.map((category) => (
+                      <option
+                        key={category.id}
+                        value={category.id}
+                        className="bg-[#0b111b] text-white"
+                      >
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
+                  База
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={resourceBasePrice}
+                    onChange={(event) =>
+                      setResourceBasePrice(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0.01, Number(event.target.value) || 0.01),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
+                  Мин
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={resourceMinMarketPrice}
+                    onChange={(event) =>
+                      setResourceMinMarketPrice(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
+                  Макс
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={resourceMaxMarketPrice}
+                    onChange={(event) =>
+                      setResourceMaxMarketPrice(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
                 <button
                   onClick={handleAddResource}
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
@@ -2163,8 +2591,36 @@ export default function AdminPanel({
                         />
                       )}
                       <span className="text-white/80 text-sm">{resource.name}</span>
+                      <span className="text-white/45 text-xs">
+                        {resourceCategories.find(
+                          (category) => category.id === resource.resourceCategoryId,
+                        )?.name ?? 'Без категории'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
+                      <select
+                        value={resource.resourceCategoryId ?? ''}
+                        onChange={(event) =>
+                          onUpdateResourceCategory(
+                            resource.id,
+                            event.target.value || undefined,
+                          )
+                        }
+                        className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                      >
+                        <option value="" className="bg-[#0b111b] text-white">
+                          Без категории
+                        </option>
+                        {resourceCategories.map((category) => (
+                          <option
+                            key={category.id}
+                            value={category.id}
+                            className="bg-[#0b111b] text-white"
+                          >
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
                       <input
                         type="color"
                         value={resource.color}
@@ -2173,6 +2629,51 @@ export default function AdminPanel({
                         }
                         className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                       />
+                      <label className="flex items-center gap-1 text-[10px] text-white/60">
+                        Б
+                        <input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          value={resource.basePrice ?? 1}
+                          onChange={(event) =>
+                            onUpdateResourcePricing(resource.id, {
+                              basePrice: Math.max(0.01, Number(event.target.value) || 1),
+                            })
+                          }
+                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] text-white/60">
+                        Мин
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={resource.minMarketPrice ?? 0}
+                          onChange={(event) =>
+                            onUpdateResourcePricing(resource.id, {
+                              minMarketPrice: Math.max(0, Number(event.target.value) || 0),
+                            })
+                          }
+                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] text-white/60">
+                        Макс
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={resource.maxMarketPrice ?? 0}
+                          onChange={(event) =>
+                            onUpdateResourcePricing(resource.id, {
+                              maxMarketPrice: Math.max(0, Number(event.target.value) || 0),
+                            })
+                          }
+                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
                       <div className="flex items-center gap-2 flex-row-reverse">
                         {resource.iconDataUrl && (
                           <button
@@ -2269,6 +2770,22 @@ export default function AdminPanel({
                     ))}
                   </select>
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[170px]">
+                  Стартовые дукаты
+                  <input
+                    type="number"
+                    min={0}
+                    value={buildingStartingDucats}
+                    onChange={(event) =>
+                      setBuildingStartingDucats(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Логотип
                   <div className="flex items-center gap-2">
@@ -2305,6 +2822,94 @@ export default function AdminPanel({
                   Добавить
                 </button>
               </div>
+              {resources.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-white/70 text-xs">Потребление за ход</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {resources.map((resource) => (
+                        <label
+                          key={`add-consume-${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={buildingConsumptionByResourceId[resource.id] ?? 0}
+                            onChange={(event) =>
+                              setBuildingConsumptionByResourceId((prev) => {
+                                const next = { ...prev };
+                                const amount = Math.max(0, Number(event.target.value) || 0);
+                                if (amount > 0) next[resource.id] = amount;
+                                else delete next[resource.id];
+                                return next;
+                              })
+                            }
+                            className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-white/70 text-xs">Добыча за ход</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {resources.map((resource) => (
+                        <label
+                          key={`add-extract-${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={buildingExtractionByResourceId[resource.id] ?? 0}
+                            onChange={(event) =>
+                              setBuildingExtractionByResourceId((prev) => {
+                                const next = { ...prev };
+                                const amount = Math.max(0, Number(event.target.value) || 0);
+                                if (amount > 0) next[resource.id] = amount;
+                                else delete next[resource.id];
+                                return next;
+                              })
+                            }
+                            className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-white/70 text-xs">Производство за ход</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {resources.map((resource) => (
+                        <label
+                          key={`add-produce-${resource.id}`}
+                          className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                        >
+                          <span>{resource.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={buildingProductionByResourceId[resource.id] ?? 0}
+                            onChange={(event) =>
+                              setBuildingProductionByResourceId((prev) => {
+                                const next = { ...prev };
+                                const amount = Math.max(0, Number(event.target.value) || 0);
+                                if (amount > 0) next[resource.id] = amount;
+                                else delete next[resource.id];
+                                return next;
+                              })
+                            }
+                            className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {buildings.length > 0 ? (
@@ -2334,6 +2939,12 @@ export default function AdminPanel({
                             Отрасль:{' '}
                             {industries.find((i) => i.id === building.industryId)
                               ?.name ?? '—'}
+                          </div>
+                          <div className="text-white/40 text-xs">
+                            Экономика: старт {Math.max(0, building.startingDucats ?? 0)} / потр.{' '}
+                            {Object.keys(building.consumptionByResourceId ?? {}).length} / доб.{' '}
+                            {Object.keys(building.extractionByResourceId ?? {}).length} / пр-во{' '}
+                            {Object.keys(building.productionByResourceId ?? {}).length}
                           </div>
                         </div>
                       </div>
@@ -2395,6 +3006,15 @@ export default function AdminPanel({
                               Изменить логотип
                             </span>
                           </label>
+                          <button
+                            onClick={() => openEditEconomy(building)}
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-cyan-400/40 relative group"
+                          >
+                            <Package className="w-4 h-4 text-white/60" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Экономика
+                            </span>
+                          </button>
                           <button
                             onClick={() => openEditRequirements(building)}
                             className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-emerald-400/40 relative group"
@@ -2567,7 +3187,7 @@ export default function AdminPanel({
               </div>
             </div>
           )}
-                    {tab === 'companies' && (
+          {tab === 'companies' && (
             <div className="space-y-4">
               <div>
                 <h2 className="text-white text-xl font-semibold">Компании</h2>
@@ -2740,9 +3360,739 @@ export default function AdminPanel({
               </div>
             </div>
           )}
+          {tab === 'routeTypes' && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-white text-xl font-semibold">Типы маршрутов</h2>
+                <p className="text-white/60 text-sm">
+                  Создавайте собственные типы линий логистики для прокладки на карте.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Название
+                  <input
+                    value={routeTypeName}
+                    onChange={(event) => setRouteTypeName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цвет
+                  <input
+                    type="color"
+                    value={routeTypeColor}
+                    onChange={(event) => setRouteTypeColor(event.target.value)}
+                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Толщина
+                  <input
+                    type="number"
+                    step={0.1}
+                    min={0.4}
+                    value={routeTypeWidth}
+                    onChange={(event) =>
+                      setRouteTypeWidth(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0.4, Number(event.target.value) || 0.4),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Штрих (опц.)
+                  <input
+                    value={routeTypeDash}
+                    onChange={(event) => setRouteTypeDash(event.target.value)}
+                    placeholder="пример: 6 3"
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цена за участок
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={routeTypeCostPerSegment}
+                    onChange={(event) =>
+                      setRouteTypeCostPerSegment(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Math.floor(Number(event.target.value) || 0)),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/75 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={routeTypeAllowSkip}
+                    onChange={(event) => setRouteTypeAllowSkip(event.target.checked)}
+                    className="w-4 h-4 accent-emerald-500"
+                  />
+                  Можно перескакивать через провинции
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Нужные здания
+                  <label className="flex items-center gap-2 text-white/70 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={routeTypeRequiredBuildingsMode === 'any'}
+                      onChange={(event) =>
+                        setRouteTypeRequiredBuildingsMode(
+                          event.target.checked ? 'any' : 'all',
+                        )
+                      }
+                      className="w-3.5 h-3.5 accent-emerald-500"
+                    />
+                    Любое здание
+                  </label>
+                  <div className="min-h-[96px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                    {buildings.length > 0 ? (
+                      buildings.map((building) => (
+                        <label
+                          key={building.id}
+                          className="flex items-center gap-2 text-white/75 text-xs"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={routeTypeRequiredBuildingIds.includes(building.id)}
+                            onChange={(event) =>
+                              setRouteTypeRequiredBuildingIds((prev) =>
+                                event.target.checked
+                                  ? Array.from(new Set([...prev, building.id]))
+                                  : prev.filter((id) => id !== building.id),
+                              )
+                            }
+                            className="w-3.5 h-3.5 accent-emerald-500"
+                          />
+                          <span>{building.name}</span>
+                        </label>
+                      ))
+                    ) : (
+                      <div className="text-white/45 text-xs">Нет зданий</div>
+                    )}
+                  </div>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Ландшафт: разрешён
+                    <label className="flex items-center gap-2 text-white/70 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={routeTypeAllowAllLandscapes}
+                        onChange={(event) =>
+                          setRouteTypeAllowAllLandscapes(event.target.checked)
+                        }
+                        className="w-3.5 h-3.5 accent-emerald-500"
+                      />
+                      Все ландшафты
+                    </label>
+                    <div className="min-h-[96px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                      {landscapes.length > 0 ? (
+                        landscapes.map((landscape) => (
+                          <label
+                            key={landscape.id}
+                            className="flex items-center gap-2 text-white/75 text-xs"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={routeTypeLandscapeAny.includes(landscape.id)}
+                              disabled={routeTypeAllowAllLandscapes}
+                              onChange={(event) =>
+                                setRouteTypeLandscapeAny((prev) =>
+                                  event.target.checked
+                                    ? Array.from(new Set([...prev, landscape.id]))
+                                    : prev.filter((id) => id !== landscape.id),
+                                )
+                              }
+                              className="w-3.5 h-3.5 accent-emerald-500"
+                            />
+                            <span>{landscape.name}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="text-white/45 text-xs">Нет ландшафтов</div>
+                      )}
+                    </div>
+                  </label>
+                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                    Ландшафт: запрещён
+                    <div className="min-h-[96px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                      {landscapes.length > 0 ? (
+                        landscapes.map((landscape) => (
+                          <label
+                            key={landscape.id}
+                            className="flex items-center gap-2 text-white/75 text-xs"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={routeTypeLandscapeNone.includes(landscape.id)}
+                              disabled={routeTypeAllowAllLandscapes}
+                              onChange={(event) =>
+                                setRouteTypeLandscapeNone((prev) =>
+                                  event.target.checked
+                                    ? Array.from(new Set([...prev, landscape.id]))
+                                    : prev.filter((id) => id !== landscape.id),
+                                )
+                              }
+                              className="w-3.5 h-3.5 accent-emerald-500"
+                            />
+                            <span>{landscape.name}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="text-white/45 text-xs">Нет ландшафтов</div>
+                      )}
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <label className="flex flex-col gap-2 text-white/70 text-sm">
+                Доступ к рынку по категориям товаров
+                <label className="flex items-center gap-2 text-white/70 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={routeTypeAllowAllMarketCategories}
+                    onChange={(event) =>
+                      setRouteTypeAllowAllMarketCategories(event.target.checked)
+                    }
+                    className="w-3.5 h-3.5 accent-emerald-500"
+                  />
+                  Все категории
+                </label>
+                <div className="min-h-[96px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                  {resourceCategories.length > 0 ? (
+                    resourceCategories.map((category) => (
+                      <label
+                        key={category.id}
+                        className="flex items-center gap-2 text-white/75 text-xs justify-between"
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={routeTypeMarketAccessCategoryIds.includes(category.id)}
+                            disabled={routeTypeAllowAllMarketCategories}
+                            onChange={(event) =>
+                              setRouteTypeMarketAccessCategoryIds((prev) =>
+                                event.target.checked
+                                  ? Array.from(new Set([...prev, category.id]))
+                                  : prev.filter((id) => id !== category.id),
+                              )
+                            }
+                            className="w-3.5 h-3.5 accent-emerald-500"
+                          />
+                          <span>{category.name}</span>
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={routeTypeTransportCapacityByCategory[category.id] ?? 0}
+                          onChange={(event) =>
+                            setRouteTypeTransportCapacityByCategory((prev) => ({
+                              ...prev,
+                              [category.id]: Math.max(
+                                0,
+                                Math.floor(Number(event.target.value) || 0),
+                              ),
+                            }))
+                          }
+                          className="w-16 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
+                    ))
+                  ) : (
+                    <div className="text-white/45 text-xs">Нет категорий</div>
+                  )}
+                </div>
+              </label>
+
+              <button
+                onClick={handleAddRouteType}
+                className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 inline-flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Добавить тип
+              </button>
+
+              <div className="space-y-2">
+                {routeTypes.map((item) => (
+                  <div
+                    key={item.id}
+                    className="px-3 py-3 rounded-lg bg-white/5 border border-white/10 space-y-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="color"
+                        value={item.color}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, { color: event.target.value })
+                        }
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
+                      />
+                      <input
+                        value={item.name}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, { name: event.target.value })
+                        }
+                        className="h-9 flex-1 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                      <input
+                        type="number"
+                        step={0.1}
+                        min={0.4}
+                        value={item.lineWidth}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, {
+                            lineWidth: Math.max(0.4, Number(event.target.value) || 0.4),
+                          })
+                        }
+                        className="w-20 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                      <input
+                        value={item.dashPattern ?? ''}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, {
+                            dashPattern: event.target.value,
+                          })
+                        }
+                        placeholder="dash"
+                        className="w-28 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={item.constructionCostPerSegment ?? 0}
+                        onChange={(event) =>
+                          onUpdateRouteType(item.id, {
+                            constructionCostPerSegment: Math.max(
+                              0,
+                              Math.floor(Number(event.target.value) || 0),
+                            ),
+                          })
+                        }
+                        title="Цена за участок"
+                        className="w-24 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                      />
+                      <button
+                        onClick={() => onDeleteRouteType(item.id)}
+                        className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                      >
+                        <Trash2 className="w-4 h-4 text-white/60" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-white/75 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={item.allowProvinceSkipping ?? false}
+                          onChange={(event) =>
+                            onUpdateRouteType(item.id, {
+                              allowProvinceSkipping: event.target.checked,
+                            })
+                          }
+                          className="w-4 h-4 accent-emerald-500"
+                        />
+                        Можно перескакивать
+                      </label>
+                      <label className="flex flex-col gap-2 text-white/70 text-sm">
+                        Нужные здания
+                        <label className="flex items-center gap-2 text-white/70 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={(item.requiredBuildingsMode ?? 'all') === 'any'}
+                            onChange={(event) =>
+                              onUpdateRouteType(item.id, {
+                                requiredBuildingsMode: event.target.checked
+                                  ? 'any'
+                                  : 'all',
+                              })
+                            }
+                            className="w-3.5 h-3.5 accent-emerald-500"
+                          />
+                          Любое здание
+                        </label>
+                        <div className="min-h-[84px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                          {buildings.length > 0 ? (
+                            buildings.map((building) => (
+                              <label
+                                key={building.id}
+                                className="flex items-center gap-2 text-white/75 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={(item.requiredBuildingIds ?? []).includes(
+                                    building.id,
+                                  )}
+                                  onChange={(event) => {
+                                    const current = item.requiredBuildingIds ?? [];
+                                    onUpdateRouteType(item.id, {
+                                      requiredBuildingIds: event.target.checked
+                                        ? Array.from(new Set([...current, building.id]))
+                                        : current.filter((id) => id !== building.id),
+                                    });
+                                  }}
+                                  className="w-3.5 h-3.5 accent-emerald-500"
+                                />
+                                <span>{building.name}</span>
+                              </label>
+                            ))
+                          ) : (
+                            <div className="text-white/45 text-xs">Нет зданий</div>
+                          )}
+                        </div>
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="flex flex-col gap-2 text-white/70 text-sm">
+                          Ландшафт: разрешён
+                          <label className="flex items-center gap-2 text-white/70 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={item.allowAllLandscapes ?? true}
+                              onChange={(event) =>
+                                onUpdateRouteType(item.id, {
+                                  allowAllLandscapes: event.target.checked,
+                                })
+                              }
+                              className="w-3.5 h-3.5 accent-emerald-500"
+                            />
+                            Все ландшафты
+                          </label>
+                          <div className="min-h-[84px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                            {landscapes.length > 0 ? (
+                              landscapes.map((landscape) => (
+                                <label
+                                  key={landscape.id}
+                                  className="flex items-center gap-2 text-white/75 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(item.landscape?.anyOf ?? []).includes(
+                                      landscape.id,
+                                    )}
+                                    disabled={item.allowAllLandscapes ?? true}
+                                    onChange={(event) => {
+                                      const anyOf = item.landscape?.anyOf ?? [];
+                                      onUpdateRouteType(item.id, {
+                                        landscape: {
+                                          anyOf: event.target.checked
+                                            ? Array.from(
+                                                new Set([...anyOf, landscape.id]),
+                                              )
+                                            : anyOf.filter(
+                                                (id) => id !== landscape.id,
+                                              ),
+                                          noneOf: item.landscape?.noneOf ?? [],
+                                        },
+                                      });
+                                    }}
+                                    className="w-3.5 h-3.5 accent-emerald-500"
+                                  />
+                                  <span>{landscape.name}</span>
+                                </label>
+                              ))
+                            ) : (
+                              <div className="text-white/45 text-xs">
+                                Нет ландшафтов
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                        <label className="flex flex-col gap-2 text-white/70 text-sm">
+                          Ландшафт: запрещён
+                          <div className="min-h-[84px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                            {landscapes.length > 0 ? (
+                              landscapes.map((landscape) => (
+                                <label
+                                  key={landscape.id}
+                                  className="flex items-center gap-2 text-white/75 text-xs"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={(item.landscape?.noneOf ?? []).includes(
+                                      landscape.id,
+                                    )}
+                                    disabled={item.allowAllLandscapes ?? true}
+                                    onChange={(event) => {
+                                      const noneOf = item.landscape?.noneOf ?? [];
+                                      onUpdateRouteType(item.id, {
+                                        landscape: {
+                                          anyOf: item.landscape?.anyOf ?? [],
+                                          noneOf: event.target.checked
+                                            ? Array.from(
+                                                new Set([...noneOf, landscape.id]),
+                                              )
+                                            : noneOf.filter(
+                                                (id) => id !== landscape.id,
+                                              ),
+                                        },
+                                      });
+                                    }}
+                                    className="w-3.5 h-3.5 accent-emerald-500"
+                                  />
+                                  <span>{landscape.name}</span>
+                                </label>
+                              ))
+                            ) : (
+                              <div className="text-white/45 text-xs">
+                                Нет ландшафтов
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                    <label className="flex flex-col gap-2 text-white/70 text-sm">
+                      Доступ к рынку по категориям товаров
+                      <label className="flex items-center gap-2 text-white/70 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={item.allowAllMarketCategories ?? true}
+                          onChange={(event) =>
+                            onUpdateRouteType(item.id, {
+                              allowAllMarketCategories: event.target.checked,
+                            })
+                          }
+                          className="w-3.5 h-3.5 accent-emerald-500"
+                        />
+                        Все категории
+                      </label>
+                      <div className="min-h-[84px] max-h-[160px] overflow-y-auto legend-scroll rounded-lg bg-black/40 border border-white/10 px-2 py-2 space-y-1.5">
+                        {resourceCategories.length > 0 ? (
+                          resourceCategories.map((category) => (
+                            <label
+                              key={category.id}
+                              className="flex items-center gap-2 text-white/75 text-xs justify-between"
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={(item.marketAccessCategoryIds ?? []).includes(
+                                    category.id,
+                                  )}
+                                  disabled={item.allowAllMarketCategories ?? true}
+                                  onChange={(event) => {
+                                    const current = item.marketAccessCategoryIds ?? [];
+                                    onUpdateRouteType(item.id, {
+                                      marketAccessCategoryIds: event.target.checked
+                                        ? Array.from(new Set([...current, category.id]))
+                                        : current.filter((id) => id !== category.id),
+                                    });
+                                  }}
+                                  className="w-3.5 h-3.5 accent-emerald-500"
+                                />
+                                <span>{category.name}</span>
+                              </span>
+                              <input
+                                type="number"
+                                min={0}
+                                step={1}
+                                value={
+                                  item.transportCapacityPerLevelByCategory?.[category.id] ??
+                                  0
+                                }
+                                onChange={(event) => {
+                                  const current =
+                                    item.transportCapacityPerLevelByCategory ?? {};
+                                  onUpdateRouteType(item.id, {
+                                    transportCapacityPerLevelByCategory: {
+                                      ...current,
+                                      [category.id]: Math.max(
+                                        0,
+                                        Math.floor(Number(event.target.value) || 0),
+                                      ),
+                                    },
+                                  });
+                                }}
+                                className="w-16 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                              />
+                            </label>
+                          ))
+                        ) : (
+                          <div className="text-white/45 text-xs">Нет категорий</div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
+
+    {editingEconomyBuildingId && (
+        <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="absolute inset-4 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <div className="text-white text-lg font-semibold">
+                  Экономика здания
+                </div>
+                <div className="text-white/60 text-sm">
+                  {editingEconomyBuilding?.name ?? 'Здание'}
+                </div>
+              </div>
+              <button
+                onClick={closeEditEconomy}
+                className="h-9 w-9 rounded-lg border border-white/10 bg-white/5 text-white/70 flex items-center justify-center hover:border-emerald-400/40"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto legend-scroll px-5 py-4 space-y-4">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <label className="flex flex-col gap-2 text-white/70 text-sm max-w-[220px]">
+                  Стартовые дукаты
+                  <input
+                    type="number"
+                    min={0}
+                    value={editEconomyStartingDucats}
+                    onChange={(event) =>
+                      setEditEconomyStartingDucats(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+
+                {resources.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/70 text-xs">Потребление за ход</div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {resources.map((resource) => (
+                          <label
+                            key={`edit-consume-${resource.id}`}
+                            className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                          >
+                            <span>{resource.name}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editEconomyConsumptionByResourceId[resource.id] ?? 0}
+                              onChange={(event) =>
+                                setEditEconomyConsumptionByResourceId((prev) => {
+                                  const next = { ...prev };
+                                  const amount = Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  );
+                                  if (amount > 0) next[resource.id] = amount;
+                                  else delete next[resource.id];
+                                  return next;
+                                })
+                              }
+                              className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/70 text-xs">Добыча за ход</div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {resources.map((resource) => (
+                          <label
+                            key={`edit-extract-${resource.id}`}
+                            className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                          >
+                            <span>{resource.name}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editEconomyExtractionByResourceId[resource.id] ?? 0}
+                              onChange={(event) =>
+                                setEditEconomyExtractionByResourceId((prev) => {
+                                  const next = { ...prev };
+                                  const amount = Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  );
+                                  if (amount > 0) next[resource.id] = amount;
+                                  else delete next[resource.id];
+                                  return next;
+                                })
+                              }
+                              className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/70 text-xs">Производство за ход</div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {resources.map((resource) => (
+                          <label
+                            key={`edit-produce-${resource.id}`}
+                            className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                          >
+                            <span>{resource.name}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={editEconomyProductionByResourceId[resource.id] ?? 0}
+                              onChange={(event) =>
+                                setEditEconomyProductionByResourceId((prev) => {
+                                  const next = { ...prev };
+                                  const amount = Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  );
+                                  if (amount > 0) next[resource.id] = amount;
+                                  else delete next[resource.id];
+                                  return next;
+                                })
+                              }
+                              className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-white/50 text-sm">Нет ресурсов</div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-white/10">
+              <button
+                onClick={closeEditEconomy}
+                className="h-9 px-3 rounded-lg border border-white/10 bg-black/30 text-white/60 text-sm hover:border-emerald-400/40"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={saveEditEconomy}
+                className="h-9 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-sm"
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     {editingBuildingId && (
         <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm animate-fadeIn">
