@@ -90,6 +90,8 @@ const layerIconMap: Record<string, React.ComponentType<{ className?: string }>> 
 
 const stripeIdFromColor = (color: string) =>
   `stripe-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
+const colonizationStripeIdFromColor = (color: string) =>
+  `stripe-colonization-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
 
 const ensureStripePattern = (svg: SVGSVGElement, color: string) => {
   const id = stripeIdFromColor(color);
@@ -126,12 +128,82 @@ const ensureStripePattern = (svg: SVGSVGElement, color: string) => {
   return `url(#${id})`;
 };
 
+const ensureColonizationStripePattern = (svg: SVGSVGElement, color: string) => {
+  const id = colonizationStripeIdFromColor(color);
+  if (svg.querySelector(`#${id}`)) {
+    return `url(#${id})`;
+  }
+
+  let defs = svg.querySelector('defs');
+  if (!defs) {
+    defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    svg.insertBefore(defs, svg.firstChild);
+  }
+
+  const pattern = document.createElementNS('http://www.w3.org/2000/svg', 'pattern');
+  pattern.setAttribute('id', id);
+  pattern.setAttribute('patternUnits', 'userSpaceOnUse');
+  pattern.setAttribute('width', '6');
+  pattern.setAttribute('height', '6');
+  pattern.setAttribute('patternTransform', 'rotate(-45)');
+
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('width', '6');
+  rect.setAttribute('height', '6');
+  rect.setAttribute('fill', color);
+
+  const bar = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bar.setAttribute('x', '0');
+  bar.setAttribute('y', '0');
+  bar.setAttribute('width', '2');
+  bar.setAttribute('height', '6');
+  bar.setAttribute('fill', 'rgba(10, 15, 26, 0.78)');
+
+  pattern.appendChild(rect);
+  pattern.appendChild(bar);
+  defs.appendChild(pattern);
+
+  return `url(#${id})`;
+};
+
 const resolveFill = (svg: SVGSVGElement, value: string) => {
   if (value.startsWith('stripe:')) {
     const color = value.slice('stripe:'.length).trim();
     return ensureStripePattern(svg, color);
   }
   return value;
+};
+
+const toLayerStrokeColor = (value: string) => {
+  const trimmed = value.trim();
+  const hexMatch = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(trimmed);
+  if (hexMatch) {
+    const hex = hexMatch[1];
+    const rgb =
+      hex.length === 3
+        ? hex.split('').map((char) => Number.parseInt(`${char}${char}`, 16))
+        : [
+            Number.parseInt(hex.slice(0, 2), 16),
+            Number.parseInt(hex.slice(2, 4), 16),
+            Number.parseInt(hex.slice(4, 6), 16),
+          ];
+    return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, 0.92)`;
+  }
+  const rgbMatch = /^rgba?\(([^)]+)\)$/i.exec(trimmed);
+  if (rgbMatch) {
+    const values = rgbMatch[1]
+      .split(',')
+      .map((part) => Number.parseFloat(part.trim()))
+      .filter((n) => Number.isFinite(n));
+    if (values.length >= 3) {
+      const alpha = values.length >= 4 ? values[3] : 1;
+      return `rgba(${values[0]}, ${values[1]}, ${values[2]}, ${Math.max(
+        0.72,
+        Math.min(1, alpha),
+      )})`;
+    }
+  }
+  return trimmed;
 };
 
 const MapSvg = memo(({ markup }: { markup: string }) => (
@@ -203,8 +275,10 @@ export default function MapView({
         minZoom: 0.7,
         maxZoom: 20,
         dblClickZoomEnabled: false,
-        zoomScaleSensitivity: 0.2,
+        zoomScaleSensitivity: 0.3,
       });
+      panZoomRef.current.zoom(4);
+      panZoomRef.current.center();
     }
 
     const paths = Array.from(svg.querySelectorAll('path'));
@@ -219,6 +293,9 @@ export default function MapView({
       provinceIds.push(provinceId);
       if (!path.getAttribute('data-original-fill')) {
         path.setAttribute('data-original-fill', path.getAttribute('fill') || '');
+      }
+      if (!path.getAttribute('data-original-stroke')) {
+        path.setAttribute('data-original-stroke', path.getAttribute('stroke') || '');
       }
       path.style.cursor = 'pointer';
     });
@@ -315,25 +392,47 @@ export default function MapView({
       if (!provinceId) return;
 
       let fill = '';
+      let strokeSourceColor = '';
       if (activeLayerIds.includes('colonization') && colonizationTint[provinceId]) {
-        fill = resolveFill(svg, colonizationTint[provinceId]);
+        const tint = colonizationTint[provinceId];
+        strokeSourceColor = tint.startsWith('stripe:')
+          ? tint.slice('stripe:'.length).trim()
+          : tint;
+        if (tint.startsWith('stripe:')) {
+          fill = ensureColonizationStripePattern(
+            svg,
+            tint.slice('stripe:'.length).trim(),
+          );
+        } else {
+          fill = resolveFill(svg, tint);
+        }
       } else {
         for (const layerId of activeLayerIds) {
           if (layerId === 'political' && politicalStripes[provinceId]) {
             const color = politicalStripes[provinceId];
-            fill = ensureStripePattern(svg, color);
+            strokeSourceColor = color;
+            fill = ensureColonizationStripePattern(svg, color);
             break;
           }
           const paint = layerPaint[layerId];
           if (paint && paint[provinceId]) {
-            fill = paint[provinceId];
+            const paintColor = paint[provinceId];
+            strokeSourceColor = paintColor.startsWith('stripe:')
+              ? paintColor.slice('stripe:'.length).trim()
+              : paintColor;
+            fill = paintColor;
             break;
           }
         }
       }
 
       const originalFill = path.getAttribute('data-original-fill') || '';
+      const originalStroke = path.getAttribute('data-original-stroke') || '#404040';
       path.setAttribute('fill', fill || originalFill || '#b9b9b9');
+      path.setAttribute(
+        'stroke',
+        strokeSourceColor ? toLayerStrokeColor(strokeSourceColor) : originalStroke,
+      );
       path.classList.toggle('map-path-selected', provinceId === selectedId);
       path.classList.toggle(
         'map-path-route',
