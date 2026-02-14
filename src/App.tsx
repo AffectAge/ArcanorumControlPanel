@@ -70,6 +70,7 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const DEFAULT_RESOURCE_BASE_PRICE = 1;
 const MARKET_PRICE_SMOOTHING = 0.15;
 const MARKET_PRICE_HISTORY_LENGTH = 10;
+const MARKET_PRICE_EPSILON = 0.0001;
 
 const normalizePositiveNumber = (value: unknown): number | undefined => {
   if (!Number.isFinite(value)) return undefined;
@@ -113,6 +114,42 @@ const normalizeResourcePriceHistory = (
     .filter((item) => Number.isFinite(item) && item > 0);
   if (normalized.length === 0) return [fallback];
   return normalized.slice(-MARKET_PRICE_HISTORY_LENGTH);
+};
+
+const computeNextMarketPrice = (params: {
+  currentPrice: number;
+  basePrice: number;
+  demand: number;
+  productionFact: number;
+  marketVolume: number;
+  minMarketPrice?: number;
+  maxMarketPrice?: number;
+}) => {
+  const {
+    currentPrice,
+    basePrice,
+    demand,
+    productionFact,
+    marketVolume,
+    minMarketPrice,
+    maxMarketPrice,
+  } = params;
+
+  const offer = Math.max(0, productionFact) + Math.max(0, marketVolume);
+  const ratio = (Math.max(0, demand) + 1) / (offer + 1);
+  let targetPrice =
+    Math.abs(Math.max(0, demand) - offer) <= MARKET_PRICE_EPSILON
+      ? basePrice
+      : currentPrice * ratio;
+
+  if (minMarketPrice != null) targetPrice = Math.max(targetPrice, minMarketPrice);
+  if (maxMarketPrice != null) targetPrice = Math.min(targetPrice, maxMarketPrice);
+
+  let nextPrice = currentPrice + (targetPrice - currentPrice) * MARKET_PRICE_SMOOTHING;
+  if (minMarketPrice != null) nextPrice = Math.max(nextPrice, minMarketPrice);
+  if (maxMarketPrice != null) nextPrice = Math.min(nextPrice, maxMarketPrice);
+
+  return normalizeResourcePrice(nextPrice, basePrice);
 };
 
 const normalizeBuildingDefinitions = (
@@ -1960,26 +1997,15 @@ function App() {
         const resourceDemand = Math.max(0, demand[resource.id] ?? 0);
         const resourceSupplyFact = Math.max(0, factualSupply[resource.id] ?? 0);
         const resourceMarketVolume = Math.max(0, marketVolume[resource.id] ?? 0);
-        const resourceSupplyForPrice = resourceSupplyFact + resourceMarketVolume;
-        const ratio = (resourceDemand + 1) / (resourceSupplyForPrice + 1);
-        let targetPrice =
-          Math.abs(resourceDemand - resourceSupplyForPrice) < 0.0001
-            ? basePrice
-            : currentPrice * ratio;
-        if (resource.minMarketPrice != null) {
-          targetPrice = Math.max(targetPrice, resource.minMarketPrice);
-        }
-        if (resource.maxMarketPrice != null) {
-          targetPrice = Math.min(targetPrice, resource.maxMarketPrice);
-        }
-        let nextPrice = currentPrice + (targetPrice - currentPrice) * MARKET_PRICE_SMOOTHING;
-        if (resource.minMarketPrice != null) {
-          nextPrice = Math.max(nextPrice, resource.minMarketPrice);
-        }
-        if (resource.maxMarketPrice != null) {
-          nextPrice = Math.min(nextPrice, resource.maxMarketPrice);
-        }
-        nextPrices[resource.id] = normalizeResourcePrice(nextPrice, basePrice);
+        nextPrices[resource.id] = computeNextMarketPrice({
+          currentPrice,
+          basePrice,
+          demand: resourceDemand,
+          productionFact: resourceSupplyFact,
+          marketVolume: resourceMarketVolume,
+          minMarketPrice: resource.minMarketPrice,
+          maxMarketPrice: resource.maxMarketPrice,
+        });
       });
       nextMarketPricesByMarketId.set(market.id, nextPrices);
     });
