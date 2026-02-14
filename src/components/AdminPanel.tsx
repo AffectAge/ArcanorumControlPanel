@@ -95,6 +95,7 @@ type AdminPanelProps = {
     basePrice?: number,
     minMarketPrice?: number,
     maxMarketPrice?: number,
+    infrastructureCostPerUnit?: number,
   ) => void;
   onAddResourceCategory: (name: string, color?: string) => void;
   onAddBuilding: (
@@ -189,6 +190,7 @@ type AdminPanelProps = {
       basePrice?: number;
       minMarketPrice?: number;
       maxMarketPrice?: number;
+      infrastructureCostPerUnit?: number;
     },
   ) => void;
   onUpdateResourceCategory: (resourceId: string, categoryId?: string) => void;
@@ -397,6 +399,8 @@ export default function AdminPanel({
   const [resourceBasePrice, setResourceBasePrice] = useState<number | ''>(1);
   const [resourceMinMarketPrice, setResourceMinMarketPrice] = useState<number | ''>(0);
   const [resourceMaxMarketPrice, setResourceMaxMarketPrice] = useState<number | ''>(0);
+  const [resourceInfrastructureCostPerUnit, setResourceInfrastructureCostPerUnit] =
+    useState<number | ''>(1);
   const [routeTypeName, setRouteTypeName] = useState('');
   const [routeTypeColor, setRouteTypeColor] = useState('#38bdf8');
   const [routeTypeWidth, setRouteTypeWidth] = useState<number | ''>(1.2);
@@ -499,6 +503,9 @@ export default function AdminPanel({
       resourceMaxMarketPrice === '' || Number(resourceMaxMarketPrice) <= 0
         ? undefined
         : Math.max(0.01, Number(resourceMaxMarketPrice)),
+      resourceInfrastructureCostPerUnit === ''
+        ? undefined
+        : Math.max(0.01, Number(resourceInfrastructureCostPerUnit) || 1),
     );
     setResourceName('');
     setResourceIcon(undefined);
@@ -506,6 +513,7 @@ export default function AdminPanel({
     setResourceBasePrice(1);
     setResourceMinMarketPrice(0);
     setResourceMaxMarketPrice(0);
+    setResourceInfrastructureCostPerUnit(1);
   };
 
   const handleAddResourceCategory = () => {
@@ -2562,6 +2570,23 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[130px]">
+                  Инфр/ед
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={resourceInfrastructureCostPerUnit}
+                    onChange={(event) =>
+                      setResourceInfrastructureCostPerUnit(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0.01, Number(event.target.value) || 0.01),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
                 <button
                   onClick={handleAddResource}
                   className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center gap-2"
@@ -2669,6 +2694,24 @@ export default function AdminPanel({
                           onChange={(event) =>
                             onUpdateResourcePricing(resource.id, {
                               maxMarketPrice: Math.max(0, Number(event.target.value) || 0),
+                            })
+                          }
+                          className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] text-white/60">
+                        Инфр
+                        <input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          value={resource.infrastructureCostPerUnit ?? 1}
+                          onChange={(event) =>
+                            onUpdateResourcePricing(resource.id, {
+                              infrastructureCostPerUnit: Math.max(
+                                0.01,
+                                Number(event.target.value) || 1,
+                              ),
                             })
                           }
                           className="w-16 h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-[11px] focus:outline-none focus:border-emerald-400/60"

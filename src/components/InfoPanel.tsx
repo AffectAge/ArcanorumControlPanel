@@ -243,9 +243,16 @@ export default function InfoPanel({
                             : 'text-rose-200'
                         }
                       >
-                        {entry.status === 'available'
-                          ? `Есть (${entry.points}, -${entry.consumedLastTurn})`
-                          : `Нет (-${entry.consumedLastTurn})`}
+                        {entry.status === 'available' ? (
+                          <>
+                            Есть ({entry.points},{' '}
+                            <span className="text-rose-300">-{entry.consumedLastTurn}</span>)
+                          </>
+                        ) : (
+                          <>
+                            Нет (<span className="text-rose-300">-{entry.consumedLastTurn}</span>)
+                          </>
+                        )}
                       </span>
                     </span>
                   </div>

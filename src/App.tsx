@@ -104,6 +104,11 @@ const normalizeOptionalResourcePrice = (value: unknown): number | undefined => {
   return safe > 0 ? safe : undefined;
 };
 
+const normalizeInfrastructureCostPerUnit = (value: unknown, fallback = 1): number => {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0.01, Number(value));
+};
+
 const normalizeResourcePriceHistory = (
   value: unknown,
   fallback: number,
@@ -175,6 +180,9 @@ const normalizeResources = (list: Trait[]): Trait[] =>
     const basePrice = normalizeResourcePrice(resource.basePrice);
     const minMarketPrice = normalizeOptionalResourcePrice(resource.minMarketPrice);
     const maxMarketPrice = normalizeOptionalResourcePrice(resource.maxMarketPrice);
+    const infrastructureCostPerUnit = normalizeInfrastructureCostPerUnit(
+      resource.infrastructureCostPerUnit,
+    );
     const boundedMin =
       minMarketPrice == null ? undefined : Math.min(minMarketPrice, maxMarketPrice ?? minMarketPrice);
     const boundedMax =
@@ -184,6 +192,7 @@ const normalizeResources = (list: Trait[]): Trait[] =>
       basePrice,
       minMarketPrice: boundedMin,
       maxMarketPrice: boundedMax,
+      infrastructureCostPerUnit,
     };
   });
 
@@ -1905,7 +1914,11 @@ function App() {
             purchaseNeedByResourceId[resourceId] = shortage;
           }
           if (shortage <= 0) return;
-          const resourceCategoryId = resourceById.get(resourceId)?.resourceCategoryId;
+          const resource = resourceById.get(resourceId);
+          const resourceCategoryId = resource?.resourceCategoryId;
+          const infrastructureCostPerUnit = normalizeInfrastructureCostPerUnit(
+            resource?.infrastructureCostPerUnit,
+          );
           let buyerInfrastructureLeft = Number.POSITIVE_INFINITY;
           if (resourceCategoryId) {
             const currentInfrastructureByCategory =
@@ -1964,7 +1977,9 @@ function App() {
               shortage,
               sellerStock,
               affordable,
-              resourceCategoryId ? Math.floor(buyerInfrastructureLeft) : Number.POSITIVE_INFINITY,
+              resourceCategoryId
+                ? Math.floor(buyerInfrastructureLeft / infrastructureCostPerUnit)
+                : Number.POSITIVE_INFINITY,
             );
             if (amount <= 0) continue;
 
@@ -1995,7 +2010,11 @@ function App() {
             );
             shortage -= amount;
             if (resourceCategoryId) {
-              buyerInfrastructureLeft = Math.max(0, buyerInfrastructureLeft - amount);
+              const consumedInfrastructure = amount * infrastructureCostPerUnit;
+              buyerInfrastructureLeft = Math.max(
+                0,
+                buyerInfrastructureLeft - consumedInfrastructure,
+              );
               const infrastructureByCategory =
                 remainingBuyerInfrastructureByProvinceIdAndCategory.get(
                   buyer.provinceId,
@@ -2007,7 +2026,7 @@ function App() {
                 consumedInfrastructureByProvinceIdAndCategory.get(buyer.provinceId) ?? {};
               consumedByCategory[resourceCategoryId] = Math.max(
                 0,
-                (consumedByCategory[resourceCategoryId] ?? 0) + amount,
+                (consumedByCategory[resourceCategoryId] ?? 0) + consumedInfrastructure,
               );
               consumedInfrastructureByProvinceIdAndCategory.set(
                 buyer.provinceId,
@@ -4873,6 +4892,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     basePrice?: number,
     minMarketPrice?: number,
     maxMarketPrice?: number,
+    infrastructureCostPerUnit?: number,
   ) => {
     const normalizedBasePrice = normalizeResourcePrice(
       basePrice,
@@ -4884,6 +4904,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       normalizedMin == null ? undefined : Math.min(normalizedMin, normalizedMax ?? normalizedMin);
     const boundedMax =
       normalizedMax == null ? undefined : Math.max(normalizedMax, boundedMin ?? normalizedMax);
+    const normalizedInfrastructureCostPerUnit = normalizeInfrastructureCostPerUnit(
+      infrastructureCostPerUnit,
+    );
     const resourceId = createId();
     setResources((prev) => [
       ...prev,
@@ -4896,6 +4919,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         basePrice: normalizedBasePrice,
         minMarketPrice: boundedMin,
         maxMarketPrice: boundedMax,
+        infrastructureCostPerUnit: normalizedInfrastructureCostPerUnit,
       },
     ]);
     setMarkets((prev) =>
@@ -4934,6 +4958,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       basePrice?: number;
       minMarketPrice?: number;
       maxMarketPrice?: number;
+      infrastructureCostPerUnit?: number;
     },
   ) => {
     let nextBasePrice = marketDefaultResourceBasePrice;
@@ -4954,12 +4979,16 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           minPriceRaw == null ? undefined : Math.min(minPriceRaw, maxPriceRaw ?? minPriceRaw);
         const maxMarketPrice =
           maxPriceRaw == null ? undefined : Math.max(maxPriceRaw, minMarketPrice ?? maxPriceRaw);
+        const infrastructureCostPerUnit = normalizeInfrastructureCostPerUnit(
+          patch.infrastructureCostPerUnit ?? item.infrastructureCostPerUnit,
+        );
         nextBasePrice = basePrice;
         return {
           ...item,
           basePrice,
           minMarketPrice,
           maxMarketPrice,
+          infrastructureCostPerUnit,
         };
       }),
     );

@@ -170,6 +170,7 @@ export type Trait = {
   basePrice?: number;
   minMarketPrice?: number;
   maxMarketPrice?: number;
+  infrastructureCostPerUnit?: number;
 };
 
 export type ResourceCategory = {
