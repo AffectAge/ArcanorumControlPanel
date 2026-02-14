@@ -108,6 +108,7 @@ body {
 
 .map-svg path {
   transition: fill 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
+  stroke-width: 0.16px;
 }
 
 .map-svg path:hover {
