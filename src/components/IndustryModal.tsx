@@ -782,7 +782,7 @@ const getInactiveReasons = (
 
       const hasOwnerAccess = agreements.some((agreement) => ownerAllowed(agreement, owner));
       if (!hasOwnerAccess) {
-        reasons.push('??? ???????????????? ??????????');
+        reasons.push('Нет дипломатического доступа владельцу');
       }
       const industryAllowed = (agreement: DiplomacyAgreement, id: string) => {
         if (!agreement.industries || agreement.industries.length === 0) return true;
