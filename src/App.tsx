@@ -19,6 +19,7 @@ import DiplomacyProposalsModal from './components/DiplomacyProposalsModal';
 import LogisticsModal from './components/LogisticsModal';
 import MarketModal from './components/MarketModal';
 import LegacyTooltipBridge from './components/LegacyTooltipBridge';
+import startingDataJson from './data/starting-data.json';
 import {
   createDefaultLogisticsState,
   ensureBaseLogisticsNodes,
@@ -454,13 +455,30 @@ const defaultCultureColors = ['#f97316', '#fb7185', '#a855f7', '#facc15'];
 const defaultLandscapeColors = ['#22c55e', '#10b981', '#84cc16', '#14b8a6'];
 const defaultClimateColors = ['#38bdf8', '#60a5fa', '#fbbf24', '#f97316'];
 const defaultReligionColors = ['#facc15', '#fb7185', '#a855f7', '#60a5fa'];
-const defaultResourceCategories: ResourceCategory[] = [
-  { id: 'resource-category-liquid', name: 'Жидкость', color: '#38bdf8' },
-  { id: 'resource-category-gas', name: 'Газ', color: '#a78bfa' },
-  { id: 'resource-category-energy', name: 'Энергия', color: '#f59e0b' },
-  { id: 'resource-category-goods', name: 'Товар', color: '#22c55e' },
-  { id: 'resource-category-service', name: 'Услуга', color: '#f472b6' },
-];
+
+type StartingDataShape = {
+  gameSettings: GameSettings;
+  climates: Trait[];
+  religions: Trait[];
+  landscapes: Trait[];
+  cultures: Trait[];
+  resourceCategories: ResourceCategory[];
+  resources: Trait[];
+  buildings: BuildingDefinition[];
+  industries: Industry[];
+  companies: Company[];
+};
+
+const startingData = startingDataJson as StartingDataShape;
+const cloneTraits = (list: Trait[]) => list.map((item) => ({ ...item }));
+const cloneResourceCategories = (list: ResourceCategory[]) =>
+  list.map((item) => ({ ...item }));
+const cloneResources = (list: Trait[]) =>
+  normalizeResources(list.map((item) => ({ ...item })));
+const cloneBuildings = (list: BuildingDefinition[]) =>
+  normalizeBuildingDefinitions(list.map((item) => ({ ...item })));
+const cloneIndustries = (list: Industry[]) => list.map((item) => ({ ...item }));
+const cloneCompanies = (list: Company[]) => list.map((item) => ({ ...item }));
 
 const initialMapLayers: MapLayer[] = [
   { id: 'political', name: 'Политическая', visible: true },
@@ -479,28 +497,17 @@ const initialMapLayers: MapLayer[] = [
 
 function App() {
   const [gameSettings, setGameSettings] = useState<GameSettings>({
-    colonizationPointsPerTurn: 10,
-    constructionPointsPerTurn: 10,
-    demolitionCostPercent: 20,
-    eventLogRetainTurns: 3,
-    marketCapitalGraceTurns: 3,
-    marketDefaultResourceBasePrice: DEFAULT_RESOURCE_BASE_PRICE,
-    marketPriceSmoothing: MARKET_PRICE_SMOOTHING,
-    marketPriceHistoryLength: MARKET_PRICE_HISTORY_LENGTH,
-    marketPriceEpsilon: MARKET_PRICE_EPSILON,
-    startingColonizationPoints: 100,
-    startingConstructionPoints: 100,
-    sciencePointsPerTurn: 0,
-    culturePointsPerTurn: 0,
-    religionPointsPerTurn: 0,
-    goldPerTurn: 0,
-    ducatsPerTurn: 0,
-    startingSciencePoints: 0,
-    startingCulturePoints: 0,
-    startingReligionPoints: 0,
-    startingGold: 0,
-    startingDucats: 100000,
-    colonizationMaxActive: 0,
+    ...startingData.gameSettings,
+    marketDefaultResourceBasePrice:
+      startingData.gameSettings.marketDefaultResourceBasePrice ??
+      DEFAULT_RESOURCE_BASE_PRICE,
+    marketPriceSmoothing:
+      startingData.gameSettings.marketPriceSmoothing ?? MARKET_PRICE_SMOOTHING,
+    marketPriceHistoryLength:
+      startingData.gameSettings.marketPriceHistoryLength ??
+      MARKET_PRICE_HISTORY_LENGTH,
+    marketPriceEpsilon:
+      startingData.gameSettings.marketPriceEpsilon ?? MARKET_PRICE_EPSILON,
   });
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | undefined>(
@@ -524,31 +531,35 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [industryOpen, setIndustryOpen] = useState(false);
   const [diplomacyOpen, setDiplomacyOpen] = useState(false);
-  const [climates, setClimates] = useState<Trait[]>([
-    { id: createId(), name: 'Умеренный', color: '#38bdf8' },
-    { id: createId(), name: 'Засушливый', color: '#f59e0b' },
-  ]);
-  const [religions, setReligions] = useState<Trait[]>([
-    { id: createId(), name: 'Солнечный культ', color: '#facc15' },
-    { id: createId(), name: 'Лунный культ', color: '#a855f7' },
-  ]);
-  const [landscapes, setLandscapes] = useState<Trait[]>([
-    { id: createId(), name: 'Равнина', color: '#22c55e' },
-    { id: createId(), name: 'Горы', color: '#10b981' },
-  ]);
+  const [climates, setClimates] = useState<Trait[]>(() =>
+    cloneTraits(startingData.climates),
+  );
+  const [religions, setReligions] = useState<Trait[]>(() =>
+    cloneTraits(startingData.religions),
+  );
+  const [landscapes, setLandscapes] = useState<Trait[]>(() =>
+    cloneTraits(startingData.landscapes),
+  );
   const [continents, setContinents] = useState<Trait[]>([]);
   const [regions, setRegions] = useState<Trait[]>([]);
-  const [cultures, setCultures] = useState<Trait[]>([
-    { id: createId(), name: 'Северяне', color: '#fb7185' },
-    { id: createId(), name: 'Южане', color: '#f97316' },
-  ]);
-  const [resources, setResources] = useState<Trait[]>([]);
-  const [resourceCategories, setResourceCategories] = useState<ResourceCategory[]>(
-    defaultResourceCategories,
+  const [cultures, setCultures] = useState<Trait[]>(() =>
+    cloneTraits(startingData.cultures),
   );
-  const [buildings, setBuildings] = useState<BuildingDefinition[]>([]);
-  const [industries, setIndustries] = useState<Industry[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [resources, setResources] = useState<Trait[]>(() =>
+    cloneResources(startingData.resources),
+  );
+  const [resourceCategories, setResourceCategories] = useState<ResourceCategory[]>(
+    () => cloneResourceCategories(startingData.resourceCategories),
+  );
+  const [buildings, setBuildings] = useState<BuildingDefinition[]>(() =>
+    cloneBuildings(startingData.buildings),
+  );
+  const [industries, setIndustries] = useState<Industry[]>(() =>
+    cloneIndustries(startingData.industries),
+  );
+  const [companies, setCompanies] = useState<Company[]>(() =>
+    cloneCompanies(startingData.companies),
+  );
   const [diplomacyAgreements, setDiplomacyAgreements] = useState<
     DiplomacyAgreement[]
   >([]);
@@ -2717,7 +2728,7 @@ function App() {
     const loadedResourceCategories =
       save.data.resourceCategories && save.data.resourceCategories.length > 0
         ? save.data.resourceCategories
-        : defaultResourceCategories;
+        : cloneResourceCategories(startingData.resourceCategories);
     setResourceCategories(loadedResourceCategories);
     const validResourceCategoryIds = new Set(
       loadedResourceCategories.map((category) => category.id),
@@ -3018,57 +3029,33 @@ function App() {
     setMapLayers(ensureMarketsMapLayer(initialMapLayers));
     setSelectedProvinceId(undefined);
     setProvinces({});
-    setClimates([
-      { id: createId(), name: 'Умеренный', color: '#38bdf8' },
-      { id: createId(), name: 'Засушливый', color: '#f59e0b' },
-    ]);
-    setReligions([
-      { id: createId(), name: 'Солнечный культ', color: '#facc15' },
-      { id: createId(), name: 'Лунный культ', color: '#a855f7' },
-    ]);
-    setLandscapes([
-      { id: createId(), name: 'Равнина', color: '#22c55e' },
-      { id: createId(), name: 'Горы', color: '#10b981' },
-    ]);
+    setClimates(cloneTraits(startingData.climates));
+    setReligions(cloneTraits(startingData.religions));
+    setLandscapes(cloneTraits(startingData.landscapes));
     setContinents([]);
     setRegions([]);
-    setCultures([
-      { id: createId(), name: 'Северяне', color: '#fb7185' },
-      { id: createId(), name: 'Южане', color: '#f97316' },
-    ]);
-    setResources([]);
-    setResourceCategories(defaultResourceCategories);
-    setBuildings([]);
-    setIndustries([]);
-    setCompanies([]);
+    setCultures(cloneTraits(startingData.cultures));
+    setResources(cloneResources(startingData.resources));
+    setResourceCategories(cloneResourceCategories(startingData.resourceCategories));
+    setBuildings(cloneBuildings(startingData.buildings));
+    setIndustries(cloneIndustries(startingData.industries));
+    setCompanies(cloneCompanies(startingData.companies));
     setDiplomacyAgreements([]);
     setDiplomacyProposals([]);
     setMarkets([]);
     setLogistics(createDefaultLogisticsState());
     setGameSettings({
-      colonizationPointsPerTurn: 10,
-      constructionPointsPerTurn: 10,
-      demolitionCostPercent: 20,
-      eventLogRetainTurns: 3,
-      diplomacyProposalExpireTurns: 3,
-      marketCapitalGraceTurns: 3,
-      marketDefaultResourceBasePrice: DEFAULT_RESOURCE_BASE_PRICE,
-      marketPriceSmoothing: MARKET_PRICE_SMOOTHING,
-      marketPriceHistoryLength: MARKET_PRICE_HISTORY_LENGTH,
-      marketPriceEpsilon: MARKET_PRICE_EPSILON,
-      startingColonizationPoints: 100,
-      startingConstructionPoints: 100,
-      sciencePointsPerTurn: 0,
-      culturePointsPerTurn: 0,
-      religionPointsPerTurn: 0,
-      goldPerTurn: 0,
-      ducatsPerTurn: 0,
-      startingSciencePoints: 0,
-      startingCulturePoints: 0,
-      startingReligionPoints: 0,
-      startingGold: 0,
-      startingDucats: 100000,
-      colonizationMaxActive: 0,
+      ...startingData.gameSettings,
+      marketDefaultResourceBasePrice:
+        startingData.gameSettings.marketDefaultResourceBasePrice ??
+        DEFAULT_RESOURCE_BASE_PRICE,
+      marketPriceSmoothing:
+        startingData.gameSettings.marketPriceSmoothing ?? MARKET_PRICE_SMOOTHING,
+      marketPriceHistoryLength:
+        startingData.gameSettings.marketPriceHistoryLength ??
+        MARKET_PRICE_HISTORY_LENGTH,
+      marketPriceEpsilon:
+        startingData.gameSettings.marketPriceEpsilon ?? MARKET_PRICE_EPSILON,
     });
     setEventLog(createDefaultLog());
     setHotseatOpen(false);

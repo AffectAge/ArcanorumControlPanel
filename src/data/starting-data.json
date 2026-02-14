@@ -1,0 +1,54 @@
+{
+  "gameSettings": {
+    "colonizationPointsPerTurn": 10,
+    "constructionPointsPerTurn": 10,
+    "demolitionCostPercent": 20,
+    "eventLogRetainTurns": 3,
+    "diplomacyProposalExpireTurns": 3,
+    "marketCapitalGraceTurns": 3,
+    "marketDefaultResourceBasePrice": 1,
+    "marketPriceSmoothing": 0.3,
+    "marketPriceHistoryLength": 10,
+    "marketPriceEpsilon": 0.0001,
+    "startingColonizationPoints": 100,
+    "startingConstructionPoints": 100,
+    "sciencePointsPerTurn": 0,
+    "culturePointsPerTurn": 0,
+    "religionPointsPerTurn": 0,
+    "goldPerTurn": 0,
+    "ducatsPerTurn": 0,
+    "startingSciencePoints": 0,
+    "startingCulturePoints": 0,
+    "startingReligionPoints": 0,
+    "startingGold": 0,
+    "startingDucats": 100000,
+    "colonizationMaxActive": 0
+  },
+  "climates": [
+    { "id": "climate-temperate", "name": "Умеренный", "color": "#38bdf8" },
+    { "id": "climate-arid", "name": "Засушливый", "color": "#f59e0b" }
+  ],
+  "religions": [
+    { "id": "religion-sun", "name": "Солнечный культ", "color": "#facc15" },
+    { "id": "religion-moon", "name": "Лунный культ", "color": "#a855f7" }
+  ],
+  "landscapes": [
+    { "id": "landscape-plains", "name": "Равнина", "color": "#22c55e" },
+    { "id": "landscape-mountains", "name": "Горы", "color": "#10b981" }
+  ],
+  "cultures": [
+    { "id": "culture-north", "name": "Северяне", "color": "#fb7185" },
+    { "id": "culture-south", "name": "Южане", "color": "#f97316" }
+  ],
+  "resourceCategories": [
+    { "id": "resource-category-liquid", "name": "Жидкость", "color": "#38bdf8" },
+    { "id": "resource-category-gas", "name": "Газ", "color": "#a78bfa" },
+    { "id": "resource-category-energy", "name": "Энергия", "color": "#f59e0b" },
+    { "id": "resource-category-goods", "name": "Товар", "color": "#22c55e" },
+    { "id": "resource-category-service", "name": "Услуга", "color": "#f472b6" }
+  ],
+  "resources": [],
+  "buildings": [],
+  "industries": [],
+  "companies": []
+}
