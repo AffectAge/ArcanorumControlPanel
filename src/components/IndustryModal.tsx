@@ -1,6 +1,7 @@
 import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon, Plus, Coins } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { expandDiplomacyAgreements } from '../diplomacyUtils';
+import Tooltip from './Tooltip';
 import type {
   BuildingDefinition,
   Country,
@@ -1613,36 +1614,38 @@ export default function IndustryModal({
                               </div>
                               <div className="flex items-center gap-2">
                                 {card.kind === 'construction' && (
-                                  <button
-                                    onClick={() =>
-                                      setCancelTarget({
-                                        provinceId: card.provinceId,
-                                        buildingId: card.buildingId,
-                                        buildingName: building?.name ?? card.buildingId,
-                                        index: card.index,
-                                      })
-                                    }
-                                    className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="Отменить строительство"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
+                                  <Tooltip label="Отменить строительство">
+                                    <button
+                                      onClick={() =>
+                                        setCancelTarget({
+                                          provinceId: card.provinceId,
+                                          buildingId: card.buildingId,
+                                          buildingName: building?.name ?? card.buildingId,
+                                          index: card.index,
+                                        })
+                                      }
+                                      className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </Tooltip>
                                 )}
                                 {card.kind === 'built' && (
-                                  <button
-                                    onClick={() => {
-                                      setConfirmTarget({
-                                        provinceId: card.provinceId,
-                                        buildingId: card.buildingId,
-                                        buildingName: building?.name ?? card.buildingId,
-                                        cost: demolishCost,
-                                      });
-                                    }}
-                                    className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="Снести"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  <Tooltip label="Снести">
+                                    <button
+                                      onClick={() => {
+                                        setConfirmTarget({
+                                          provinceId: card.provinceId,
+                                          buildingId: card.buildingId,
+                                          buildingName: building?.name ?? card.buildingId,
+                                          cost: demolishCost,
+                                        });
+                                      }}
+                                      className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </Tooltip>
                                 )}
                               </div>
 </div>
@@ -1678,37 +1681,38 @@ export default function IndustryModal({
                               <div className="flex items-center gap-2">
                                 <Factory className="w-3.5 h-3.5" />
                                 <span className="text-white/40">Владелец:</span>
-                                <button
-                                  onClick={() =>
-                                    setOwnerEditor({
-                                      key: card.key,
-                                      provinceId: card.provinceId,
-                                      kind: card.kind,
-                                      buildingId: card.buildingId,
-                                      index: card.index,
-                                      type: card.owner.type,
-                                      countryId:
-                                        card.owner.type === 'state'
-                                          ? card.owner.countryId
-                                          : countries[0]?.id ?? '',
-                                      companyId:
-                                        card.owner.type === 'company'
-                                          ? card.owner.companyId
-                                          : companies[0]?.id ?? '',
-                                    })
-                                  }
-                                  className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-white/70 hover:border-emerald-400/40"
-                                  title="Изменить владельца"
-                                >
-                                  {ownerLogo && (
-                                    <img
-                                      src={ownerLogo}
-                                      alt=""
-                                      className="w-4 h-4 rounded object-cover border border-white/10"
-                                    />
-                                  )}
-                                  {ownerLabel}
-                                </button>
+                                <Tooltip label="Изменить владельца">
+                                  <button
+                                    onClick={() =>
+                                      setOwnerEditor({
+                                        key: card.key,
+                                        provinceId: card.provinceId,
+                                        kind: card.kind,
+                                        buildingId: card.buildingId,
+                                        index: card.index,
+                                        type: card.owner.type,
+                                        countryId:
+                                          card.owner.type === 'state'
+                                            ? card.owner.countryId
+                                            : countries[0]?.id ?? '',
+                                        companyId:
+                                          card.owner.type === 'company'
+                                            ? card.owner.companyId
+                                            : companies[0]?.id ?? '',
+                                      })
+                                    }
+                                    className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-white/70 hover:border-emerald-400/40"
+                                  >
+                                    {ownerLogo && (
+                                      <img
+                                        src={ownerLogo}
+                                        alt=""
+                                        className="w-4 h-4 rounded object-cover border border-white/10"
+                                      />
+                                    )}
+                                    {ownerLabel}
+                                  </button>
+                                </Tooltip>
                               </div>
                               {card.kind === 'built' && (
                                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
@@ -2132,22 +2136,22 @@ export default function IndustryModal({
                 {filteredCards.map((card) => {
                   if (card.kind === 'empty') {
                     return (
-                      <button
-                        key={card.key}
-                        onClick={() => onOpenConstruction(card.provinceId)}
-                        className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col items-center justify-center gap-3 shadow-lg shadow-black/30 hover:border-emerald-400/40"
-                        title="Открыть строительство"
-                      >
-                        <div className="w-12 h-12 rounded-xl border border-white/10 bg-black/30 flex items-center justify-center">
-                          <Plus className="w-6 h-6 text-emerald-300" />
-                        </div>
-                        <div className="text-white/70 text-sm text-center">
-                          {card.provinceId}
-                        </div>
-                        <div className="text-white/40 text-xs">
-                          Нет построек
-                        </div>
-                      </button>
+                      <Tooltip key={card.key} label="Открыть строительство">
+                        <button
+                          onClick={() => onOpenConstruction(card.provinceId)}
+                          className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col items-center justify-center gap-3 shadow-lg shadow-black/30 hover:border-emerald-400/40"
+                        >
+                          <div className="w-12 h-12 rounded-xl border border-white/10 bg-black/30 flex items-center justify-center">
+                            <Plus className="w-6 h-6 text-emerald-300" />
+                          </div>
+                          <div className="text-white/70 text-sm text-center">
+                            {card.provinceId}
+                          </div>
+                          <div className="text-white/40 text-xs">
+                            Нет построек
+                          </div>
+                        </button>
+                      </Tooltip>
                     );
                   }
 
@@ -2296,36 +2300,38 @@ export default function IndustryModal({
                               </div>
                               <div className="flex items-center gap-2">
                                 {card.kind === 'construction' && (
-                                  <button
-                                    onClick={() =>
-                                      setCancelTarget({
-                                        provinceId: card.provinceId,
-                                        buildingId: card.buildingId,
-                                        buildingName: building?.name ?? card.buildingId,
-                                        index: card.index,
-                                      })
-                                    }
-                                    className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="Отменить строительство"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
+                                  <Tooltip label="Отменить строительство">
+                                    <button
+                                      onClick={() =>
+                                        setCancelTarget({
+                                          provinceId: card.provinceId,
+                                          buildingId: card.buildingId,
+                                          buildingName: building?.name ?? card.buildingId,
+                                          index: card.index,
+                                        })
+                                      }
+                                      className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </Tooltip>
                                 )}
                                 {card.kind === 'built' && (
-                                  <button
-                                    onClick={() => {
-                                      setConfirmTarget({
-                                        provinceId: card.provinceId,
-                                        buildingId: card.buildingId,
-                                        buildingName: building?.name ?? card.buildingId,
-                                        cost: demolishCost,
-                                      });
-                                    }}
-                                    className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
-                                    title="Снести"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
+                                  <Tooltip label="Снести">
+                                    <button
+                                      onClick={() => {
+                                        setConfirmTarget({
+                                          provinceId: card.provinceId,
+                                          buildingId: card.buildingId,
+                                          buildingName: building?.name ?? card.buildingId,
+                                          cost: demolishCost,
+                                        });
+                                      }}
+                                      className="w-9 h-9 rounded-lg border border-white/10 bg-black/40 text-white/60 hover:border-red-400/40 hover:text-red-300 flex items-center justify-center"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </Tooltip>
                                 )}
                               </div>
 </div>
@@ -2361,42 +2367,43 @@ export default function IndustryModal({
                         <div className="flex items-center gap-2">
                           <Factory className="w-3.5 h-3.5" />
                           <span className="text-white/40">Владелец:</span>
-                            <button
-                              onClick={() =>
-                                setOwnerEditor({
-                                  key: card.key,
-                                  provinceId: card.provinceId,
-                                  kind: card.kind,
-                                  buildingId: card.buildingId,
-                                  index: card.index,
-                                  type: card.owner.type,
-                                  countryId:
-                                    card.owner.type === 'state'
-                                      ? card.owner.countryId
-                                    : countries[0]?.id ?? '',
-                                companyId:
-                                  card.owner.type === 'company'
-                                    ? card.owner.companyId
-                                    : companies[0]?.id ?? '',
-                              })
-                            }
-                            className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-white/70 hover:border-emerald-400/40"
-                            title="Изменить владельца"
-                          >
-                                  {ownerLogo ? (
-                                    <img
-                                      src={ownerLogo}
-                                      alt=""
-                                      className="w-4 h-4 rounded object-cover border border-white/10"
-                                    />
-                                  ) : ownerColor ? (
-                                    <span
-                                      className="w-4 h-4 rounded-full border border-white/10"
-                                      style={{ backgroundColor: ownerColor }}
-                                    />
-                                  ) : null}
-                            {ownerLabel}
-                          </button>
+                            <Tooltip label="Изменить владельца">
+                              <button
+                                onClick={() =>
+                                  setOwnerEditor({
+                                    key: card.key,
+                                    provinceId: card.provinceId,
+                                    kind: card.kind,
+                                    buildingId: card.buildingId,
+                                    index: card.index,
+                                    type: card.owner.type,
+                                    countryId:
+                                      card.owner.type === 'state'
+                                        ? card.owner.countryId
+                                      : countries[0]?.id ?? '',
+                                  companyId:
+                                    card.owner.type === 'company'
+                                      ? card.owner.companyId
+                                      : companies[0]?.id ?? '',
+                                })
+                              }
+                              className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 text-white/70 hover:border-emerald-400/40"
+                            >
+                              {ownerLogo ? (
+                                <img
+                                  src={ownerLogo}
+                                  alt=""
+                                  className="w-4 h-4 rounded object-cover border border-white/10"
+                                />
+                              ) : ownerColor ? (
+                                <span
+                                  className="w-4 h-4 rounded-full border border-white/10"
+                                  style={{ backgroundColor: ownerColor }}
+                                />
+                              ) : null}
+                              {ownerLabel}
+                            </button>
+                          </Tooltip>
                         </div>
                         {card.kind === 'built' && (
                           <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">

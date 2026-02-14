@@ -18,6 +18,7 @@ import {
   Factory,
   Route,
 } from 'lucide-react';
+import Tooltip from './Tooltip';
 import type {
   Country,
   ProvinceRecord,
@@ -3712,22 +3713,23 @@ export default function AdminPanel({
                         placeholder="dash"
                         className="w-28 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
                       />
-                      <input
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={item.constructionCostPerSegment ?? 0}
-                        onChange={(event) =>
-                          onUpdateRouteType(item.id, {
-                            constructionCostPerSegment: Math.max(
-                              0,
-                              Math.floor(Number(event.target.value) || 0),
-                            ),
-                          })
-                        }
-                        title="Цена за участок"
-                        className="w-24 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
-                      />
+                      <Tooltip label="Цена за участок">
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={item.constructionCostPerSegment ?? 0}
+                          onChange={(event) =>
+                            onUpdateRouteType(item.id, {
+                              constructionCostPerSegment: Math.max(
+                                0,
+                                Math.floor(Number(event.target.value) || 0),
+                              ),
+                            })
+                          }
+                          className="w-24 h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </Tooltip>
                       <button
                         onClick={() => onDeleteRouteType(item.id)}
                         className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"

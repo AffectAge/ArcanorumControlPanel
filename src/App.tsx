@@ -18,6 +18,7 @@ import DiplomacyModal from './components/DiplomacyModal';
 import DiplomacyProposalsModal from './components/DiplomacyProposalsModal';
 import LogisticsModal from './components/LogisticsModal';
 import MarketModal from './components/MarketModal';
+import LegacyTooltipBridge from './components/LegacyTooltipBridge';
 import {
   createDefaultLogisticsState,
   ensureBaseLogisticsNodes,
@@ -5551,6 +5552,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
 
   return (
     <EventLogContext.Provider value={eventLogValue}>
+      <LegacyTooltipBridge />
       <div className="relative w-full h-screen bg-gradient-to-br from-[#0a0f18] via-[#0d1420] to-[#0a0f18] overflow-hidden">
       <div
         className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/10 via-transparent to-transparent"
@@ -5729,6 +5731,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           setSavePanelOpen(true);
         }}
         onOpenAdmin={() => setAdminOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       {pendingDiplomacyProposals.length > 0 && (
         <button
@@ -6013,7 +6016,6 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       )}
 
       <BottomDock
-        onOpenSettings={() => setSettingsOpen(true)}
         onOpenIndustry={() => setIndustryOpen(true)}
         onOpenDiplomacy={() => setDiplomacyOpen(true)}
         onOpenMarkets={() => setMarketsOpen(true)}

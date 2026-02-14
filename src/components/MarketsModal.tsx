@@ -16,6 +16,7 @@ import type {
   ProvinceRecord,
   Trait,
 } from '../types';
+import Tooltip from './Tooltip';
 
 type MarketsModalProps = {
   open: boolean;
@@ -120,30 +121,29 @@ const MiniGraphCard = ({
   ariaLabel: string;
   tooltip: string;
 }) => (
-  <div
-    className={`group relative min-h-[86px] rounded-md border px-2 py-1.5 min-w-[116px] flex flex-col justify-between ${borderClassName} ${bgClassName}`}
-  >
-    <div className="text-[10px] text-white/80 leading-none mb-1">{title}</div>
-    <div className="inline-flex items-center justify-between gap-2 w-full">
-      <span className={`text-xs tabular-nums ${valueClassName}`}>{value}</span>
-      <svg
-        viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
-        className="h-6 w-[84px]"
-        aria-label={ariaLabel}
-      >
-        <path
-          d={getSparklinePath(values, GRAPH_WIDTH, GRAPH_HEIGHT)}
-          fill="none"
-          stroke={stroke}
-          strokeWidth="1.7"
-          strokeLinecap="round"
-        />
-      </svg>
+  <Tooltip label={title} description={tooltip}>
+    <div
+      className={`relative min-h-[86px] rounded-md border px-2 py-1.5 min-w-[116px] flex flex-col justify-between ${borderClassName} ${bgClassName}`}
+    >
+      <div className="text-[10px] text-white/80 leading-none mb-1">{title}</div>
+      <div className="inline-flex items-center justify-between gap-2 w-full">
+        <span className={`text-xs tabular-nums ${valueClassName}`}>{value}</span>
+        <svg
+          viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
+          className="h-6 w-[84px]"
+          aria-label={ariaLabel}
+        >
+          <path
+            d={getSparklinePath(values, GRAPH_WIDTH, GRAPH_HEIGHT)}
+            fill="none"
+            stroke={stroke}
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
     </div>
-    <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-      {tooltip}
-    </span>
-  </div>
+  </Tooltip>
 );
 
 const ShareDonut = ({
@@ -168,38 +168,37 @@ const ShareDonut = ({
   const normalized = Math.max(0, Math.min(100, value));
   const pieBackground = `conic-gradient(${pathColor} 0% ${normalized}%, rgba(255,255,255,0.08) ${normalized}% 100%)`;
   return (
-    <div className="group relative inline-flex flex-col items-center gap-1 min-w-[116px] rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5">
-      <div className="relative h-8 w-[84px] transition-transform duration-150 group-hover:scale-105">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative h-[30px] w-[30px]">
-            <div
-              className="absolute inset-0 rounded-full border border-white/20 shadow-[inset_0_0_10px_rgba(255,255,255,0.1)]"
-              style={{ background: pieBackground }}
-            />
-            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.2),transparent_48%)]" />
-            <div className="absolute inset-[5px] rounded-full border border-white/15 bg-[#09101a]/95" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[8px] font-medium text-white/90 tabular-nums">
-                {normalized.toFixed(0)}%
-              </span>
+    <Tooltip
+      label={label}
+      description={`${description} ${amountLabel}: ${formatCompactNumber(amount, 0)} | ${secondaryAmountLabel}: ${formatCompactNumber(secondaryAmount, 0)} (${normalized.toFixed(1)}%)`}
+    >
+      <div className="group relative inline-flex flex-col items-center gap-1 min-w-[116px] rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5">
+        <div className="relative h-8 w-[84px] transition-transform duration-150 group-hover:scale-105">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative h-[30px] w-[30px]">
+              <div
+                className="absolute inset-0 rounded-full border border-white/20 shadow-[inset_0_0_10px_rgba(255,255,255,0.1)]"
+                style={{ background: pieBackground }}
+              />
+              <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.2),transparent_48%)]" />
+              <div className="absolute inset-[5px] rounded-full border border-white/15 bg-[#09101a]/95" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[8px] font-medium text-white/90 tabular-nums">
+                  {normalized.toFixed(0)}%
+                </span>
+              </div>
             </div>
           </div>
         </div>
+        <span className="text-[10px] text-white/60 leading-none">{label}</span>
+        <span className="text-[10px] text-white/85 tabular-nums leading-none">
+          {amountLabel}: {formatCompactNumber(amount, 0)}
+        </span>
+        <span className="text-[9px] text-white/50 tabular-nums leading-none">
+          {secondaryAmountLabel}: {formatCompactNumber(secondaryAmount, 0)}
+        </span>
       </div>
-      <span className="text-[10px] text-white/60 leading-none">{label}</span>
-      <span className="text-[10px] text-white/85 tabular-nums leading-none">
-        {amountLabel}: {formatCompactNumber(amount, 0)}
-      </span>
-      <span className="text-[9px] text-white/50 tabular-nums leading-none">
-        {secondaryAmountLabel}: {formatCompactNumber(secondaryAmount, 0)}
-      </span>
-      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-60 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-        {description}
-        <br />
-        {amountLabel}: {formatCompactNumber(amount, 0)} | {secondaryAmountLabel}: {formatCompactNumber(secondaryAmount, 0)}
-        {' '}({normalized.toFixed(1)}%)
-      </span>
-    </div>
+    </Tooltip>
   );
 };
 
@@ -912,12 +911,15 @@ export default function MarketsModal({
                 ) : (
                   <>
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <div className="group relative text-white/85 text-sm font-semibold mb-2 inline-flex items-center gap-2">
-                        <span>Биржа товаров</span>
-                        <span className="pointer-events-none absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] font-normal text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                          Карточки ресурсов с ключевыми метриками рынка.
-                        </span>
-                      </div>
+                      <Tooltip
+                        label="Биржа товаров"
+                        description="Карточки ресурсов с ключевыми метриками рынка."
+                        side="bottom"
+                      >
+                        <div className="text-white/85 text-sm font-semibold mb-2 inline-flex items-center gap-2">
+                          <span>Биржа товаров</span>
+                        </div>
+                      </Tooltip>
                       <div className="space-y-2">
                         {goodsStats.rows.map((row) => (
                           <div

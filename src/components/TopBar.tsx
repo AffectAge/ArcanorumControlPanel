@@ -33,6 +33,7 @@ type TopBarProps = {
   onOpenSave: () => void;
   onOpenLoad: () => void;
   onOpenAdmin: () => void;
+  onOpenSettings: () => void;
 };
 
 export default function TopBar({
@@ -55,6 +56,7 @@ export default function TopBar({
   onOpenSave,
   onOpenLoad,
   onOpenAdmin,
+  onOpenSettings,
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoverTip, setHoverTip] = useState<{
@@ -156,7 +158,13 @@ export default function TopBar({
                 Редактор стран
               </button>
               <div className="h-px bg-white/10 my-1" />
-              <button className="w-full px-4 py-3 text-left text-white/80 hover:bg-emerald-400/10 hover:text-emerald-400 transition-colors">
+              <button
+                onClick={() => {
+                  onOpenSettings();
+                  setMenuOpen(false);
+                }}
+                className="w-full px-4 py-3 text-left text-white/80 hover:bg-emerald-400/10 hover:text-emerald-400 transition-colors"
+              >
                 Настройки
               </button>
               <button className="w-full px-4 py-3 text-left text-white/80 hover:bg-red-400/10 hover:text-red-400 transition-colors">

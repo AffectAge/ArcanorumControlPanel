@@ -1,6 +1,7 @@
 import { X, Hammer, Ban } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { expandDiplomacyAgreements } from '../diplomacyUtils';
+import Tooltip from './Tooltip';
 import type {
   BuildingDefinition,
   Company,
@@ -487,32 +488,32 @@ export default function ConstructionModal({
                         countryId: country.id,
                       });
                     return (
-                      <button
-                        key={country.id}
-                        onClick={() => setStateCountryId(country.id)}
-                        className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-                          resolvedStateCountryId === country.id
-                            ? 'border-emerald-400/60 bg-emerald-500/20'
-                            : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
-                        } ${
-                          hoveredBuildingId
-                            ? available
-                              ? 'ring-1 ring-emerald-400/60'
-                              : 'opacity-40 ring-1 ring-red-400/40'
-                            : ''
-                        }`}
-                        title={country.name}
-                      >
-                        {country.flagDataUrl ? (
-                          <img
-                            src={country.flagDataUrl}
-                            alt=""
-                            className="w-6 h-6 rounded object-contain"
-                          />
-                        ) : (
-                          <span className="text-white/50 text-[10px]">Flag</span>
-                        )}
-                      </button>
+                      <Tooltip key={country.id} label={country.name}>
+                        <button
+                          onClick={() => setStateCountryId(country.id)}
+                          className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                            resolvedStateCountryId === country.id
+                              ? 'border-emerald-400/60 bg-emerald-500/20'
+                              : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
+                          } ${
+                            hoveredBuildingId
+                              ? available
+                                ? 'ring-1 ring-emerald-400/60'
+                                : 'opacity-40 ring-1 ring-red-400/40'
+                              : ''
+                          }`}
+                        >
+                          {country.flagDataUrl ? (
+                            <img
+                              src={country.flagDataUrl}
+                              alt=""
+                              className="w-6 h-6 rounded object-contain"
+                            />
+                          ) : (
+                            <span className="text-white/50 text-[10px]">Flag</span>
+                          )}
+                        </button>
+                      </Tooltip>
                     );
                   })}
                 </div>
@@ -528,32 +529,32 @@ export default function ConstructionModal({
                       companyId: company.id,
                     });
                   return (
-                    <button
-                      key={company.id}
-                      onClick={() => setCompanyId(company.id)}
-                      className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
-                        companyId === company.id
-                          ? 'border-emerald-400/60 bg-emerald-500/20'
-                          : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
-                      } ${
-                        hoveredBuildingId
-                          ? available
-                            ? 'ring-1 ring-emerald-400/60'
-                            : 'opacity-40 ring-1 ring-red-400/40'
-                          : ''
-                      }`}
-                      title={company.name}
-                    >
-                      {company.iconDataUrl ? (
-                        <img
-                          src={company.iconDataUrl}
-                          alt=""
-                          className="w-6 h-6 rounded object-cover"
-                        />
-                      ) : (
-                        <span className="text-white/50 text-[10px]">Logo</span>
-                      )}
-                    </button>
+                    <Tooltip key={company.id} label={company.name}>
+                      <button
+                        onClick={() => setCompanyId(company.id)}
+                        className={`w-8 h-8 rounded-lg border flex items-center justify-center ${
+                          companyId === company.id
+                            ? 'border-emerald-400/60 bg-emerald-500/20'
+                            : 'border-white/10 bg-black/30 hover:border-emerald-400/40'
+                        } ${
+                          hoveredBuildingId
+                            ? available
+                              ? 'ring-1 ring-emerald-400/60'
+                              : 'opacity-40 ring-1 ring-red-400/40'
+                            : ''
+                        }`}
+                      >
+                        {company.iconDataUrl ? (
+                          <img
+                            src={company.iconDataUrl}
+                            alt=""
+                            className="w-6 h-6 rounded object-cover"
+                          />
+                        ) : (
+                          <span className="text-white/50 text-[10px]">Logo</span>
+                        )}
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>
