@@ -27,11 +27,14 @@ export type GameState = {
   continents?: Trait[];
   regions?: Trait[];
   resources?: Trait[];
+  resourceCategories?: ResourceCategory[];
   buildings?: BuildingDefinition[];
   industries?: Industry[];
   companies?: Company[];
   diplomacy?: DiplomacyAgreement[];
   diplomacyProposals?: DiplomacyProposal[];
+  logistics?: LogisticsState;
+  markets?: Market[];
   settings?: GameSettings;
   eventLog?: EventLogState;
 };
@@ -55,6 +58,7 @@ export type MapLayerPaint = Record<string, Record<string, string>>;
 
 export type ProvinceData = {
   id: string;
+  adjacentProvinceIds?: string[];
   ownerCountryId?: string;
   climateId?: string;
   religionId?: string;
@@ -71,6 +75,85 @@ export type ProvinceData = {
   colonizationDisabled?: boolean;
   buildingsBuilt?: BuiltBuilding[];
   constructionProgress?: Record<string, ConstructionEntry[]>;
+  logisticsPointsByCategory?: Record<string, number>;
+};
+
+export type LogisticsRouteType = {
+  id: string;
+  name: string;
+  color: string;
+  lineWidth: number;
+  dashPattern?: string;
+  constructionCostPerSegment?: number;
+  allowProvinceSkipping?: boolean;
+  requiredBuildingIds?: string[];
+  requiredBuildingsMode?: 'all' | 'any';
+  landscape?: TraitCriteria;
+  allowAllLandscapes?: boolean;
+  marketAccessCategoryIds?: string[];
+  allowAllMarketCategories?: boolean;
+  transportCapacityPerLevelByCategory?: Record<string, number>;
+};
+
+export type LogisticsNodeType =
+  | 'province'
+  | 'country_market'
+  | 'world_market'
+  | 'port'
+  | 'hub'
+  | 'border';
+
+export type LogisticsNode = {
+  id: string;
+  type: LogisticsNodeType;
+  provinceId?: string;
+  countryId?: string;
+  name?: string;
+};
+
+export type LogisticsEdge = {
+  id: string;
+  fromNodeId: string;
+  toNodeId: string;
+  routeId?: string;
+  routeTypeId?: string;
+  active?: boolean;
+  bidirectional?: boolean;
+  ownerCountryId?: string;
+  requiresTransitAgreement?: boolean;
+};
+
+export type LogisticsRoute = {
+  id: string;
+  name: string;
+  routeTypeId: string;
+  provinceIds: string[];
+  ownerCountryId?: string;
+  countryStatuses?: Record<string, 'open' | 'closed'>;
+  constructionRequiredPoints?: number;
+  constructionProgressPoints?: number;
+  level?: number;
+};
+
+export type LogisticsState = {
+  nodes: LogisticsNode[];
+  edges: LogisticsEdge[];
+  routeTypes: LogisticsRouteType[];
+  routes: LogisticsRoute[];
+};
+
+export type Market = {
+  id: string;
+  name: string;
+  leaderCountryId: string;
+  creatorCountryId: string;
+  color: string;
+  logoDataUrl?: string;
+  memberCountryIds: string[];
+  warehouseByResourceId?: Record<string, number>;
+  capitalProvinceId?: string;
+  capitalLostSinceTurn?: number;
+  createdTurn?: number;
 };
 
 export type ProvinceRecord = Record<string, ProvinceData>;
@@ -80,6 +163,13 @@ export type Trait = {
   name: string;
   color: string;
   iconDataUrl?: string;
+  resourceCategoryId?: string;
+};
+
+export type ResourceCategory = {
+  id: string;
+  name: string;
+  color?: string;
 };
 
 export type GameSettings = {
@@ -88,6 +178,7 @@ export type GameSettings = {
   constructionPointsPerTurn?: number;
   demolitionCostPercent?: number;
   diplomacyProposalExpireTurns?: number;
+  marketCapitalGraceTurns?: number;
   startingColonizationPoints?: number;
   startingConstructionPoints?: number;
   sciencePointsPerTurn?: number;
@@ -188,11 +279,21 @@ export type DiplomacyAgreement = {
   title?: string;
   hostCountryId: string;
   guestCountryId: string;
+  agreementCategory?: 'construction' | 'logistics' | 'market_invite' | 'market';
+  marketLeaderCountryId?: string;
   kind?: 'company' | 'state';
   allowState?: boolean;
   allowCompanies?: boolean;
   companyIds?: string[];
   buildingIds?: string[];
+  routeTypeIds?: string[];
+  logisticsRouteLimits?: Record<
+    string,
+    {
+      maxRoutes?: number;
+      maxSegments?: number;
+    }
+  >;
   provinceIds?: string[];
   industries?: string[];
   limits?: {
@@ -201,11 +302,21 @@ export type DiplomacyAgreement = {
     global?: number;
   };
   counterTerms?: {
+    agreementCategory?: 'construction' | 'logistics' | 'market_invite' | 'market';
+    marketLeaderCountryId?: string;
     kind?: 'company' | 'state';
     allowState?: boolean;
     allowCompanies?: boolean;
     companyIds?: string[];
     buildingIds?: string[];
+    routeTypeIds?: string[];
+    logisticsRouteLimits?: Record<
+      string,
+      {
+        maxRoutes?: number;
+        maxSegments?: number;
+      }
+    >;
     provinceIds?: string[];
     industries?: string[];
     limits?: {

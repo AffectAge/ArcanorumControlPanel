@@ -22,6 +22,7 @@ import type {
   BuildingDefinition,
   Company,
   DiplomacyProposal,
+  LogisticsRouteType,
 } from '../types';
 
 type DiplomacyModalProps = {
@@ -31,6 +32,7 @@ type DiplomacyModalProps = {
   provinces: ProvinceRecord;
   buildings: BuildingDefinition[];
   companies: Company[];
+  routeTypes: LogisticsRouteType[];
   agreements: DiplomacyAgreement[];
   proposals: DiplomacyProposal[];
   turn: number;
@@ -43,6 +45,11 @@ type DiplomacyModalProps = {
   onWithdrawProposal: (id: string) => void;
 };
 
+type RouteLimitDraft = {
+  maxRoutes: number | '';
+  maxSegments: number | '';
+};
+
 export default function DiplomacyModal({
   open,
   countries,
@@ -50,6 +57,7 @@ export default function DiplomacyModal({
   provinces,
   buildings,
   companies,
+  routeTypes,
   agreements,
   proposals,
   turn,
@@ -64,6 +72,11 @@ export default function DiplomacyModal({
       id: 'build-rights',
       name: 'Право строительства',
       description: 'Компании и государства',
+    },
+    {
+      id: 'logistics-rights',
+      name: 'Право логистики',
+      description: 'Прокладка маршрутов',
     },
   ];
   const [activeTreatyType, setActiveTreatyType] = useState(treatyTypes[0].id);
@@ -107,6 +120,20 @@ export default function DiplomacyModal({
   const [otherSelectedBuildingIds, setOtherSelectedBuildingIds] = useState<
     Set<string>
   >(() => new Set());
+  const [allRouteTypes, setAllRouteTypes] = useState(true);
+  const [selectedRouteTypeIds, setSelectedRouteTypeIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [otherAllRouteTypes, setOtherAllRouteTypes] = useState(true);
+  const [otherSelectedRouteTypeIds, setOtherSelectedRouteTypeIds] = useState<
+    Set<string>
+  >(() => new Set());
+  const [routeTypeLimitsDraft, setRouteTypeLimitsDraft] = useState<
+    Record<string, RouteLimitDraft>
+  >({});
+  const [otherRouteTypeLimitsDraft, setOtherRouteTypeLimitsDraft] = useState<
+    Record<string, RouteLimitDraft>
+  >({});
   const [otherAllProvinces, setOtherAllProvinces] = useState(true);
   const [otherSelectedProvinceIds, setOtherSelectedProvinceIds] = useState<
     Set<string>
@@ -227,6 +254,64 @@ export default function DiplomacyModal({
   }, [open, otherAllBuildings, buildings]);
   useEffect(() => {
     if (!open) return;
+    if (allRouteTypes) {
+      setSelectedRouteTypeIds(new Set());
+      return;
+    }
+    setSelectedRouteTypeIds((prev) => {
+      const allowed = new Set(routeTypes.map((r) => r.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (allowed.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [open, allRouteTypes, routeTypes]);
+  useEffect(() => {
+    if (!open) return;
+    if (otherAllRouteTypes) {
+      setOtherSelectedRouteTypeIds(new Set());
+      return;
+    }
+    setOtherSelectedRouteTypeIds((prev) => {
+      const allowed = new Set(routeTypes.map((r) => r.id));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (allowed.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [open, otherAllRouteTypes, routeTypes]);
+  useEffect(() => {
+    if (!open) return;
+    setRouteTypeLimitsDraft((prev) => {
+      const next: Record<string, RouteLimitDraft> = {};
+      routeTypes.forEach((routeType) => {
+        const existing = prev[routeType.id];
+        next[routeType.id] = {
+          maxRoutes: existing?.maxRoutes ?? 0,
+          maxSegments: existing?.maxSegments ?? 0,
+        };
+      });
+      return next;
+    });
+  }, [open, routeTypes]);
+  useEffect(() => {
+    if (!open) return;
+    setOtherRouteTypeLimitsDraft((prev) => {
+      const next: Record<string, RouteLimitDraft> = {};
+      routeTypes.forEach((routeType) => {
+        const existing = prev[routeType.id];
+        next[routeType.id] = {
+          maxRoutes: existing?.maxRoutes ?? 0,
+          maxSegments: existing?.maxSegments ?? 0,
+        };
+      });
+      return next;
+    });
+  }, [open, routeTypes]);
+  useEffect(() => {
+    if (!open) return;
     if (allProvinces) {
       setSelectedProvinceIds(new Set());
       return;
@@ -257,6 +342,43 @@ export default function DiplomacyModal({
   }, [open, otherAllProvinces, guestProvinceIds]);
 
   if (!open) return null;
+  const isLogisticsTreaty = activeTreatyType === 'logistics-rights';
+
+  const buildRouteLimits = (
+    limitsDraft: Record<string, RouteLimitDraft>,
+    selectedRouteTypeIdsInput: Set<string>,
+    includeAllRouteTypes: boolean,
+  ) => {
+    const result: Record<
+      string,
+      {
+        maxRoutes?: number;
+        maxSegments?: number;
+      }
+    > = {};
+    routeTypes.forEach((routeType) => {
+      if (!includeAllRouteTypes && !selectedRouteTypeIdsInput.has(routeType.id)) {
+        return;
+      }
+      const item = limitsDraft[routeType.id];
+      const maxRoutesRaw = item?.maxRoutes;
+      const maxSegmentsRaw = item?.maxSegments;
+      const maxRoutes =
+        maxRoutesRaw === '' || Number(maxRoutesRaw) <= 0
+          ? undefined
+          : Math.max(0, Number(maxRoutesRaw));
+      const maxSegments =
+        maxSegmentsRaw === '' || Number(maxSegmentsRaw) <= 0
+          ? undefined
+          : Math.max(0, Number(maxSegmentsRaw));
+      if (maxRoutes == null && maxSegments == null) return;
+      result[routeType.id] = {
+        maxRoutes,
+        maxSegments,
+      };
+    });
+    return Object.keys(result).length > 0 ? result : undefined;
+  };
 
   const getTermsUsage = (
     hostCountryId: string,
@@ -364,6 +486,11 @@ export default function DiplomacyModal({
   const handleAdd = () => {
     if (!hostId || !guestId) return;
     if (hostId === guestId) return;
+    if (isLogisticsTreaty) {
+      if (!allowState || !otherAllowState) return;
+      if (!allRouteTypes && selectedRouteTypeIds.size === 0) return;
+      if (!otherAllRouteTypes && otherSelectedRouteTypeIds.size === 0) return;
+    } else {
     if (!allowState && !allowCompanies) return;
     if (allowCompanies && !allCompanies && selectedCompanyIds.size === 0) return;
     if (!otherAllowState && !otherAllowCompanies) return;
@@ -374,6 +501,7 @@ export default function DiplomacyModal({
     ) {
       return;
     }
+    }
     onCreateProposal({
       fromCountryId: guestId,
       toCountryId: hostId,
@@ -381,22 +509,36 @@ export default function DiplomacyModal({
         title: agreementTitle.trim() || undefined,
         hostCountryId: hostId,
         guestCountryId: guestId,
+        agreementCategory: isLogisticsTreaty ? 'logistics' : 'construction',
         allowState,
-        allowCompanies,
+        allowCompanies: isLogisticsTreaty ? false : allowCompanies,
         companyIds:
-          allowCompanies && !allCompanies
+          !isLogisticsTreaty && allowCompanies && !allCompanies
             ? Array.from(selectedCompanyIds)
             : undefined,
         buildingIds:
-          !allBuildings && selectedBuildingIds.size > 0
+          !isLogisticsTreaty && !allBuildings && selectedBuildingIds.size > 0
             ? Array.from(selectedBuildingIds)
             : undefined,
+        routeTypeIds:
+          isLogisticsTreaty && !allRouteTypes && selectedRouteTypeIds.size > 0
+            ? Array.from(selectedRouteTypeIds)
+            : undefined,
+        logisticsRouteLimits: isLogisticsTreaty
+          ? buildRouteLimits(
+              routeTypeLimitsDraft,
+              selectedRouteTypeIds,
+              allRouteTypes,
+            )
+          : undefined,
         provinceIds:
           !allProvinces && selectedProvinceIds.size > 0
             ? Array.from(selectedProvinceIds)
             : undefined,
         industries:
-          selectedIndustries.size > 0 ? Array.from(selectedIndustries) : undefined,
+          !isLogisticsTreaty && selectedIndustries.size > 0
+            ? Array.from(selectedIndustries)
+            : undefined,
         limits: {
           perProvince:
             limitProvince === '' || Number(limitProvince) <= 0
@@ -419,22 +561,38 @@ export default function DiplomacyModal({
       counterAgreement: {
         hostCountryId: guestId,
         guestCountryId: hostId,
+        agreementCategory: isLogisticsTreaty ? 'logistics' : 'construction',
         allowState: otherAllowState,
-        allowCompanies: otherAllowCompanies,
+        allowCompanies: isLogisticsTreaty ? false : otherAllowCompanies,
         companyIds:
-          otherAllowCompanies && !otherAllCompanies
+          !isLogisticsTreaty && otherAllowCompanies && !otherAllCompanies
             ? Array.from(otherSelectedCompanyIds)
             : undefined,
         buildingIds:
-          !otherAllBuildings && otherSelectedBuildingIds.size > 0
+          !isLogisticsTreaty &&
+          !otherAllBuildings &&
+          otherSelectedBuildingIds.size > 0
             ? Array.from(otherSelectedBuildingIds)
             : undefined,
+        routeTypeIds:
+          isLogisticsTreaty &&
+          !otherAllRouteTypes &&
+          otherSelectedRouteTypeIds.size > 0
+            ? Array.from(otherSelectedRouteTypeIds)
+            : undefined,
+        logisticsRouteLimits: isLogisticsTreaty
+          ? buildRouteLimits(
+              otherRouteTypeLimitsDraft,
+              otherSelectedRouteTypeIds,
+              otherAllRouteTypes,
+            )
+          : undefined,
         provinceIds:
           !otherAllProvinces && otherSelectedProvinceIds.size > 0
             ? Array.from(otherSelectedProvinceIds)
             : undefined,
         industries:
-          otherSelectedIndustries.size > 0
+          !isLogisticsTreaty && otherSelectedIndustries.size > 0
             ? Array.from(otherSelectedIndustries)
             : undefined,
         limits: {
@@ -462,6 +620,9 @@ export default function DiplomacyModal({
     setSelectedCompanyIds(new Set());
     setAllBuildings(true);
     setSelectedBuildingIds(new Set());
+    setAllRouteTypes(true);
+    setSelectedRouteTypeIds(new Set());
+    setRouteTypeLimitsDraft({});
     setAllProvinces(true);
     setSelectedProvinceIds(new Set());
     setDurationTurns(0);
@@ -475,11 +636,22 @@ export default function DiplomacyModal({
     setOtherLimitGlobal(0);
     setOtherAllBuildings(true);
     setOtherSelectedBuildingIds(new Set());
+    setOtherAllRouteTypes(true);
+    setOtherSelectedRouteTypeIds(new Set());
+    setOtherRouteTypeLimitsDraft({});
     setOtherAllProvinces(true);
     setOtherSelectedProvinceIds(new Set());
   };
 
-  const canAddAgreement =
+  const canAddAgreement = isLogisticsTreaty
+    ? Boolean(hostId && guestId && hostId !== guestId) &&
+      allowState &&
+      otherAllowState &&
+      (allRouteTypes || selectedRouteTypeIds.size > 0) &&
+      (otherAllRouteTypes || otherSelectedRouteTypeIds.size > 0) &&
+      (allProvinces || selectedProvinceIds.size > 0) &&
+      (otherAllProvinces || otherSelectedProvinceIds.size > 0)
+    :
     Boolean(hostId && guestId && hostId !== guestId) &&
     (allowState || allowCompanies) &&
     (!allowCompanies || allCompanies || selectedCompanyIds.size > 0) &&
@@ -631,7 +803,11 @@ export default function DiplomacyModal({
                   Что получим мы
                 </div>
                 <div className="grid grid-cols-1 gap-3">
-                  <div className="text-white/70 text-sm">Разрешить строить</div>
+                  <div className="text-white/70 text-sm">
+                    {isLogisticsTreaty
+                      ? 'Разрешить прокладывать маршруты'
+                      : 'Разрешить строить'}
+                  </div>
                   <label className="flex items-center gap-2 text-white/70 text-sm">
                     <input
                       type="checkbox"
@@ -641,16 +817,18 @@ export default function DiplomacyModal({
                     />
                     Государству
                   </label>
-                  <label className="flex items-center gap-2 text-white/70 text-sm">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 accent-emerald-500"
-                      checked={allowCompanies}
-                      onChange={(event) => setAllowCompanies(event.target.checked)}
-                    />
-                    Компаниям
-                  </label>
-                  {allowCompanies && (
+                  {!isLogisticsTreaty && (
+                    <label className="flex items-center gap-2 text-white/70 text-sm">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 accent-emerald-500"
+                        checked={allowCompanies}
+                        onChange={(event) => setAllowCompanies(event.target.checked)}
+                      />
+                      Компаниям
+                    </label>
+                  )}
+                  {!isLogisticsTreaty && allowCompanies && (
                     <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
                       <label className="flex items-center gap-2 text-white/70 text-xs">
                         <input
@@ -698,6 +876,8 @@ export default function DiplomacyModal({
                     </div>
                   )}
                 </div>
+                {!isLogisticsTreaty && (
+                <>
                 <div className="space-y-2">
                 <div className="text-white/60 text-xs">Отрасли (пусто = все)</div>
                 <div className="max-h-40 overflow-y-auto legend-scroll space-y-2 pr-1">
@@ -829,6 +1009,142 @@ export default function DiplomacyModal({
                   </div>
                 )}
               </div>
+              </>
+                )}
+              {isLogisticsTreaty && (
+                <div className="space-y-3">
+                  <div className="text-white/60 text-xs">Типы маршрутов</div>
+                  <label className="flex items-center gap-2 text-white/70 text-xs">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-emerald-500"
+                      checked={allRouteTypes}
+                      onChange={(event) => setAllRouteTypes(event.target.checked)}
+                    />
+                    Все типы маршрутов
+                  </label>
+                  {!allRouteTypes && (
+                    <div className="max-h-40 overflow-y-auto legend-scroll space-y-2 pr-1">
+                      {routeTypes.length > 0 ? (
+                        routeTypes.map((routeType) => (
+                          <label
+                            key={routeType.id}
+                            className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-xs"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedRouteTypeIds.has(routeType.id)}
+                              onChange={(event) =>
+                                setSelectedRouteTypeIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (event.target.checked) next.add(routeType.id);
+                                  else next.delete(routeType.id);
+                                  return next;
+                                })
+                              }
+                              className="w-4 h-4 accent-emerald-500"
+                            />
+                            <span>{routeType.name}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="text-white/40 text-xs">Нет типов маршрутов</div>
+                      )}
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <div className="text-white/60 text-xs">
+                      Лимиты по типам (0 = без лимита)
+                    </div>
+                    <div className="max-h-44 overflow-y-auto legend-scroll space-y-2 pr-1">
+                      {routeTypes.length > 0 ? (
+                        routeTypes.map((routeType) => {
+                          const isTypeEnabled =
+                            allRouteTypes || selectedRouteTypeIds.has(routeType.id);
+                          const draft = routeTypeLimitsDraft[routeType.id] ?? {
+                            maxRoutes: 0,
+                            maxSegments: 0,
+                          };
+                          return (
+                            <div
+                              key={`limits:${routeType.id}`}
+                              className={`rounded-lg border px-3 py-2 ${
+                                isTypeEnabled
+                                  ? 'border-white/10 bg-black/30'
+                                  : 'border-white/5 bg-black/20 opacity-60'
+                              }`}
+                            >
+                              <div className="text-white/75 text-xs mb-2">
+                                {routeType.name}
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <label className="flex flex-col gap-1 text-[11px] text-white/50">
+                                  Маршруты
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    disabled={!isTypeEnabled}
+                                    value={draft.maxRoutes}
+                                    onChange={(event) =>
+                                      setRouteTypeLimitsDraft((prev) => ({
+                                        ...prev,
+                                        [routeType.id]: {
+                                          ...(prev[routeType.id] ?? {
+                                            maxRoutes: 0,
+                                            maxSegments: 0,
+                                          }),
+                                          maxRoutes:
+                                            event.target.value === ''
+                                              ? ''
+                                              : Math.max(
+                                                  0,
+                                                  Number(event.target.value) || 0,
+                                                ),
+                                        },
+                                      }))
+                                    }
+                                    className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60 disabled:opacity-60"
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1 text-[11px] text-white/50">
+                                  Графы
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    disabled={!isTypeEnabled}
+                                    value={draft.maxSegments}
+                                    onChange={(event) =>
+                                      setRouteTypeLimitsDraft((prev) => ({
+                                        ...prev,
+                                        [routeType.id]: {
+                                          ...(prev[routeType.id] ?? {
+                                            maxRoutes: 0,
+                                            maxSegments: 0,
+                                          }),
+                                          maxSegments:
+                                            event.target.value === ''
+                                              ? ''
+                                              : Math.max(
+                                                  0,
+                                                  Number(event.target.value) || 0,
+                                                ),
+                                        },
+                                      }))
+                                    }
+                                    className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60 disabled:opacity-60"
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-white/40 text-xs">Нет типов маршрутов</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <div className="text-white/60 text-xs">Провинции</div>
                 <label className="flex items-center gap-2 text-white/70 text-xs">
@@ -898,7 +1214,11 @@ export default function DiplomacyModal({
                   Что получит вторая сторона
                 </div>
                 <div className="grid grid-cols-1 gap-3">
-                  <div className="text-white/70 text-sm">Разрешить строить</div>
+                  <div className="text-white/70 text-sm">
+                    {isLogisticsTreaty
+                      ? 'Разрешить прокладывать маршруты'
+                      : 'Разрешить строить'}
+                  </div>
                   <label className="flex items-center gap-2 text-white/70 text-sm">
                     <input
                       type="checkbox"
@@ -908,18 +1228,20 @@ export default function DiplomacyModal({
                     />
                     Государству
                   </label>
-                  <label className="flex items-center gap-2 text-white/70 text-sm">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 accent-emerald-500"
-                      checked={otherAllowCompanies}
-                      onChange={(event) =>
-                        setOtherAllowCompanies(event.target.checked)
-                      }
-                    />
-                    Компаниям
-                  </label>
-                  {otherAllowCompanies && (
+                  {!isLogisticsTreaty && (
+                    <label className="flex items-center gap-2 text-white/70 text-sm">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 accent-emerald-500"
+                        checked={otherAllowCompanies}
+                        onChange={(event) =>
+                          setOtherAllowCompanies(event.target.checked)
+                        }
+                      />
+                      Компаниям
+                    </label>
+                  )}
+                  {!isLogisticsTreaty && otherAllowCompanies && (
                     <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
                       <label className="flex items-center gap-2 text-white/70 text-xs">
                         <input
@@ -969,7 +1291,8 @@ export default function DiplomacyModal({
                     </div>
                   )}
                 </div>
-
+                {!isLogisticsTreaty && (
+                  <>
                 <div className="space-y-2">
                   <div className="text-white/60 text-xs">Отрасли (пусто = все)</div>
                   <div className="max-h-40 overflow-y-auto legend-scroll space-y-2 pr-1">
@@ -1101,6 +1424,145 @@ export default function DiplomacyModal({
                     </div>
                   )}
                 </div>
+                  </>
+                )}
+                {isLogisticsTreaty && (
+                  <div className="space-y-3">
+                    <div className="text-white/60 text-xs">Типы маршрутов</div>
+                    <label className="flex items-center gap-2 text-white/70 text-xs">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 accent-emerald-500"
+                        checked={otherAllRouteTypes}
+                        onChange={(event) =>
+                          setOtherAllRouteTypes(event.target.checked)
+                        }
+                      />
+                      Все типы маршрутов
+                    </label>
+                    {!otherAllRouteTypes && (
+                      <div className="max-h-40 overflow-y-auto legend-scroll space-y-2 pr-1">
+                        {routeTypes.length > 0 ? (
+                          routeTypes.map((routeType) => (
+                            <label
+                              key={routeType.id}
+                              className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white/70 text-xs"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={otherSelectedRouteTypeIds.has(routeType.id)}
+                                onChange={(event) =>
+                                  setOtherSelectedRouteTypeIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (event.target.checked) next.add(routeType.id);
+                                    else next.delete(routeType.id);
+                                    return next;
+                                  })
+                                }
+                                className="w-4 h-4 accent-emerald-500"
+                              />
+                              <span>{routeType.name}</span>
+                            </label>
+                          ))
+                        ) : (
+                          <div className="text-white/40 text-xs">Нет типов маршрутов</div>
+                        )}
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <div className="text-white/60 text-xs">
+                        Лимиты по типам (0 = без лимита)
+                      </div>
+                      <div className="max-h-44 overflow-y-auto legend-scroll space-y-2 pr-1">
+                        {routeTypes.length > 0 ? (
+                          routeTypes.map((routeType) => {
+                            const isTypeEnabled =
+                              otherAllRouteTypes ||
+                              otherSelectedRouteTypeIds.has(routeType.id);
+                            const draft = otherRouteTypeLimitsDraft[routeType.id] ?? {
+                              maxRoutes: 0,
+                              maxSegments: 0,
+                            };
+                            return (
+                              <div
+                                key={`other-limits:${routeType.id}`}
+                                className={`rounded-lg border px-3 py-2 ${
+                                  isTypeEnabled
+                                    ? 'border-white/10 bg-black/30'
+                                    : 'border-white/5 bg-black/20 opacity-60'
+                                }`}
+                              >
+                                <div className="text-white/75 text-xs mb-2">
+                                  {routeType.name}
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <label className="flex flex-col gap-1 text-[11px] text-white/50">
+                                    Маршруты
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      disabled={!isTypeEnabled}
+                                      value={draft.maxRoutes}
+                                      onChange={(event) =>
+                                        setOtherRouteTypeLimitsDraft((prev) => ({
+                                          ...prev,
+                                          [routeType.id]: {
+                                            ...(prev[routeType.id] ?? {
+                                              maxRoutes: 0,
+                                              maxSegments: 0,
+                                            }),
+                                            maxRoutes:
+                                              event.target.value === ''
+                                                ? ''
+                                                : Math.max(
+                                                    0,
+                                                    Number(event.target.value) || 0,
+                                                  ),
+                                          },
+                                        }))
+                                      }
+                                      className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60 disabled:opacity-60"
+                                    />
+                                  </label>
+                                  <label className="flex flex-col gap-1 text-[11px] text-white/50">
+                                    Графы
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      disabled={!isTypeEnabled}
+                                      value={draft.maxSegments}
+                                      onChange={(event) =>
+                                        setOtherRouteTypeLimitsDraft((prev) => ({
+                                          ...prev,
+                                          [routeType.id]: {
+                                            ...(prev[routeType.id] ?? {
+                                              maxRoutes: 0,
+                                              maxSegments: 0,
+                                            }),
+                                            maxSegments:
+                                              event.target.value === ''
+                                                ? ''
+                                                : Math.max(
+                                                    0,
+                                                    Number(event.target.value) || 0,
+                                                  ),
+                                          },
+                                        }))
+                                      }
+                                      className="h-8 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60 disabled:opacity-60"
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-white/40 text-xs">Нет типов маршрутов</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <div className="text-white/60 text-xs">Провинции</div>
                   <label className="flex items-center gap-2 text-white/70 text-xs">
@@ -1192,10 +1654,23 @@ export default function DiplomacyModal({
                     const resolveTerms = (
                       terms: {
                         kind?: 'company' | 'state';
+                        agreementCategory?:
+                          | 'construction'
+                          | 'logistics'
+                          | 'market_invite'
+                          | 'market';
                         allowState?: boolean;
                         allowCompanies?: boolean;
                         companyIds?: string[];
                         buildingIds?: string[];
+                        routeTypeIds?: string[];
+                        logisticsRouteLimits?: Record<
+                          string,
+                          {
+                            maxRoutes?: number;
+                            maxSegments?: number;
+                          }
+                        >;
                         provinceIds?: string[];
                         industries?: string[];
                         limits?: {
@@ -1219,22 +1694,52 @@ export default function DiplomacyModal({
                             (id) => buildings.find((entry) => entry.id === id)?.name ?? id,
                           )
                         : [];
+                      const termRouteTypes = terms?.routeTypeIds?.length
+                        ? terms.routeTypeIds.map(
+                            (id) => routeTypes.find((entry) => entry.id === id)?.name ?? id,
+                          )
+                        : [];
                       const termProvinces = terms?.provinceIds?.length
                         ? terms.provinceIds
                         : [];
+                      const routeLimitsSummary =
+                        terms?.logisticsRouteLimits &&
+                        Object.keys(terms.logisticsRouteLimits).length > 0
+                          ? Object.entries(terms.logisticsRouteLimits)
+                              .map(([typeId, value]) => {
+                                const typeName =
+                                  routeTypes.find((entry) => entry.id === typeId)?.name ??
+                                  typeId;
+                                const routesLabel =
+                                  (value.maxRoutes ?? 0) > 0 ? value.maxRoutes : '∞';
+                                const segmentsLabel =
+                                  (value.maxSegments ?? 0) > 0
+                                    ? value.maxSegments
+                                    : '∞';
+                                return `${typeName}: маршр. ${routesLabel}, графы ${segmentsLabel}`;
+                              })
+                              .join('; ')
+                          : 'Без лимитов по типам';
                       const termIndustries = terms?.industries?.length
                         ? terms.industries.map(
                             (id) =>
                               industries.find((entry) => entry.id === id)?.name ?? id,
                           )
                         : [];
+                      const category = terms?.agreementCategory ?? 'construction';
                       return {
+                        category,
                         allowsState,
                         allowsCompanies,
                         companiesLabel: allowsCompanies
                           ? formatListSummary(termCompanies, 'Все компании')
                           : 'Не разрешено',
                         buildingsLabel: formatListSummary(termBuildings, 'Все здания'),
+                        routeTypesLabel: formatListSummary(
+                          termRouteTypes,
+                          'Все типы маршрутов',
+                        ),
+                        routeLimitsSummary,
                         provincesLabel: formatListSummary(termProvinces, 'Все провинции'),
                         industriesLabel: formatListSummary(termIndustries, 'Все отрасли'),
                         limitsLabel: `Пров. ${limitLabel(terms?.limits?.perProvince ?? 0)} / Гос. ${limitLabel(terms?.limits?.perCountry ?? 0)} / Мир ${limitLabel(terms?.limits?.global ?? 0)}`,
@@ -1263,6 +1768,14 @@ export default function DiplomacyModal({
                         : { perProvince: 0, perCountry: 0, global: 0 };
                     const hostTermsLabel = resolveTerms(hostGetsTerms);
                     const guestTermsLabel = resolveTerms(guestGetsTerms);
+                    const isLogisticsAgreement =
+                      hostTermsLabel.category === 'logistics' ||
+                      guestTermsLabel.category === 'logistics';
+                    const isMarketInviteAgreement =
+                      hostTermsLabel.category === 'market_invite' ||
+                      guestTermsLabel.category === 'market_invite' ||
+                      hostTermsLabel.category === 'market' ||
+                      guestTermsLabel.category === 'market';
                     const agreementTitleLabel = agreement.title?.trim();
                     const statusLabel =
                       item.type === 'proposal' ? 'Ожидаем ответа' : 'Действует';
@@ -1319,67 +1832,108 @@ export default function DiplomacyModal({
                                   </span>
                                 )}
                               </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <Briefcase className="w-3.5 h-3.5" />
-                                  Компании:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Какие компании могут строить по договору.
-                                  </span>
-                                </span>{' '}
-                                {hostTermsLabel.companiesLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <Factory className="w-3.5 h-3.5" />
-                                  Здания:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Список типов зданий, доступных по договору.
-                                  </span>
-                                </span>{' '}
-                                {hostTermsLabel.buildingsLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <MapPin className="w-3.5 h-3.5" />
-                                  Провинции:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    В каких провинциях действуют эти условия.
-                                  </span>
-                                </span>{' '}
-                                {hostTermsLabel.provincesLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <Layers className="w-3.5 h-3.5" />
-                                  Отрасли:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Ограничение по отраслям разрешенных зданий.
-                                  </span>
-                                </span>{' '}
-                                {hostTermsLabel.industriesLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <Gauge className="w-3.5 h-3.5" />
-                                  Лимиты:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Максимум построек по провинции, стране и миру.
-                                  </span>
-                                </span>{' '}
-                                {hostTermsLabel.limitsLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <BarChart3 className="w-3.5 h-3.5" />
-                                  Использовано:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Сколько слотов лимита уже занято.
-                                  </span>
-                                </span>{' '}
-                                Пров. {hostUsage.perProvince} / Гос.{' '}
-                                {hostUsage.perCountry} / Мир {hostUsage.global}
-                              </div>
+                              {isLogisticsAgreement ? (
+                                <>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Layers className="w-3.5 h-3.5" />
+                                      Типы маршрутов:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Какие типы маршрутов разрешены по договору.
+                                      </span>
+                                    </span>{' '}
+                                    {hostTermsLabel.routeTypesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <MapPin className="w-3.5 h-3.5" />
+                                      Провинции:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        В каких провинциях действуют эти условия.
+                                      </span>
+                                    </span>{' '}
+                                    {hostTermsLabel.provincesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Gauge className="w-3.5 h-3.5" />
+                                      Лимиты типа:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Ограничения по числу маршрутов и графов для каждого типа.
+                                      </span>
+                                    </span>{' '}
+                                    {hostTermsLabel.routeLimitsSummary}
+                                  </div>
+                                </>
+                              ) : isMarketInviteAgreement ? (
+                                <div className="text-white/70 text-center">
+                                  Тип договора: приглашение в рынок
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Briefcase className="w-3.5 h-3.5" />
+                                      Компании:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Какие компании могут строить по договору.
+                                      </span>
+                                    </span>{' '}
+                                    {hostTermsLabel.companiesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Factory className="w-3.5 h-3.5" />
+                                      Здания:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Список типов зданий, доступных по договору.
+                                      </span>
+                                    </span>{' '}
+                                    {hostTermsLabel.buildingsLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <MapPin className="w-3.5 h-3.5" />
+                                      Провинции:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        В каких провинциях действуют эти условия.
+                                      </span>
+                                    </span>{' '}
+                                    {hostTermsLabel.provincesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Layers className="w-3.5 h-3.5" />
+                                      Отрасли:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Ограничение по отраслям разрешенных зданий.
+                                      </span>
+                                    </span>{' '}
+                                    {hostTermsLabel.industriesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Gauge className="w-3.5 h-3.5" />
+                                      Лимиты:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Максимум построек по провинции, стране и миру.
+                                      </span>
+                                    </span>{' '}
+                                    {hostTermsLabel.limitsLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <BarChart3 className="w-3.5 h-3.5" />
+                                      Использовано:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Сколько слотов лимита уже занято.
+                                      </span>
+                                    </span>{' '}
+                                    Пров. {hostUsage.perProvince} / Гос.{' '}
+                                    {hostUsage.perCountry} / Мир {hostUsage.global}
+                                  </div>
+                                </>
+                              )}
                             </div>
                             </div>
                             <div className="space-y-2">
@@ -1419,67 +1973,108 @@ export default function DiplomacyModal({
                                   </span>
                                 )}
                               </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <Briefcase className="w-3.5 h-3.5" />
-                                  Компании:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Какие компании могут строить по договору.
-                                  </span>
-                                </span>{' '}
-                                {guestTermsLabel.companiesLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <Factory className="w-3.5 h-3.5" />
-                                  Здания:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Список типов зданий, доступных по договору.
-                                  </span>
-                                </span>{' '}
-                                {guestTermsLabel.buildingsLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <MapPin className="w-3.5 h-3.5" />
-                                  Провинции:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    В каких провинциях действуют эти условия.
-                                  </span>
-                                </span>{' '}
-                                {guestTermsLabel.provincesLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <Layers className="w-3.5 h-3.5" />
-                                  Отрасли:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Ограничение по отраслям разрешенных зданий.
-                                  </span>
-                                </span>{' '}
-                                {guestTermsLabel.industriesLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <Gauge className="w-3.5 h-3.5" />
-                                  Лимиты:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Максимум построек по провинции, стране и миру.
-                                  </span>
-                                </span>{' '}
-                                {guestTermsLabel.limitsLabel}
-                              </div>
-                              <div className="text-white/55 text-center">
-                                <span className="relative group text-white/65 inline-flex items-center gap-1">
-                                  <BarChart3 className="w-3.5 h-3.5" />
-                                  Использовано:
-                                  <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Сколько слотов лимита уже занято.
-                                  </span>
-                                </span>{' '}
-                                Пров. {guestUsage.perProvince} / Гос.{' '}
-                                {guestUsage.perCountry} / Мир {guestUsage.global}
-                              </div>
+                              {isLogisticsAgreement ? (
+                                <>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Layers className="w-3.5 h-3.5" />
+                                      Типы маршрутов:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Какие типы маршрутов разрешены по договору.
+                                      </span>
+                                    </span>{' '}
+                                    {guestTermsLabel.routeTypesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <MapPin className="w-3.5 h-3.5" />
+                                      Провинции:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        В каких провинциях действуют эти условия.
+                                      </span>
+                                    </span>{' '}
+                                    {guestTermsLabel.provincesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Gauge className="w-3.5 h-3.5" />
+                                      Лимиты типа:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Ограничения по числу маршрутов и графов для каждого типа.
+                                      </span>
+                                    </span>{' '}
+                                    {guestTermsLabel.routeLimitsSummary}
+                                  </div>
+                                </>
+                              ) : isMarketInviteAgreement ? (
+                                <div className="text-white/70 text-center">
+                                  Тип договора: приглашение в рынок
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Briefcase className="w-3.5 h-3.5" />
+                                      Компании:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Какие компании могут строить по договору.
+                                      </span>
+                                    </span>{' '}
+                                    {guestTermsLabel.companiesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Factory className="w-3.5 h-3.5" />
+                                      Здания:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Список типов зданий, доступных по договору.
+                                      </span>
+                                    </span>{' '}
+                                    {guestTermsLabel.buildingsLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <MapPin className="w-3.5 h-3.5" />
+                                      Провинции:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        В каких провинциях действуют эти условия.
+                                      </span>
+                                    </span>{' '}
+                                    {guestTermsLabel.provincesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Layers className="w-3.5 h-3.5" />
+                                      Отрасли:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Ограничение по отраслям разрешенных зданий.
+                                      </span>
+                                    </span>{' '}
+                                    {guestTermsLabel.industriesLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <Gauge className="w-3.5 h-3.5" />
+                                      Лимиты:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Максимум построек по провинции, стране и миру.
+                                      </span>
+                                    </span>{' '}
+                                    {guestTermsLabel.limitsLabel}
+                                  </div>
+                                  <div className="text-white/55 text-center">
+                                    <span className="relative group text-white/65 inline-flex items-center gap-1">
+                                      <BarChart3 className="w-3.5 h-3.5" />
+                                      Использовано:
+                                      <span className="pointer-events-none absolute -top-8 left-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/80 px-2.5 py-1 text-[11px] text-white/85 shadow-xl opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Сколько слотов лимита уже занято.
+                                      </span>
+                                    </span>{' '}
+                                    Пров. {guestUsage.perProvince} / Гос.{' '}
+                                    {guestUsage.perCountry} / Мир {guestUsage.global}
+                                  </div>
+                                </>
+                              )}
                             </div>
                             </div>
                           </div>

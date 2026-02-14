@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Handshake } from 'lucide-react';
 import TopBar from './components/TopBar';
 import LeftToolbar from './components/LeftToolbar';
@@ -16,6 +16,12 @@ import EventLogPanel from './components/EventLogPanel';
 import IndustryModal from './components/IndustryModal';
 import DiplomacyModal from './components/DiplomacyModal';
 import DiplomacyProposalsModal from './components/DiplomacyProposalsModal';
+import LogisticsModal from './components/LogisticsModal';
+import MarketsModal from './components/MarketsModal';
+import {
+  createDefaultLogisticsState,
+  ensureBaseLogisticsNodes,
+} from './logistics';
 import {
   EventLogContext,
   createDefaultLog,
@@ -40,6 +46,11 @@ import type {
   RequirementNode,
   DiplomacyAgreement,
   DiplomacyProposal,
+  LogisticsState,
+  LogisticsEdge,
+  LogisticsRouteType,
+  Market,
+  ResourceCategory,
   EventLogEntry,
   EventCategory,
   EventLogState,
@@ -214,6 +225,13 @@ const defaultCultureColors = ['#f97316', '#fb7185', '#a855f7', '#facc15'];
 const defaultLandscapeColors = ['#22c55e', '#10b981', '#84cc16', '#14b8a6'];
 const defaultClimateColors = ['#38bdf8', '#60a5fa', '#fbbf24', '#f97316'];
 const defaultReligionColors = ['#facc15', '#fb7185', '#a855f7', '#60a5fa'];
+const defaultResourceCategories: ResourceCategory[] = [
+  { id: 'resource-category-liquid', name: 'Жидкость', color: '#38bdf8' },
+  { id: 'resource-category-gas', name: 'Газ', color: '#a78bfa' },
+  { id: 'resource-category-energy', name: 'Энергия', color: '#f59e0b' },
+  { id: 'resource-category-goods', name: 'Товар', color: '#22c55e' },
+  { id: 'resource-category-service', name: 'Услуга', color: '#f472b6' },
+];
 
 const initialMapLayers: MapLayer[] = [
   { id: 'political', name: 'РџРѕР»РёС‚РёС‡РµСЃРєР°СЏ', visible: true },
@@ -236,6 +254,7 @@ function App() {
     constructionPointsPerTurn: 10,
     demolitionCostPercent: 20,
     eventLogRetainTurns: 3,
+    marketCapitalGraceTurns: 3,
     startingColonizationPoints: 100,
     startingConstructionPoints: 100,
     sciencePointsPerTurn: 0,
@@ -291,6 +310,9 @@ function App() {
     { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
   ]);
   const [resources, setResources] = useState<Trait[]>([]);
+  const [resourceCategories, setResourceCategories] = useState<ResourceCategory[]>(
+    defaultResourceCategories,
+  );
   const [buildings, setBuildings] = useState<BuildingDefinition[]>([]);
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -300,6 +322,10 @@ function App() {
   const [diplomacyProposals, setDiplomacyProposals] = useState<
     DiplomacyProposal[]
   >([]);
+  const [logistics, setLogistics] = useState<LogisticsState>(
+    createDefaultLogisticsState(),
+  );
+  const [markets, setMarkets] = useState<Market[]>([]);
   const [diplomacyInboxOpen, setDiplomacyInboxOpen] = useState(false);
   const [diplomacySentNotice, setDiplomacySentNotice] = useState<{
     open: boolean;
@@ -324,11 +350,49 @@ function App() {
     y: number;
     provinceId: string;
   } | null>(null);
+  const [logisticsOpen, setLogisticsOpen] = useState(false);
+  const [marketsOpen, setMarketsOpen] = useState(false);
+  const [logisticsRoutePlannerActive, setLogisticsRoutePlannerActive] =
+    useState(false);
+  const [logisticsRouteProvinceIds, setLogisticsRouteProvinceIds] = useState<string[]>(
+    [],
+  );
+  const [routePlannerHint, setRoutePlannerHint] = useState<string | undefined>(
+    undefined,
+  );
+  const [logisticsRouteDraft, setLogisticsRouteDraft] = useState<{
+    name: string;
+    routeTypeId: string;
+  } | null>(null);
+  const [adjacencyRecomputeRequested, setAdjacencyRecomputeRequested] =
+    useState(false);
   const [colonizationModalOpen, setColonizationModalOpen] = useState(false);
   const [constructionModalOpen, setConstructionModalOpen] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>(
     undefined,
   );
+
+  const ensureMarketsMapLayer = useCallback((layers: MapLayer[]) => {
+    if (layers.some((layer) => layer.id === 'markets')) return layers;
+    return [
+      ...layers,
+      { id: 'markets', name: 'Рынки', visible: false },
+    ];
+  }, []);
+
+  useEffect(() => {
+    setMapLayers((prev) => ensureMarketsMapLayer(prev));
+  }, [ensureMarketsMapLayer]);
+
+  useEffect(() => {
+    setLogistics((prev) => {
+      const nodes = ensureBaseLogisticsNodes(provinces, countries, prev.nodes);
+      return {
+        ...prev,
+        nodes,
+      };
+    });
+  }, [provinces, countries, logistics.edges, turn]);
 
   const getActiveColonizationsCount = (countryId?: string) => {
     if (!countryId) return 0;
@@ -411,6 +475,752 @@ function App() {
   const selectCountry = (id: string) => {
     setActiveCountryId(id);
   };
+
+  const addLogisticsEdge = (edge: LogisticsEdge) => {
+    setLogistics((prev) => {
+      const exists = prev.edges.some(
+        (entry) =>
+          ((entry.fromNodeId === edge.fromNodeId &&
+            entry.toNodeId === edge.toNodeId) ||
+            (entry.fromNodeId === edge.toNodeId &&
+              entry.toNodeId === edge.fromNodeId)) &&
+          (entry.routeTypeId ?? '') === (edge.routeTypeId ?? '') &&
+          (entry.ownerCountryId ?? '') === (edge.ownerCountryId ?? ''),
+      );
+      if (exists) return prev;
+      return {
+        ...prev,
+        edges: [...prev.edges, edge],
+      };
+    });
+  };
+
+  const addLogisticsRouteType = (payload: {
+    name: string;
+    color: string;
+    lineWidth: number;
+    dashPattern?: string;
+    constructionCostPerSegment?: number;
+    allowProvinceSkipping?: boolean;
+    requiredBuildingIds?: string[];
+    requiredBuildingsMode?: 'all' | 'any';
+    landscape?: { anyOf?: string[]; noneOf?: string[] };
+    allowAllLandscapes?: boolean;
+    marketAccessCategoryIds?: string[];
+    allowAllMarketCategories?: boolean;
+    transportCapacityPerLevelByCategory?: Record<string, number>;
+  }) => {
+    setLogistics((prev) => ({
+      ...prev,
+      routeTypes: [
+        ...prev.routeTypes,
+        {
+          id: createId(),
+          name: payload.name,
+          color: payload.color,
+          lineWidth: Math.max(0.4, payload.lineWidth),
+          dashPattern: payload.dashPattern?.trim() || undefined,
+          constructionCostPerSegment: Math.max(
+            0,
+            Math.floor(payload.constructionCostPerSegment ?? 0),
+          ),
+          allowProvinceSkipping: Boolean(payload.allowProvinceSkipping),
+          requiredBuildingIds: Array.from(
+            new Set(payload.requiredBuildingIds ?? []),
+          ),
+          requiredBuildingsMode: payload.requiredBuildingsMode ?? 'all',
+          landscape: {
+            anyOf: Array.from(new Set(payload.landscape?.anyOf ?? [])),
+            noneOf: Array.from(new Set(payload.landscape?.noneOf ?? [])),
+          },
+          allowAllLandscapes: payload.allowAllLandscapes ?? true,
+          marketAccessCategoryIds: Array.from(
+            new Set(payload.marketAccessCategoryIds ?? []),
+          ),
+          allowAllMarketCategories: payload.allowAllMarketCategories ?? true,
+          transportCapacityPerLevelByCategory: {
+            ...(payload.transportCapacityPerLevelByCategory ?? {}),
+          },
+        },
+      ],
+    }));
+  };
+
+  const updateLogisticsRouteType = (
+    id: string,
+    patch: Partial<
+      Pick<
+        LogisticsRouteType,
+        | 'name'
+        | 'color'
+        | 'lineWidth'
+        | 'dashPattern'
+        | 'constructionCostPerSegment'
+        | 'allowProvinceSkipping'
+        | 'requiredBuildingIds'
+        | 'requiredBuildingsMode'
+        | 'landscape'
+        | 'allowAllLandscapes'
+        | 'marketAccessCategoryIds'
+        | 'allowAllMarketCategories'
+        | 'transportCapacityPerLevelByCategory'
+      >
+    >,
+  ) => {
+    setLogistics((prev) => ({
+      ...prev,
+      routeTypes: prev.routeTypes.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...patch,
+              lineWidth:
+                patch.lineWidth == null ? item.lineWidth : Math.max(0.4, patch.lineWidth),
+              dashPattern:
+                patch.dashPattern == null
+                  ? item.dashPattern
+                  : patch.dashPattern.trim() || undefined,
+              constructionCostPerSegment:
+                patch.constructionCostPerSegment == null
+                  ? item.constructionCostPerSegment ?? 0
+                  : Math.max(0, Math.floor(patch.constructionCostPerSegment)),
+              allowProvinceSkipping:
+                patch.allowProvinceSkipping == null
+                  ? item.allowProvinceSkipping ?? false
+                  : patch.allowProvinceSkipping,
+              requiredBuildingIds:
+                patch.requiredBuildingIds == null
+                  ? item.requiredBuildingIds ?? []
+                  : Array.from(new Set(patch.requiredBuildingIds)),
+              requiredBuildingsMode:
+                patch.requiredBuildingsMode == null
+                  ? item.requiredBuildingsMode ?? 'all'
+                  : patch.requiredBuildingsMode,
+              landscape:
+                patch.landscape == null
+                  ? item.landscape ?? { anyOf: [], noneOf: [] }
+                  : {
+                      anyOf: Array.from(new Set(patch.landscape.anyOf ?? [])),
+                      noneOf: Array.from(new Set(patch.landscape.noneOf ?? [])),
+                    },
+              allowAllLandscapes:
+                patch.allowAllLandscapes == null
+                  ? item.allowAllLandscapes ?? true
+                  : patch.allowAllLandscapes,
+              marketAccessCategoryIds:
+                patch.marketAccessCategoryIds == null
+                  ? item.marketAccessCategoryIds ?? []
+                  : Array.from(new Set(patch.marketAccessCategoryIds)),
+              allowAllMarketCategories:
+                patch.allowAllMarketCategories == null
+                  ? item.allowAllMarketCategories ?? true
+                  : patch.allowAllMarketCategories,
+              transportCapacityPerLevelByCategory:
+                patch.transportCapacityPerLevelByCategory == null
+                  ? item.transportCapacityPerLevelByCategory ?? {}
+                  : { ...patch.transportCapacityPerLevelByCategory },
+            }
+          : item,
+      ),
+    }));
+  };
+
+  const deleteLogisticsRouteType = (id: string) => {
+    setLogistics((prev) => {
+      if (prev.routeTypes.length <= 1) return prev;
+      const fallback = prev.routeTypes.find((item) => item.id !== id);
+      const nextTypes = prev.routeTypes.filter((item) => item.id !== id);
+      return {
+        ...prev,
+        routeTypes: nextTypes,
+        edges: prev.edges.map((edge) =>
+          edge.routeTypeId === id && fallback
+            ? { ...edge, routeTypeId: fallback.id }
+            : edge,
+        ),
+      };
+    });
+  };
+
+  const addMarket = (payload: {
+    actorCountryId?: string;
+    name: string;
+    leaderCountryId: string;
+    memberCountryIds: string[];
+    color?: string;
+    logoDataUrl?: string;
+    capitalProvinceId?: string;
+  }) => {
+    if (!payload.actorCountryId) return;
+    if (payload.actorCountryId !== payload.leaderCountryId) return;
+    if (!payload.capitalProvinceId) return;
+    const capitalProvince = provinces[payload.capitalProvinceId];
+    if (!capitalProvince) return;
+    if (capitalProvince.ownerCountryId !== payload.leaderCountryId) return;
+    const creatorOwnedProvinceIds = Object.values(provinces).filter(
+      (province) => province.ownerCountryId === payload.leaderCountryId,
+    );
+    if (creatorOwnedProvinceIds.length === 0) return;
+    const marketId = createId();
+    setMarkets((prev) => {
+      const alreadyInMarket = prev.some((market) =>
+        payload.actorCountryId
+          ? market.memberCountryIds.includes(payload.actorCountryId)
+          : false,
+      );
+      if (alreadyInMarket) return prev;
+      const members = Array.from(
+        new Set([payload.leaderCountryId, ...payload.memberCountryIds]),
+      );
+      const next = prev
+        .map((market) => ({
+          ...market,
+          memberCountryIds: market.memberCountryIds.filter(
+            (countryId) => !members.includes(countryId),
+          ),
+        }))
+        .filter(
+          (market) =>
+            market.memberCountryIds.length > 0 &&
+            market.memberCountryIds.includes(market.leaderCountryId),
+        );
+      return [
+        ...next,
+        {
+          id: marketId,
+          name: payload.name,
+          leaderCountryId: payload.leaderCountryId,
+          creatorCountryId: payload.actorCountryId,
+          color:
+            payload.color ??
+            countries.find((country) => country.id === payload.leaderCountryId)?.color ??
+            '#22c55e',
+          logoDataUrl: payload.logoDataUrl,
+          memberCountryIds: members,
+          warehouseByResourceId: {},
+          capitalProvinceId: payload.capitalProvinceId,
+          capitalLostSinceTurn: undefined,
+          createdTurn: turn,
+        },
+      ];
+    });
+  };
+
+  const updateMarket = (
+    marketId: string,
+    patch: {
+      actorCountryId?: string;
+      name?: string;
+      leaderCountryId?: string;
+      memberCountryIds?: string[];
+      color?: string;
+      logoDataUrl?: string;
+      capitalProvinceId?: string;
+    },
+  ) => {
+    setMarkets((prev) => {
+      const current = prev.find((market) => market.id === marketId);
+      if (!current) return prev;
+      if (!patch.actorCountryId || patch.actorCountryId !== current.creatorCountryId) {
+        return prev;
+      }
+      const leaderCountryId = patch.leaderCountryId ?? current.leaderCountryId;
+      const memberCountryIds = Array.from(
+        new Set([leaderCountryId, ...(patch.memberCountryIds ?? current.memberCountryIds)]),
+      );
+      const nextCapitalProvinceId = patch.capitalProvinceId ?? current.capitalProvinceId;
+      if (!nextCapitalProvinceId) return prev;
+      const capitalProvince = provinces[nextCapitalProvinceId];
+      if (!capitalProvince) return prev;
+      if (capitalProvince.ownerCountryId !== leaderCountryId) return prev;
+      return prev
+        .map((market) => {
+          if (market.id === marketId) {
+            return {
+              ...market,
+              name: patch.name ?? market.name,
+              leaderCountryId,
+              color: patch.color ?? market.color,
+              logoDataUrl:
+                typeof patch.logoDataUrl === 'undefined'
+                  ? market.logoDataUrl
+                  : patch.logoDataUrl,
+              memberCountryIds,
+              capitalProvinceId: nextCapitalProvinceId,
+              capitalLostSinceTurn: undefined,
+            };
+          }
+          return {
+            ...market,
+            memberCountryIds: market.memberCountryIds.filter(
+              (countryId) => !memberCountryIds.includes(countryId),
+            ),
+          };
+        })
+        .filter(
+          (market) =>
+            market.memberCountryIds.length > 0 &&
+            market.memberCountryIds.includes(market.leaderCountryId),
+        );
+    });
+  };
+
+  const deleteMarket = (marketId: string, actorCountryId?: string) => {
+    setMarkets((prev) =>
+      prev.filter(
+        (market) =>
+          market.id !== marketId || market.creatorCountryId !== actorCountryId,
+      ),
+    );
+  };
+
+  const leaveMarket = (countryId?: string, marketId?: string) => {
+    if (!countryId) return;
+    setMarkets((prev) =>
+      prev
+        .map((market) => {
+          if (marketId && market.id !== marketId) return market;
+          if (!market.memberCountryIds.includes(countryId)) return market;
+          if (market.leaderCountryId === countryId) return market;
+          return {
+            ...market,
+            memberCountryIds: market.memberCountryIds.filter((id) => id !== countryId),
+          };
+        })
+        .filter(
+          (market) =>
+            market.memberCountryIds.length > 0 &&
+            market.memberCountryIds.includes(market.leaderCountryId),
+        ),
+    );
+    addEvent({
+      category: 'economy',
+      message: `${countries.find((entry) => entry.id === countryId)?.name ?? countryId} вышла из рынка.`,
+      countryId,
+      priority: 'low',
+    });
+  };
+
+  const tradeWithMarketWarehouse = (payload: {
+    marketId: string;
+    actorCountryId?: string;
+    resourceId: string;
+    amount: number;
+    action: 'buy' | 'sell';
+  }) => {
+    if (!payload.actorCountryId) return;
+    const amount = Math.max(1, Math.floor(payload.amount || 0));
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    let executed = false;
+    setMarkets((prev) =>
+      prev.map((market) => {
+        if (market.id !== payload.marketId) return market;
+        if (!market.memberCountryIds.includes(payload.actorCountryId as string)) {
+          return market;
+        }
+        const stockMap = { ...(market.warehouseByResourceId ?? {}) };
+        const current = Math.max(0, stockMap[payload.resourceId] ?? 0);
+        const delta = payload.action === 'sell' ? amount : -amount;
+        const next = current + delta;
+        if (next < 0) return market;
+        stockMap[payload.resourceId] = next;
+        executed = true;
+        return {
+          ...market,
+          warehouseByResourceId: stockMap,
+        };
+      }),
+    );
+
+    if (!executed) return;
+    const actorName =
+      countries.find((country) => country.id === payload.actorCountryId)?.name ??
+      payload.actorCountryId;
+    const resourceName =
+      resources.find((resource) => resource.id === payload.resourceId)?.name ??
+      payload.resourceId;
+    addEvent({
+      category: 'economy',
+      countryId: payload.actorCountryId,
+      priority: 'low',
+      message:
+        payload.action === 'sell'
+          ? `${actorName} продала ${amount} ед. ресурса "${resourceName}" на склад рынка.`
+          : `${actorName} купила ${amount} ед. ресурса "${resourceName}" со склада рынка.`,
+    });
+  };
+
+  const setRouteCountryStatus = (
+    routeId: string,
+    countryId: string,
+    status: 'open' | 'closed',
+  ) => {
+    setLogistics((prev) => ({
+      ...prev,
+      routes: prev.routes.map((route) =>
+        route.id === routeId
+          ? {
+              ...route,
+              countryStatuses: {
+                ...(route.countryStatuses ?? {}),
+                [countryId]: status,
+              },
+            }
+          : route,
+      ),
+    }));
+  };
+
+  const setRouteLevel = (routeId: string, level: number, actorCountryId?: string) => {
+    const safeLevel = Math.max(1, Math.floor(level || 1));
+    setLogistics((prev) => ({
+      ...prev,
+      routes: prev.routes.map((route) => {
+        if (route.id !== routeId) return route;
+        if (!actorCountryId || route.ownerCountryId !== actorCountryId) return route;
+        return { ...route, level: safeLevel };
+      }),
+    }));
+  };
+
+  const demolishLogisticsRoute = (routeId: string) => {
+    if (!activeCountryId) return;
+    const route = logistics.routes.find((entry) => entry.id === routeId);
+    if (!route) return;
+
+    const totalSegments = Math.max(0, route.provinceIds.length - 1);
+    if (totalSegments <= 0) return;
+
+    const isOwner = route.ownerCountryId === activeCountryId;
+    const removableSegmentIndexes: number[] = [];
+    for (let seg = 0; seg < totalSegments; seg += 1) {
+      if (isOwner) {
+        removableSegmentIndexes.push(seg);
+        continue;
+      }
+      const provinceId = route.provinceIds[seg + 1];
+      if (provinces[provinceId]?.ownerCountryId === activeCountryId) {
+        removableSegmentIndexes.push(seg);
+      }
+    }
+    if (removableSegmentIndexes.length === 0) return;
+
+    const routeType = logistics.routeTypes.find(
+      (type) => type.id === route.routeTypeId,
+    );
+    const fallbackTotalCost = Math.max(
+      0,
+      Math.floor(routeType?.constructionCostPerSegment ?? 0) * totalSegments,
+    );
+    const routeTotalCost = Math.max(
+      0,
+      route.constructionRequiredPoints ?? fallbackTotalCost,
+    );
+    const removedBaseCost = isOwner
+      ? routeTotalCost
+      : totalSegments > 0
+        ? (routeTotalCost * removableSegmentIndexes.length) / totalSegments
+        : 0;
+    const percent = Math.max(0, gameSettings.demolitionCostPercent ?? 20);
+    const demolishCost = Math.ceil((removedBaseCost * percent) / 100);
+
+    const actorCountry = countries.find((entry) => entry.id === activeCountryId);
+    const actorPoints = actorCountry?.constructionPoints ?? 0;
+    if (actorPoints < demolishCost) {
+      addEvent({
+        category: 'economy',
+        message: `Недостаточно очков строительства для сноса маршрута "${route.name}". Требуется: ${demolishCost}.`,
+        countryId: activeCountryId,
+        priority: 'low',
+      });
+      return;
+    }
+
+    setCountries((prev) =>
+      prev.map((entry) =>
+        entry.id === activeCountryId
+          ? {
+              ...entry,
+              constructionPoints: Math.max(
+                0,
+                (entry.constructionPoints ?? 0) - demolishCost,
+              ),
+            }
+          : entry,
+      ),
+    );
+
+    setLogistics((prev) => {
+      const targetIndex = prev.routes.findIndex((entry) => entry.id === routeId);
+      if (targetIndex === -1) return prev;
+      const target = prev.routes[targetIndex];
+      const targetSegments = Math.max(0, target.provinceIds.length - 1);
+      if (targetSegments <= 0) return prev;
+
+      const targetIsOwner = target.ownerCountryId === activeCountryId;
+      const removedSegments = new Set<number>();
+      for (let seg = 0; seg < targetSegments; seg += 1) {
+        if (targetIsOwner) {
+          removedSegments.add(seg);
+          continue;
+        }
+        const provinceId = target.provinceIds[seg + 1];
+        if (provinces[provinceId]?.ownerCountryId === activeCountryId) {
+          removedSegments.add(seg);
+        }
+      }
+      if (removedSegments.size === 0) return prev;
+
+      const runs: Array<{ start: number; end: number }> = [];
+      let runStart: number | null = null;
+      for (let seg = 0; seg < targetSegments; seg += 1) {
+        const isKept = !removedSegments.has(seg);
+        if (isKept && runStart == null) {
+          runStart = seg;
+        }
+        const closesRun =
+          runStart != null && (!isKept || seg === targetSegments - 1);
+        if (closesRun) {
+          const runEnd = isKept ? seg : seg - 1;
+          if (runEnd >= runStart) {
+            runs.push({ start: runStart, end: runEnd });
+          }
+          runStart = null;
+        }
+      }
+
+      const routeRequiredTotal = Math.max(0, target.constructionRequiredPoints ?? 0);
+      const routeProgressTotal = Math.max(
+        0,
+        target.constructionProgressPoints ?? routeRequiredTotal,
+      );
+      const routeIsCompleted =
+        routeRequiredTotal <= 0 || routeProgressTotal >= routeRequiredTotal;
+
+      const segmentToRouteId = new Map<number, string>();
+      const nextRoutesForTarget = runs.map((run, index) => {
+        const segmentCount = run.end - run.start + 1;
+        const nextRouteId = index === 0 ? target.id : createId();
+        for (let seg = run.start; seg <= run.end; seg += 1) {
+          segmentToRouteId.set(seg, nextRouteId);
+        }
+        const requiredPart =
+          routeRequiredTotal > 0
+            ? Math.round((routeRequiredTotal * segmentCount) / targetSegments)
+            : 0;
+        const progressPart =
+          routeRequiredTotal <= 0
+            ? 0
+            : routeIsCompleted
+              ? requiredPart
+              : Math.min(
+                  requiredPart,
+                  Math.round((routeProgressTotal * segmentCount) / targetSegments),
+                );
+        return {
+          ...target,
+          id: nextRouteId,
+          name:
+            index === 0 ? target.name : `${target.name} (часть ${index + 1})`,
+          provinceIds: target.provinceIds.slice(run.start, run.end + 2),
+          constructionRequiredPoints: requiredPart,
+          constructionProgressPoints: progressPart,
+        };
+      });
+
+      const edgeSegmentByKey = new Map<string, number>();
+      const toSegmentKey = (a: string, b: string) =>
+        a < b ? `${a}::${b}` : `${b}::${a}`;
+      for (let seg = 0; seg < target.provinceIds.length - 1; seg += 1) {
+        const a = target.provinceIds[seg];
+        const b = target.provinceIds[seg + 1];
+        edgeSegmentByKey.set(toSegmentKey(a, b), seg);
+      }
+
+      const nextEdges = prev.edges.flatMap((edge) => {
+        if (edge.routeId !== routeId) return [edge];
+        if (
+          !edge.fromNodeId.startsWith('province:') ||
+          !edge.toNodeId.startsWith('province:')
+        ) {
+          return [];
+        }
+        const fromProvinceId = edge.fromNodeId.slice('province:'.length);
+        const toProvinceId = edge.toNodeId.slice('province:'.length);
+        const segmentIndex = edgeSegmentByKey.get(
+          toSegmentKey(fromProvinceId, toProvinceId),
+        );
+        if (segmentIndex == null) return [];
+        const nextRouteId = segmentToRouteId.get(segmentIndex);
+        if (!nextRouteId) return [];
+        if (nextRouteId === routeId) return [edge];
+        return [{ ...edge, routeId: nextRouteId }];
+      });
+
+      const nextRoutes = [...prev.routes];
+      nextRoutes.splice(targetIndex, 1, ...nextRoutesForTarget);
+      return {
+        ...prev,
+        routes: nextRoutes.filter((entry) => entry.provinceIds.length > 1),
+        edges: nextEdges,
+      };
+    });
+
+    const actorName = actorCountry?.name ?? activeCountryId;
+    addEvent({
+      category: 'economy',
+      message: isOwner
+        ? `${actorName} снесла маршрут "${route.name}" (стоимость: ${demolishCost}).`
+        : `${actorName} снесла графы маршрута "${route.name}" на своей территории (стоимость: ${demolishCost}).`,
+      countryId: activeCountryId,
+      priority: 'low',
+    });
+  };
+
+  useEffect(() => {
+    setLogistics((prev) => {
+      if (prev.routes.length === 0 || prev.edges.length === 0) return prev;
+
+      const routeById = new Map(prev.routes.map((route) => [route.id, route]));
+      let changed = false;
+      const nextEdges = prev.edges.map((edge) => {
+        if (!edge.routeId) return edge;
+        const route = routeById.get(edge.routeId);
+        if (!route || route.provinceIds.length < 2) return edge;
+        const requiredPoints = Math.max(0, route.constructionRequiredPoints ?? 0);
+        const progressPoints = Math.max(
+          0,
+          route.constructionProgressPoints ?? requiredPoints,
+        );
+        if (requiredPoints > 0 && progressPoints < requiredPoints) {
+          const isActive = false;
+          if ((edge.active ?? true) === isActive) return edge;
+          changed = true;
+          return { ...edge, active: isActive };
+        }
+
+        const fromProvinceId = edge.fromNodeId.startsWith('province:')
+          ? edge.fromNodeId.slice('province:'.length)
+          : '';
+        const toProvinceId = edge.toNodeId.startsWith('province:')
+          ? edge.toNodeId.slice('province:'.length)
+          : '';
+        if (!fromProvinceId || !toProvinceId) return edge;
+
+        let segmentIndex = -1;
+        for (let i = 0; i < route.provinceIds.length - 1; i += 1) {
+          const a = route.provinceIds[i];
+          const b = route.provinceIds[i + 1];
+          if (
+            (a === fromProvinceId && b === toProvinceId) ||
+            (a === toProvinceId && b === fromProvinceId)
+          ) {
+            segmentIndex = i;
+            break;
+          }
+        }
+        if (segmentIndex === -1) return edge;
+
+        let cutoff = Number.POSITIVE_INFINITY;
+        for (let i = 1; i < route.provinceIds.length; i += 1) {
+          const provinceId = route.provinceIds[i];
+          const ownerId = provinces[provinceId]?.ownerCountryId;
+          if (!ownerId) continue;
+          const status = route.countryStatuses?.[ownerId] ?? 'open';
+          if (status === 'closed') {
+            cutoff = Math.min(cutoff, i - 1);
+            break;
+          }
+        }
+
+        const isActive = segmentIndex < cutoff;
+        if ((edge.active ?? true) === isActive) return edge;
+        changed = true;
+        return { ...edge, active: isActive };
+      });
+
+      return changed ? { ...prev, edges: nextEdges } : prev;
+    });
+  }, [provinces, logistics.routes]);
+
+  useEffect(() => {
+    if (turn <= 0) return;
+    setProvinces((prev) => {
+      const categoryIds = resourceCategories.map((category) => category.id);
+      const routeById = new Map(logistics.routes.map((route) => [route.id, route]));
+      const routeTypeById = new Map(
+        logistics.routeTypes.map((routeType) => [routeType.id, routeType]),
+      );
+      const activeProvincesByRoute = new Map<string, Set<string>>();
+      const parseProvinceNodeId = (nodeId: string) =>
+        nodeId.startsWith('province:') ? nodeId.slice('province:'.length) : undefined;
+
+      logistics.edges.forEach((edge) => {
+        if (!edge.routeId || edge.active === false) return;
+        const fromProvinceId = parseProvinceNodeId(edge.fromNodeId);
+        const toProvinceId = parseProvinceNodeId(edge.toNodeId);
+        if (!fromProvinceId || !toProvinceId) return;
+        if (!prev[fromProvinceId] || !prev[toProvinceId]) return;
+        if (!activeProvincesByRoute.has(edge.routeId)) {
+          activeProvincesByRoute.set(edge.routeId, new Set<string>());
+        }
+        const set = activeProvincesByRoute.get(edge.routeId);
+        set?.add(fromProvinceId);
+        set?.add(toProvinceId);
+      });
+
+      const nextPointsByProvince = new Map<string, Record<string, number>>();
+      activeProvincesByRoute.forEach((provinceIds, routeId) => {
+        const route = routeById.get(routeId);
+        if (!route) return;
+        const routeType = routeTypeById.get(route.routeTypeId);
+        if (!routeType) return;
+        const level = Math.max(1, Math.floor(route.level ?? 1));
+        const perLevel = routeType.transportCapacityPerLevelByCategory ?? {};
+        const allowedCategories =
+          routeType.allowAllMarketCategories ?? true
+            ? categoryIds
+            : (routeType.marketAccessCategoryIds ?? []).filter((id) =>
+                categoryIds.includes(id),
+              );
+        if (allowedCategories.length === 0) return;
+        provinceIds.forEach((provinceId) => {
+          const current = nextPointsByProvince.get(provinceId) ?? {};
+          const next = { ...current };
+          allowedCategories.forEach((categoryId) => {
+            const perLevelValue = Math.max(0, perLevel[categoryId] ?? 0);
+            const gain = perLevelValue * level;
+            if (gain <= 0) return;
+            next[categoryId] = (next[categoryId] ?? 0) + gain;
+          });
+          nextPointsByProvince.set(provinceId, next);
+        });
+      });
+
+      let changed = false;
+      const next: ProvinceRecord = { ...prev };
+      Object.values(prev).forEach((province) => {
+        const expectedRaw = nextPointsByProvince.get(province.id) ?? {};
+        const expected = Object.fromEntries(
+          Object.entries(expectedRaw).filter(([, value]) => value > 0),
+        );
+        const current = province.logisticsPointsByCategory ?? {};
+        const currentKeys = Object.keys(current);
+        const expectedKeys = Object.keys(expected);
+        const same =
+          currentKeys.length === expectedKeys.length &&
+          expectedKeys.every((key) => (current[key] ?? 0) === (expected[key] ?? 0));
+        if (same) return;
+        changed = true;
+        next[province.id] = {
+          ...province,
+          logisticsPointsByCategory: expected,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [turn]);
 
   const pruneLogEntries = (
     entries: EventLogEntry[],
@@ -532,15 +1342,28 @@ function App() {
     const available = country?.constructionPoints ?? 0;
     if (!country || available <= 0) return;
 
-    let tasksCount = 0;
+    let buildingTasksCount = 0;
     Object.values(provinces).forEach((province) => {
       if (province.ownerCountryId !== countryId) return;
       const progress = province.constructionProgress ?? {};
       Object.values(progress).forEach((entries) => {
-        tasksCount += entries.length;
+        buildingTasksCount += entries.length;
       });
     });
 
+    const routeTaskIds = logistics.routes
+      .filter((route) => {
+        if (route.ownerCountryId !== countryId) return false;
+        const required = Math.max(0, route.constructionRequiredPoints ?? 0);
+        const progress = Math.max(
+          0,
+          route.constructionProgressPoints ?? required,
+        );
+        return required > 0 && progress < required;
+      })
+      .map((route) => route.id);
+
+    const tasksCount = buildingTasksCount + routeTaskIds.length;
     if (tasksCount === 0) return;
 
     const share = available / tasksCount;
@@ -597,6 +1420,49 @@ function App() {
         }
       });
       return next;
+    });
+
+    const completedRoutes: { id: string; name: string }[] = [];
+    if (routeTaskIds.length > 0) {
+      setLogistics((prev) => {
+        const routeTaskSet = new Set(routeTaskIds);
+        let changed = false;
+        const nextRoutes = prev.routes.map((route) => {
+          if (!routeTaskSet.has(route.id)) return route;
+          const required = Math.max(0, route.constructionRequiredPoints ?? 0);
+          const current = Math.max(
+            0,
+            route.constructionProgressPoints ?? 0,
+          );
+          const updated = Math.min(required, current + share);
+          if (updated >= required && current < required) {
+            completedRoutes.push({ id: route.id, name: route.name });
+          }
+          if (updated === current) return route;
+          changed = true;
+          return {
+            ...route,
+            constructionProgressPoints: updated,
+          };
+        });
+        const completedRouteIds = new Set(completedRoutes.map((item) => item.id));
+        const nextEdges = prev.edges.map((edge) => {
+          if (!edge.routeId || !completedRouteIds.has(edge.routeId)) return edge;
+          if (edge.active === true) return edge;
+          changed = true;
+          return { ...edge, active: true };
+        });
+        return changed ? { ...prev, routes: nextRoutes, edges: nextEdges } : prev;
+      });
+    }
+
+    completedRoutes.forEach((route) => {
+      addEvent({
+        category: 'economy',
+        message: `Строительство маршрута завершено: ${route.name}.`,
+        countryId,
+        priority: 'medium',
+      });
     });
 
     setCountries((prev) =>
@@ -778,7 +1644,7 @@ function App() {
             agreement.guestCountryId;
           addEvent({
             category: 'diplomacy',
-            message: `Срок договора ${hostName} ↔ ${guestName} истек. Отправлен запрос продления обеим сторонам.`,
+            message: `пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ ${hostName} - ${guestName} пїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.`,
             countryId: agreement.hostCountryId,
             priority: 'low',
           });
@@ -787,6 +1653,74 @@ function App() {
       setDiplomacyAgreements(activeAgreements);
       if (renewalProposals.length > 0) {
         setDiplomacyProposals((prev) => [...prev, ...renewalProposals]);
+      }
+
+      const marketCapitalGraceTurns = Math.max(
+        1,
+        gameSettings.marketCapitalGraceTurns ?? 3,
+      );
+      if (markets.length > 0) {
+        const nextMarkets: Market[] = [];
+        let marketsChanged = false;
+        markets.forEach((market) => {
+          const capitalId = market.capitalProvinceId;
+          const capitalProvince = capitalId ? provinces[capitalId] : undefined;
+          const hasValidCapital = Boolean(
+            capitalId &&
+              capitalProvince &&
+              capitalProvince.ownerCountryId &&
+              market.memberCountryIds.includes(capitalProvince.ownerCountryId),
+          );
+
+          if (hasValidCapital) {
+            if (market.capitalLostSinceTurn != null) {
+              marketsChanged = true;
+              nextMarkets.push({ ...market, capitalLostSinceTurn: undefined });
+              addEvent({
+                category: 'economy',
+                message: `Столица рынка "${market.name}" снова назначена. Таймер удаления сброшен.`,
+                countryId: market.creatorCountryId,
+                priority: 'low',
+              });
+            } else {
+              nextMarkets.push(market);
+            }
+            return;
+          }
+
+          const lostSinceTurn = market.capitalLostSinceTurn ?? nextTurn;
+          const turnsWithoutCapital = nextTurn - lostSinceTurn;
+          const turnsLeft = Math.max(0, marketCapitalGraceTurns - turnsWithoutCapital);
+
+          if (turnsWithoutCapital >= marketCapitalGraceTurns) {
+            marketsChanged = true;
+            addEvent({
+              category: 'economy',
+              message: `Рынок "${market.name}" удален: новая столица не назначена в срок (${marketCapitalGraceTurns} ход.).`,
+              countryId: market.creatorCountryId,
+              priority: 'medium',
+            });
+            return;
+          }
+
+          if (market.capitalLostSinceTurn == null) {
+            marketsChanged = true;
+            addEvent({
+              category: 'economy',
+              message: `Рынок "${market.name}" потерял столицу. Назначьте новую в течение ${turnsLeft} ход.`,
+              countryId: market.creatorCountryId,
+              priority: 'high',
+            });
+          }
+
+          nextMarkets.push({
+            ...market,
+            capitalLostSinceTurn: lostSinceTurn,
+          });
+        });
+        if (marketsChanged) {
+          setMarkets(nextMarkets);
+        }
       }
     }
   };
@@ -806,11 +1740,14 @@ function App() {
       regions,
       cultures,
       resources,
+      resourceCategories,
       buildings,
       industries,
       companies,
       diplomacy: diplomacyAgreements,
       diplomacyProposals,
+      logistics,
+      markets,
       settings: gameSettings,
       eventLog,
     }),
@@ -828,11 +1765,14 @@ function App() {
       regions,
       cultures,
       resources,
+      resourceCategories,
       buildings,
       industries,
       companies,
       diplomacyAgreements,
       diplomacyProposals,
+      logistics,
+      markets,
       gameSettings,
       eventLog,
     ],
@@ -889,7 +1829,7 @@ function App() {
     setActiveCountryId(
       save.data.activeCountryId ?? save.data.countries[0]?.id ?? undefined,
     );
-    setMapLayers(save.data.mapLayers ?? initialMapLayers);
+    setMapLayers(ensureMarketsMapLayer(save.data.mapLayers ?? initialMapLayers));
     setSelectedProvinceId(save.data.selectedProvinceId);
     setProvinces(normalizeProvinceRecord(save.data.provinces ?? {}));
     setClimates(save.data.climates ?? climates);
@@ -898,34 +1838,153 @@ function App() {
     setContinents(save.data.continents ?? continents);
     setRegions(save.data.regions ?? regions);
     setCultures(save.data.cultures ?? cultures);
-    setResources(save.data.resources ?? resources);
+    const loadedResourceCategories =
+      save.data.resourceCategories && save.data.resourceCategories.length > 0
+        ? save.data.resourceCategories
+        : defaultResourceCategories;
+    setResourceCategories(loadedResourceCategories);
+    const validResourceCategoryIds = new Set(
+      loadedResourceCategories.map((category) => category.id),
+    );
+    setResources(
+      (save.data.resources ?? resources).map((item) => ({
+        ...item,
+        resourceCategoryId:
+          item.resourceCategoryId &&
+          validResourceCategoryIds.has(item.resourceCategoryId)
+            ? item.resourceCategoryId
+            : undefined,
+      })),
+    );
     setBuildings(save.data.buildings ?? buildings);
     setIndustries(save.data.industries ?? industries);
     setCompanies(save.data.companies ?? companies);
     setDiplomacyAgreements(save.data.diplomacy ?? []);
     setDiplomacyProposals(save.data.diplomacyProposals ?? []);
-    setGameSettings(
-      save.data.settings ?? {
-        colonizationPointsPerTurn: 10,
-        constructionPointsPerTurn: 10,
-        demolitionCostPercent: 20,
-        eventLogRetainTurns: 3,
-        diplomacyProposalExpireTurns: 3,
-        startingColonizationPoints: 100,
-        startingConstructionPoints: 100,
-        sciencePointsPerTurn: 0,
-        culturePointsPerTurn: 0,
-        religionPointsPerTurn: 0,
-        goldPerTurn: 0,
-        ducatsPerTurn: 0,
-        startingSciencePoints: 0,
-        startingCulturePoints: 0,
-        startingReligionPoints: 0,
-        startingGold: 0,
-        startingDucats: 100000,
-        colonizationMaxActive: 0,
-      },
-    );
+    setMarkets(() => {
+      const loaded = save.data.markets ?? [];
+      const validCountryIds = new Set(
+        (save.data.countries ?? []).map((country) => country.id),
+      );
+      const validProvinceIds = new Set(
+        Object.keys(save.data.provinces ?? {}),
+      );
+      const validResourceIds = new Set(
+        (save.data.resources ?? []).map((resource) => resource.id),
+      );
+      return loaded
+        .map((market) => {
+          if (!validCountryIds.has(market.leaderCountryId)) return null;
+          const members = Array.from(
+            new Set(
+              [
+                market.leaderCountryId,
+                ...(market.memberCountryIds ?? []),
+              ].filter((countryId) => validCountryIds.has(countryId)),
+            ),
+          );
+          return {
+            ...market,
+            creatorCountryId:
+              market.creatorCountryId && validCountryIds.has(market.creatorCountryId)
+                ? market.creatorCountryId
+                : market.leaderCountryId,
+            color:
+              market.color ??
+              (save.data.countries ?? []).find(
+                (country) => country.id === market.leaderCountryId,
+              )?.color ??
+              '#22c55e',
+            logoDataUrl: market.logoDataUrl,
+            memberCountryIds: members,
+            warehouseByResourceId: Object.fromEntries(
+              Object.entries(market.warehouseByResourceId ?? {}).filter(
+                ([resourceId, amount]) =>
+                  validResourceIds.has(resourceId) &&
+                  Number.isFinite(amount) &&
+                  Number(amount) > 0,
+              ),
+            ),
+            capitalProvinceId:
+              market.capitalProvinceId &&
+              validProvinceIds.has(market.capitalProvinceId)
+                ? market.capitalProvinceId
+                : undefined,
+            capitalLostSinceTurn:
+              typeof market.capitalLostSinceTurn === 'number'
+                ? market.capitalLostSinceTurn
+                : undefined,
+          };
+        })
+        .filter(Boolean) as Market[];
+    });
+    setLogistics(() => {
+      const base = createDefaultLogisticsState();
+      const loaded = save.data.logistics;
+      if (!loaded) return base;
+      return {
+        ...base,
+        ...loaded,
+        routeTypes:
+          loaded.routeTypes && loaded.routeTypes.length > 0
+            ? loaded.routeTypes.map((item) => ({
+                ...item,
+                constructionCostPerSegment:
+                  item.constructionCostPerSegment ?? 0,
+                allowProvinceSkipping: item.allowProvinceSkipping ?? false,
+                requiredBuildingIds: item.requiredBuildingIds ?? [],
+                requiredBuildingsMode: item.requiredBuildingsMode ?? 'all',
+                landscape: item.landscape ?? { anyOf: [], noneOf: [] },
+                allowAllLandscapes: item.allowAllLandscapes ?? true,
+                marketAccessCategoryIds: (item.marketAccessCategoryIds ?? []).filter(
+                  (categoryId) => validResourceCategoryIds.has(categoryId),
+                ),
+                allowAllMarketCategories: item.allowAllMarketCategories ?? true,
+                transportCapacityPerLevelByCategory: {
+                  ...(item.transportCapacityPerLevelByCategory ?? {}),
+                },
+              }))
+            : base.routeTypes,
+        routes: (loaded.routes ?? []).map((route) => {
+          const required = Math.max(
+            0,
+            route.constructionRequiredPoints ?? 0,
+          );
+          const progress =
+            route.constructionProgressPoints == null
+              ? required
+              : Math.max(0, route.constructionProgressPoints);
+          return {
+            ...route,
+            constructionRequiredPoints: required,
+            constructionProgressPoints: Math.min(progress, required),
+            level: Math.max(1, Math.floor(route.level ?? 1)),
+          };
+        }),
+      };
+    });
+    setGameSettings({
+      colonizationPointsPerTurn: 10,
+      constructionPointsPerTurn: 10,
+      demolitionCostPercent: 20,
+      eventLogRetainTurns: 3,
+      diplomacyProposalExpireTurns: 3,
+      marketCapitalGraceTurns: 3,
+      startingColonizationPoints: 100,
+      startingConstructionPoints: 100,
+      sciencePointsPerTurn: 0,
+      culturePointsPerTurn: 0,
+      religionPointsPerTurn: 0,
+      goldPerTurn: 0,
+      ducatsPerTurn: 0,
+      startingSciencePoints: 0,
+      startingCulturePoints: 0,
+      startingReligionPoints: 0,
+      startingGold: 0,
+      startingDucats: 100000,
+      colonizationMaxActive: 0,
+      ...(save.data.settings ?? {}),
+    });
     setEventLog(normalizeEventLog(save.data.eventLog));
     setSavePanelOpen(false);
   };
@@ -1003,7 +2062,7 @@ function App() {
     setTurn(1);
     setCountries([]);
     setActiveCountryId(undefined);
-    setMapLayers(initialMapLayers);
+    setMapLayers(ensureMarketsMapLayer(initialMapLayers));
     setSelectedProvinceId(undefined);
     setProvinces({});
     setClimates([
@@ -1025,17 +2084,21 @@ function App() {
       { id: createId(), name: 'Р®Р¶Р°РЅРµ', color: '#f97316' },
     ]);
     setResources([]);
+    setResourceCategories(defaultResourceCategories);
     setBuildings([]);
     setIndustries([]);
     setCompanies([]);
     setDiplomacyAgreements([]);
     setDiplomacyProposals([]);
+    setMarkets([]);
+    setLogistics(createDefaultLogisticsState());
     setGameSettings({
       colonizationPointsPerTurn: 10,
       constructionPointsPerTurn: 10,
       demolitionCostPercent: 20,
       eventLogRetainTurns: 3,
       diplomacyProposalExpireTurns: 3,
+      marketCapitalGraceTurns: 3,
       startingColonizationPoints: 100,
       startingConstructionPoints: 100,
       sciencePointsPerTurn: 0,
@@ -1138,10 +2201,64 @@ function App() {
     });
   };
 
-  const layerPaint: MapLayerPaint = useMemo(() => {
+  const needsAdjacencyComputation = useMemo(
+    () =>
+      Object.values(provinces).some(
+        (province) =>
+          !province.adjacentProvinceIds ||
+          province.adjacentProvinceIds.length === 0,
+      ),
+    [provinces],
+  );
+
+  const persistProvinceAdjacency = useCallback(
+    (adjacency: Record<string, string[]>) => {
+      setProvinces((prev) => {
+        let changed = false;
+        const next: ProvinceRecord = { ...prev };
+        Object.entries(adjacency).forEach(([provinceId, neighbors]) => {
+          const province = next[provinceId];
+          if (!province) return;
+          const normalized = Array.from(new Set(neighbors)).sort();
+          const current = (province.adjacentProvinceIds ?? []).slice().sort();
+          if (
+            current.length !== normalized.length ||
+            current.some((id, idx) => id !== normalized[idx])
+          ) {
+            next[provinceId] = {
+              ...province,
+              adjacentProvinceIds: normalized,
+            };
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    },
+    [],
+  );
+
+  const shouldComputeAdjacency =
+    needsAdjacencyComputation || adjacencyRecomputeRequested;
+
+  const handleProvinceAdjacencyDetected = useCallback(
+    (adjacency: Record<string, string[]>) => {
+      persistProvinceAdjacency(adjacency);
+      setAdjacencyRecomputeRequested(false);
+    },
+    [persistProvinceAdjacency],
+  );
+
+const layerPaint: MapLayerPaint = useMemo(() => {
     const paint: MapLayerPaint = {};
     mapLayers.forEach((layer) => {
       paint[layer.id] = {};
+    });
+    const marketByCountry = new Map<string, Market>();
+    markets.forEach((market) => {
+      market.memberCountryIds.forEach((countryId) => {
+        marketByCountry.set(countryId, market);
+      });
     });
 
     Object.values(provinces).forEach((province) => {
@@ -1216,11 +2333,19 @@ function App() {
           }
         }
       }
+      if (province.ownerCountryId) {
+        const market = marketByCountry.get(province.ownerCountryId);
+        if (market) {
+          paint.markets ??= {};
+          paint.markets[province.id] = market.color;
+        }
+      }
     });
 
     return paint;
   }, [
     countries,
+    markets,
     mapLayers,
     provinces,
     climates,
@@ -1344,6 +2469,10 @@ function App() {
     legends.resources = selectedResource
       ? [{ label: selectedResource.name, color: selectedResource.color }]
       : [];
+    legends.markets = markets.slice(0, 8).map((market) => ({
+      label: market.name,
+      color: market.color,
+    }));
     legends.political = countries.slice(0, 5).map((item) => ({
       label: item.name,
       color: item.color,
@@ -1382,6 +2511,7 @@ function App() {
     regions,
     cultures,
     resources,
+    markets,
     selectedResourceId,
     countries,
   ]);
@@ -1389,6 +2519,269 @@ function App() {
   const selectedProvince = selectedProvinceId
     ? provinces[selectedProvinceId]
     : undefined;
+  const marketCapitals = useMemo(
+    () =>
+      markets
+        .filter((market) => market.capitalProvinceId)
+        .map((market) => ({
+          provinceId: market.capitalProvinceId as string,
+          marketId: market.id,
+          marketName: market.name,
+          color: market.color,
+          logoDataUrl: market.logoDataUrl,
+        }))
+        .filter((entry) => Boolean(provinces[entry.provinceId])),
+    [markets, provinces],
+  );
+  const logisticsDraftRouteType = logisticsRouteDraft
+    ? logistics.routeTypes.find((item) => item.id === logisticsRouteDraft.routeTypeId)
+    : undefined;
+  const logisticsDraftSegmentCost = Math.max(
+    0,
+    Math.floor(logisticsDraftRouteType?.constructionCostPerSegment ?? 0),
+  );
+  const logisticsDraftTotalCost = Math.max(
+    0,
+    (logisticsRouteProvinceIds.length - 1) * logisticsDraftSegmentCost,
+  );
+  const selectedProvinceRouteConstructionProgress = useMemo(() => {
+    if (!selectedProvinceId) return [];
+    return logistics.routes
+      .filter((route) => route.provinceIds.includes(selectedProvinceId))
+      .map((route) => {
+        const required = Math.max(0, route.constructionRequiredPoints ?? 0);
+        const progress = Math.max(
+          0,
+          route.constructionProgressPoints ?? required,
+        );
+        return {
+          routeName: route.name,
+          progressPoints: progress,
+          requiredPoints: required,
+        };
+      })
+      .filter((entry) => entry.requiredPoints > 0 && entry.progressPoints < entry.requiredPoints);
+  }, [selectedProvinceId, logistics.routes]);
+  const activeCountryMarket = useMemo(() => {
+    if (!activeCountryId) return undefined;
+    return markets.find((market) => market.memberCountryIds.includes(activeCountryId));
+  }, [markets, activeCountryId]);
+  const selectedProvinceMarketAccessByCategory = useMemo<
+    | {
+      categoryId: string;
+      categoryName: string;
+      categoryColor?: string;
+      status: 'available' | 'unavailable';
+      points: number;
+    }[]
+    | undefined
+  >(() => {
+    if (!selectedProvinceId || !activeCountryId) return undefined;
+    const selected = provinces[selectedProvinceId];
+    if (!selected || selected.ownerCountryId !== activeCountryId) return undefined;
+    if (resourceCategories.length === 0) return [];
+
+    const base = resourceCategories.map((category) => ({
+      categoryId: category.id,
+      categoryName: category.name,
+      categoryColor: category.color,
+      status: 'unavailable' as const,
+      points: 0,
+    }));
+
+    const capitalId = activeCountryMarket?.capitalProvinceId;
+    if (!capitalId || !provinces[capitalId]) return base;
+
+    const parseProvinceNodeId = (nodeId: string) =>
+      nodeId.startsWith('province:') ? nodeId.slice('province:'.length) : undefined;
+    const routeById = new Map(logistics.routes.map((route) => [route.id, route]));
+    const routeTypeById = new Map(
+      logistics.routeTypes.map((routeType) => [routeType.id, routeType]),
+    );
+    const routeAllowsCategory = (routeId: string, categoryId: string) => {
+      const route = routeById.get(routeId);
+      if (!route) return false;
+      const routeType = routeTypeById.get(route.routeTypeId);
+      if (!routeType) return true;
+      if (routeType.allowAllMarketCategories ?? true) return true;
+      return (routeType.marketAccessCategoryIds ?? []).includes(categoryId);
+    };
+
+    return base.map((entry) => {
+      const graph = new Map<string, Set<string>>();
+      const addLink = (from: string, to: string) => {
+        if (!graph.has(from)) {
+          graph.set(from, new Set<string>());
+        }
+        graph.get(from)?.add(to);
+      };
+
+      logistics.edges.forEach((edge) => {
+        if (!edge.routeId) return;
+        if (edge.active === false) return;
+        if (!routeAllowsCategory(edge.routeId, entry.categoryId)) return;
+        const fromProvinceId = parseProvinceNodeId(edge.fromNodeId);
+        const toProvinceId = parseProvinceNodeId(edge.toNodeId);
+        if (!fromProvinceId || !toProvinceId) return;
+        if (!provinces[fromProvinceId] || !provinces[toProvinceId]) return;
+        addLink(fromProvinceId, toProvinceId);
+        addLink(toProvinceId, fromProvinceId);
+      });
+
+      const visited = new Set<string>();
+      const queue: string[] = [capitalId];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (!current || visited.has(current)) continue;
+        visited.add(current);
+        const neighbours = graph.get(current);
+        if (!neighbours) continue;
+        neighbours.forEach((provinceId) => {
+          if (!visited.has(provinceId)) {
+            queue.push(provinceId);
+          }
+        });
+      }
+
+      return {
+        ...entry,
+        status: visited.has(selectedProvinceId) ? 'available' : 'unavailable',
+        points: Math.max(
+          0,
+          provinces[selectedProvinceId]?.logisticsPointsByCategory?.[entry.categoryId] ?? 0,
+        ),
+      };
+    });
+  }, [
+    selectedProvinceId,
+    activeCountryId,
+    provinces,
+    resourceCategories,
+    activeCountryMarket,
+    logistics.edges,
+    logistics.routes,
+    logistics.routeTypes,
+  ]);
+
+  const isAgreementActive = (agreement: DiplomacyAgreement) => {
+    if (!agreement.durationTurns || agreement.durationTurns <= 0) return true;
+    if (!agreement.startTurn) return true;
+    return turn - agreement.startTurn < agreement.durationTurns;
+  };
+
+  const hasRouteBuildAccessByAgreement = (
+    hostCountryId: string,
+    guestCountryId: string,
+    provinceId: string,
+    routeTypeId?: string,
+  ) =>
+    diplomacyAgreements.some((agreement) => {
+      if (!isAgreementActive(agreement)) return false;
+      const terms = resolveAgreementTerms(agreement, hostCountryId, guestCountryId);
+      if (!terms) return false;
+      const category = terms.agreementCategory ?? 'construction';
+      if (category !== 'logistics') return false;
+      const allowsState = terms.allowState ?? terms.kind === 'state';
+      if (!allowsState) return false;
+      if (terms.routeTypeIds && terms.routeTypeIds.length > 0) {
+        if (!routeTypeId || !terms.routeTypeIds.includes(routeTypeId)) return false;
+      }
+      if (terms.provinceIds && terms.provinceIds.length > 0) {
+        return terms.provinceIds.includes(provinceId);
+      }
+      return true;
+    });
+
+  const countRouteUsageOnHost = (
+    hostCountryId: string,
+    guestCountryId: string,
+    routeTypeId: string,
+    candidateProvinceIds?: string[],
+  ) => {
+    let routes = 0;
+    let segments = 0;
+    logistics.routes.forEach((route) => {
+      if (route.ownerCountryId !== guestCountryId) return;
+      if (route.routeTypeId !== routeTypeId) return;
+      let routeSegmentsOnHost = 0;
+      for (let i = 1; i < route.provinceIds.length; i += 1) {
+        const provinceId = route.provinceIds[i];
+        if (provinces[provinceId]?.ownerCountryId === hostCountryId) {
+          routeSegmentsOnHost += 1;
+        }
+      }
+      if (routeSegmentsOnHost > 0) {
+        routes += 1;
+        segments += routeSegmentsOnHost;
+      }
+    });
+    if (candidateProvinceIds && candidateProvinceIds.length > 1) {
+      let candidateSegmentsOnHost = 0;
+      for (let i = 1; i < candidateProvinceIds.length; i += 1) {
+        const provinceId = candidateProvinceIds[i];
+        if (provinces[provinceId]?.ownerCountryId === hostCountryId) {
+          candidateSegmentsOnHost += 1;
+        }
+      }
+      if (candidateSegmentsOnHost > 0) {
+        routes += 1;
+        segments += candidateSegmentsOnHost;
+      }
+    }
+    return { routes, segments };
+  };
+
+  const hasRouteBuildAccessByAgreementForPath = (
+    hostCountryId: string,
+    guestCountryId: string,
+    routeTypeId: string,
+    provinceIds: string[],
+  ) => {
+    const hostPathProvinceIds = provinceIds.filter(
+      (provinceId) => provinces[provinceId]?.ownerCountryId === hostCountryId,
+    );
+    if (hostPathProvinceIds.length === 0) return true;
+    return diplomacyAgreements.some((agreement) => {
+      if (!isAgreementActive(agreement)) return false;
+      const terms = resolveAgreementTerms(agreement, hostCountryId, guestCountryId);
+      if (!terms) return false;
+      const category = terms.agreementCategory ?? 'construction';
+      if (category !== 'logistics') return false;
+      const allowsState = terms.allowState ?? terms.kind === 'state';
+      if (!allowsState) return false;
+      if (terms.routeTypeIds && terms.routeTypeIds.length > 0) {
+        if (!terms.routeTypeIds.includes(routeTypeId)) return false;
+      }
+      if (terms.provinceIds && terms.provinceIds.length > 0) {
+        const allPathProvincesCovered = hostPathProvinceIds.every((provinceId) =>
+          terms.provinceIds?.includes(provinceId),
+        );
+        if (!allPathProvincesCovered) return false;
+      }
+      const perTypeLimits = terms.logisticsRouteLimits?.[routeTypeId];
+      if (perTypeLimits) {
+        const usage = countRouteUsageOnHost(
+          hostCountryId,
+          guestCountryId,
+          routeTypeId,
+          provinceIds,
+        );
+        if (
+          (perTypeLimits.maxRoutes ?? 0) > 0 &&
+          usage.routes > (perTypeLimits.maxRoutes ?? 0)
+        ) {
+          return false;
+        }
+        if (
+          (perTypeLimits.maxSegments ?? 0) > 0 &&
+          usage.segments > (perTypeLimits.maxSegments ?? 0)
+        ) {
+          return false;
+        }
+      }
+      return true;
+    });
+  };
 
   const toggleLayer = (id: string) => {
     setMapLayers((prev) => {
@@ -1753,6 +3146,40 @@ function App() {
     });
   };
 
+  const applyMarketMembershipByAgreement = (
+    agreement: Omit<DiplomacyAgreement, 'id'>,
+  ) => {
+    const category = agreement.agreementCategory ?? 'construction';
+    if (category !== 'market_invite' && category !== 'market') return;
+    const leaderCountryId = agreement.marketLeaderCountryId ?? agreement.hostCountryId;
+    const guestCountryId =
+      agreement.hostCountryId === leaderCountryId
+        ? agreement.guestCountryId
+        : agreement.hostCountryId;
+    if (!leaderCountryId || !guestCountryId || leaderCountryId === guestCountryId) {
+      return;
+    }
+    setMarkets((prev) => {
+      const targetMarket = prev.find(
+        (market) => market.leaderCountryId === leaderCountryId,
+      );
+      if (!targetMarket) return prev;
+      return prev
+        .map((market) => ({
+          ...market,
+          memberCountryIds:
+            market.id === targetMarket.id
+              ? Array.from(new Set([...market.memberCountryIds, guestCountryId]))
+              : market.memberCountryIds.filter((id) => id !== guestCountryId),
+        }))
+        .filter(
+          (market) =>
+            market.memberCountryIds.length > 0 &&
+            market.memberCountryIds.includes(market.leaderCountryId),
+        );
+    });
+  };
+
   const addDiplomacyProposal = (
     payload: Omit<DiplomacyProposal, 'id' | 'createdTurn'>,
   ) => {
@@ -1778,6 +3205,45 @@ function App() {
       priority: 'low',
     });
     setDiplomacySentNotice({ open: true, toCountryName: toName });
+  };
+
+  const inviteCountryToMarketByTreaty = (targetCountryId: string) => {
+    if (!activeCountryId || !targetCountryId || activeCountryId === targetCountryId) {
+      return;
+    }
+    const ownMarket = markets.find(
+      (market) => market.leaderCountryId === activeCountryId,
+    );
+    if (!ownMarket) return;
+    if (ownMarket.creatorCountryId !== activeCountryId) return;
+    if (ownMarket.memberCountryIds.includes(targetCountryId)) return;
+    const alreadyAssigned = markets.some((market) =>
+      market.memberCountryIds.includes(targetCountryId),
+    );
+    if (alreadyAssigned) return;
+    const existingInvite = diplomacyProposals.some((proposal) => {
+      const category = proposal.agreement.agreementCategory ?? 'construction';
+      return (
+        (category === 'market_invite' || category === 'market') &&
+        proposal.fromCountryId === activeCountryId &&
+        proposal.toCountryId === targetCountryId &&
+        proposal.agreement.marketLeaderCountryId === activeCountryId
+      );
+    });
+    if (existingInvite) return;
+    addDiplomacyProposal({
+      fromCountryId: activeCountryId,
+      toCountryId: targetCountryId,
+      agreement: {
+        title: `Приглашение в рынок ${ownMarket.name}`,
+        hostCountryId: activeCountryId,
+        guestCountryId: targetCountryId,
+        agreementCategory: 'market_invite',
+        marketLeaderCountryId: activeCountryId,
+        allowState: true,
+        allowCompanies: false,
+      },
+    });
   };
 
   const acceptDiplomacyProposal = (proposalId: string) => {
@@ -1837,22 +3303,30 @@ function App() {
       ...proposal.agreement,
       counterTerms: proposal.counterAgreement
         ? {
+            agreementCategory: proposal.counterAgreement.agreementCategory,
+            marketLeaderCountryId: proposal.counterAgreement.marketLeaderCountryId,
             kind: proposal.counterAgreement.kind,
             allowState: proposal.counterAgreement.allowState,
             allowCompanies: proposal.counterAgreement.allowCompanies,
             companyIds: proposal.counterAgreement.companyIds,
             buildingIds: proposal.counterAgreement.buildingIds,
+            routeTypeIds: proposal.counterAgreement.routeTypeIds,
+            logisticsRouteLimits: proposal.counterAgreement.logisticsRouteLimits,
             provinceIds: proposal.counterAgreement.provinceIds,
             industries: proposal.counterAgreement.industries,
             limits: proposal.counterAgreement.limits,
           }
         : proposal.reciprocal
           ? {
+              agreementCategory: proposal.agreement.agreementCategory,
+              marketLeaderCountryId: proposal.agreement.marketLeaderCountryId,
               kind: proposal.agreement.kind,
               allowState: proposal.agreement.allowState,
               allowCompanies: proposal.agreement.allowCompanies,
               companyIds: proposal.agreement.companyIds,
               buildingIds: proposal.agreement.buildingIds,
+              routeTypeIds: proposal.agreement.routeTypeIds,
+              logisticsRouteLimits: proposal.agreement.logisticsRouteLimits,
               provinceIds: proposal.agreement.provinceIds,
               industries: proposal.agreement.industries,
               limits: proposal.agreement.limits,
@@ -1860,6 +3334,7 @@ function App() {
           : undefined,
     };
     applyDiplomacyAgreement(mergedAgreement);
+    applyMarketMembershipByAgreement(mergedAgreement);
     setDiplomacyProposals((prev) =>
       prev.filter((entry) => entry.id !== proposalId),
     );
@@ -2040,7 +3515,12 @@ function App() {
             agreement,
             terms: resolveAgreementTerms(agreement, hostId, ownerCountryId),
           }))
-          .filter((entry) => entry.terms != null);
+          .filter(
+            (entry) =>
+              entry.terms != null &&
+              (entry.terms.agreementCategory ?? 'construction') ===
+                'construction',
+          );
         if (matchesWithTerms.length === 0) return false;
 
         const industryAllowed = (
@@ -2609,8 +4089,62 @@ function App() {
     });
   };
 
-  const addResource = (name: string, color: string, iconDataUrl?: string) => {
-    setResources((prev) => [...prev, { id: createId(), name, color, iconDataUrl }]);
+  const addResource = (
+    name: string,
+    color: string,
+    iconDataUrl?: string,
+    resourceCategoryId?: string,
+  ) => {
+    setResources((prev) => [
+      ...prev,
+      { id: createId(), name, color, iconDataUrl, resourceCategoryId },
+    ]);
+  };
+
+  const addResourceCategory = (name: string, color?: string) => {
+    setResourceCategories((prev) => [
+      ...prev,
+      { id: createId(), name, color: color || '#38bdf8' },
+    ]);
+  };
+
+  const updateResourceCategory = (resourceId: string, resourceCategoryId?: string) => {
+    setResources((prev) =>
+      prev.map((item) =>
+        item.id === resourceId ? { ...item, resourceCategoryId } : item,
+      ),
+    );
+  };
+
+  const updateResourceCategoryColor = (id: string, color: string) => {
+    setResourceCategories((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, color } : item)),
+    );
+  };
+
+  const deleteResourceCategory = (id: string) => {
+    setResourceCategories((prev) => prev.filter((item) => item.id !== id));
+    setResources((prev) =>
+      prev.map((item) =>
+        item.resourceCategoryId === id
+          ? { ...item, resourceCategoryId: undefined }
+          : item,
+      ),
+    );
+    setLogistics((prev) => ({
+      ...prev,
+      routeTypes: prev.routeTypes.map((item) => ({
+        ...item,
+        marketAccessCategoryIds: (item.marketAccessCategoryIds ?? []).filter(
+          (categoryId) => categoryId !== id,
+        ),
+        transportCapacityPerLevelByCategory: Object.fromEntries(
+          Object.entries(item.transportCapacityPerLevelByCategory ?? {}).filter(
+            ([categoryId]) => categoryId !== id,
+          ),
+        ),
+      })),
+    }));
   };
 
   const updateReligionIcon = (id: string, iconDataUrl?: string) => {
@@ -2811,13 +4345,129 @@ function App() {
           colonizationTint={colonizationTint}
           layerLegends={layerLegends}
           resources={resources}
-        buildings={buildings}
+          logisticsNodes={logistics.nodes}
+          logisticsEdges={logistics.edges}
+          logisticsRouteTypes={logistics.routeTypes}
+          logisticsRouteProvinceIds={logisticsRouteProvinceIds}
+          marketCapitals={marketCapitals}
           selectedResourceId={selectedResourceId}
           onSelectResource={setSelectedResourceId}
           selectedId={selectedProvinceId}
           onToggleLayer={toggleLayer}
           onProvincesDetected={ensureProvinces}
+          onProvinceAdjacencyDetected={
+            shouldComputeAdjacency ? handleProvinceAdjacencyDetected : undefined
+          }
           onSelectProvince={(id) => {
+            if (logisticsRoutePlannerActive) {
+              setLogisticsRouteProvinceIds((prev) => {
+                if (prev[prev.length - 1] === id) return prev;
+                const routeType = logistics.routeTypes.find(
+                  (item) => item.id === logisticsRouteDraft?.routeTypeId,
+                );
+                const province = provinces[id];
+                if (!province) {
+                  setRoutePlannerHint('Провинция не найдена в данных карты.');
+                  return prev;
+                }
+                if (!activeCountryId) {
+                  setRoutePlannerHint('???????? ???????? ?????? ??? ????????????? ????????.');
+                  return prev;
+                }
+                const provinceOwnerId = province.ownerCountryId;
+                if (!provinceOwnerId) {
+                  setRoutePlannerHint('??????? ????? ??????? ?????? ? ?????????? ??????????.');
+                  return prev;
+                }
+                if (
+                  provinceOwnerId !== activeCountryId &&
+                  !hasRouteBuildAccessByAgreement(
+                    provinceOwnerId,
+                    activeCountryId,
+                    province.id,
+                    logisticsRouteDraft?.routeTypeId,
+                  )
+                ) {
+                  setRoutePlannerHint('??? ???????????????? ????? ????????????? ???????? ? ???? ?????????.');
+                  return prev;
+                }
+                const requiredBuildingIds = routeType?.requiredBuildingIds ?? [];
+                if (requiredBuildingIds.length > 0) {
+                  const builtIds = new Set(
+                    (province.buildingsBuilt ?? []).map((entry) => entry.buildingId),
+                  );
+                  const mode = routeType?.requiredBuildingsMode ?? 'all';
+                  if (mode === 'all') {
+                    const missing = requiredBuildingIds.filter(
+                      (buildingId) => !builtIds.has(buildingId),
+                    );
+                    if (missing.length > 0) {
+                      const missingName = buildings.find(
+                        (item) => item.id === missing[0],
+                      )?.name;
+                      setRoutePlannerHint(
+                        `??? ???? ????????? ?? ??????? ??????: ${missingName ?? missing[0]}.`,
+                      );
+                      return prev;
+                    }
+                  } else {
+                    const hasAnyRequired = requiredBuildingIds.some((buildingId) =>
+                      builtIds.has(buildingId),
+                    );
+                    if (!hasAnyRequired) {
+                      setRoutePlannerHint(
+                        '??? ???? ????????? ????????? ????? ?? ????????? ??????.',
+                      );
+                      return prev;
+                    }
+                  }
+                }
+                const landscapeAny = routeType?.landscape?.anyOf ?? [];
+                const landscapeNone = routeType?.landscape?.noneOf ?? [];
+                const provinceLandscapeId = province.landscapeId;
+                if (!(routeType?.allowAllLandscapes ?? true)) {
+                  if (
+                    landscapeAny.length > 0 &&
+                    (!provinceLandscapeId || !landscapeAny.includes(provinceLandscapeId))
+                  ) {
+                    setRoutePlannerHint(
+                      '???????? ????????? ?? ???????? ??? ????? ???? ????????.',
+                    );
+                    return prev;
+                  }
+                  if (
+                    provinceLandscapeId &&
+                    landscapeNone.includes(provinceLandscapeId)
+                  ) {
+                    setRoutePlannerHint(
+                      '???? ??? ???????? ???????? ?? ????????? ?????????.',
+                    );
+                    return prev;
+                  }
+                }
+                if (prev.includes(id)) {
+                  setRoutePlannerHint(
+                    'Провинция уже есть в этом маршруте. Выберите другую соседнюю.',
+                  );
+                  return prev;
+                }
+                const lastId = prev[prev.length - 1];
+                if (lastId && !(routeType?.allowProvinceSkipping ?? false)) {
+                  const neighbors = provinces[lastId]?.adjacentProvinceIds ?? [];
+                  if (!neighbors.includes(id)) {
+                    setRoutePlannerHint(
+                      'Нельзя перескочить через провинцию: выберите соседнюю.',
+                    );
+                    return prev;
+                  }
+                }
+                setRoutePlannerHint(undefined);
+                return [...prev, id];
+              });
+              setSelectedProvinceId(id);
+              setInfoPanelOpen(false);
+              return;
+            }
             setSelectedProvinceId(id);
             setInfoPanelOpen(true);
           }}
@@ -2861,10 +4511,148 @@ function App() {
           className="absolute left-1/2 -translate-x-1/2 top-[88px] h-9 px-4 rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-200 text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400/20 hover:border-emerald-300/60 transition-colors z-40"
         >
           <Handshake className="w-4 h-4" />
-          Р”РѕРіРѕРІРѕСЂС‹ ({pendingDiplomacyProposals.length})
+          ???????? ({pendingDiplomacyProposals.length})
         </button>
       )}
       <LeftToolbar />
+      {logisticsRoutePlannerActive && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-24 z-40 rounded-xl border border-cyan-400/40 bg-[#08131f]/90 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-900/30">
+          <div className="px-2">
+            <div className="text-cyan-100/90 text-xs">
+              ????????? ????????: {logisticsRouteProvinceIds.length} ?????
+            </div>
+            <div className="text-cyan-100/70 text-[11px] leading-tight">
+              ???????? ????????? ?? ????? ?? ???????. ??????? ????????, ?????
+              ?????????, ??? ????????, ????? ????????? ??? ?????????.
+            </div>
+            <div className="text-cyan-100/75 text-[11px] leading-tight mt-1">
+              Стоимость: {logisticsDraftTotalCost} (участков: {Math.max(0, logisticsRouteProvinceIds.length - 1)} x {logisticsDraftSegmentCost})
+            </div>
+            {routePlannerHint && (
+              <div className="text-amber-200/90 text-[11px] leading-tight mt-1">
+                {routePlannerHint}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => {
+              if (!logisticsRouteDraft || logisticsRouteProvinceIds.length < 2) {
+                setRoutePlannerHint('Для строительства нужно выбрать минимум 2 провинции.');
+                return;
+              }
+              if (!activeCountryId) {
+                setRoutePlannerHint('Выберите активную страну для строительства.');
+                return;
+              }
+              const draftRouteType = logistics.routeTypes.find(
+                (item) => item.id === logisticsRouteDraft.routeTypeId,
+              );
+              const segmentCount = Math.max(0, logisticsRouteProvinceIds.length - 1);
+              const segmentCost = Math.max(
+                0,
+                Math.floor(draftRouteType?.constructionCostPerSegment ?? 0),
+              );
+              const totalCost = segmentCount * segmentCost;
+              const foreignHostCountryIds = Array.from(
+                new Set(
+                  logisticsRouteProvinceIds
+                    .map((provinceId) => provinces[provinceId]?.ownerCountryId)
+                    .filter(
+                      (ownerId): ownerId is string =>
+                        Boolean(ownerId) && ownerId !== activeCountryId,
+                    ),
+                ),
+              );
+              const blockedHostId = foreignHostCountryIds.find(
+                (hostCountryId) =>
+                  !hasRouteBuildAccessByAgreementForPath(
+                    hostCountryId,
+                    activeCountryId,
+                    logisticsRouteDraft.routeTypeId,
+                    logisticsRouteProvinceIds,
+                  ),
+              );
+              if (blockedHostId) {
+                const blockedCountryName =
+                  countries.find((item) => item.id === blockedHostId)?.name ??
+                  blockedHostId;
+                setRoutePlannerHint(
+                  `Превышены лимиты или нет прав логистического договора для страны ${blockedCountryName}.`,
+                );
+                return;
+              }
+              const startsUnderConstruction = totalCost > 0;
+              const routeId = createId();
+              setLogistics((prev) => ({
+                ...prev,
+                routes: [
+                  ...prev.routes,
+                  {
+                    id: routeId,
+                    name: logisticsRouteDraft.name,
+                    routeTypeId: logisticsRouteDraft.routeTypeId,
+                    provinceIds: logisticsRouteProvinceIds,
+                    ownerCountryId: activeCountryId,
+                    countryStatuses: {},
+                    constructionRequiredPoints: totalCost,
+                    constructionProgressPoints: startsUnderConstruction ? 0 : totalCost,
+                    level: 1,
+                  },
+                ],
+              }));
+              for (let i = 0; i < logisticsRouteProvinceIds.length - 1; i += 1) {
+                const fromProvinceId = logisticsRouteProvinceIds[i];
+                const toProvinceId = logisticsRouteProvinceIds[i + 1];
+                if (
+                  !fromProvinceId ||
+                  !toProvinceId ||
+                  fromProvinceId === toProvinceId
+                ) {
+                  continue;
+                }
+                addLogisticsEdge({
+                  id: createId(),
+                  routeId,
+                  fromNodeId: `province:${fromProvinceId}`,
+                  toNodeId: `province:${toProvinceId}`,
+                  routeTypeId: logisticsRouteDraft.routeTypeId,
+                  active: true,
+                  bidirectional: true,
+                  ownerCountryId: activeCountryId,
+                });
+              }
+              if (startsUnderConstruction) {
+                addEvent({
+                  category: 'economy',
+                  message: `?????? ????????????? ???????? "${logisticsRouteDraft.name}" (${totalCost} ?????).`,
+                  countryId: activeCountryId,
+                  priority: 'low',
+                });
+              }
+              setLogisticsRouteProvinceIds([]);
+              setLogisticsRouteDraft(null);
+              setRoutePlannerHint(undefined);
+              setLogisticsRoutePlannerActive(false);
+              setLogisticsOpen(true);
+            }}
+            className="h-8 px-3 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm"
+          >
+            ??????
+          </button>
+          <button
+            onClick={() => {
+              setLogisticsRoutePlannerActive(false);
+              setLogisticsRouteDraft(null);
+              setLogisticsRouteProvinceIds([]);
+              setRoutePlannerHint(undefined);
+              setLogisticsOpen(true);
+            }}
+            className="h-8 px-3 rounded-lg border border-white/15 bg-black/30 text-white/80 text-sm"
+          >
+            ??????
+          </button>
+        </div>
+      )}
 
       {diplomacySentNotice.open && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn">
@@ -2994,6 +4782,8 @@ function App() {
               ? provinces[selectedProvinceId]?.colonizationCost
               : undefined
           }
+          routeConstructionProgress={selectedProvinceRouteConstructionProgress}
+          marketAccessByCategory={selectedProvinceMarketAccessByCategory}
         />
       )}
 
@@ -3001,6 +4791,7 @@ function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenIndustry={() => setIndustryOpen(true)}
         onOpenDiplomacy={() => setDiplomacyOpen(true)}
+        onOpenMarkets={() => setMarketsOpen(true)}
       />
       <EventLogPanel activeCountryId={activeCountryId} countries={countries} />
 
@@ -3027,6 +4818,62 @@ function App() {
             setAdminOpen(true);
           }
         }}
+        onOpenLogistics={() => {
+          if (contextMenu?.provinceId) {
+            setSelectedProvinceId(contextMenu.provinceId);
+          }
+          setLogisticsRouteProvinceIds([]);
+          setLogisticsRoutePlannerActive(false);
+          setLogisticsRouteDraft(null);
+          setRoutePlannerHint(undefined);
+          setLogisticsOpen(true);
+        }}
+      />
+
+      <LogisticsModal
+        open={logisticsOpen}
+        provinces={provinces}
+        countries={countries}
+        routeTypes={logistics.routeTypes}
+        routes={logistics.routes}
+        activeCountryId={activeCountryId}
+        demolitionCostPercent={gameSettings.demolitionCostPercent ?? 20}
+        onSetRouteStatus={setRouteCountryStatus}
+        onSetRouteLevel={setRouteLevel}
+        onDemolishRoute={demolishLogisticsRoute}
+        onClose={() => {
+          setLogisticsOpen(false);
+          setLogisticsRoutePlannerActive(false);
+          setLogisticsRouteDraft(null);
+          setLogisticsRouteProvinceIds([]);
+          setRoutePlannerHint(undefined);
+        }}
+        onStartRouteBuild={(payload) => {
+          setLogisticsRouteDraft({
+            name: payload.name,
+            routeTypeId: payload.routeTypeId,
+          });
+          setLogisticsRouteProvinceIds([]);
+          setRoutePlannerHint(undefined);
+          setLogisticsOpen(false);
+          setLogisticsRoutePlannerActive(true);
+        }}
+      />
+      <MarketsModal
+        open={marketsOpen}
+        countries={countries}
+        markets={markets}
+        provinces={provinces}
+        resources={resources}
+        proposals={diplomacyProposals}
+        activeCountryId={activeCountryId}
+        onClose={() => setMarketsOpen(false)}
+        onCreateMarket={addMarket}
+        onUpdateMarket={updateMarket}
+        onDeleteMarket={deleteMarket}
+        onLeaveMarket={leaveMarket}
+        onTradeWithWarehouse={tradeWithMarketWarehouse}
+        onInviteByTreaty={inviteCountryToMarketByTreaty}
       />
 
       <HotseatPanel
@@ -3109,6 +4956,8 @@ function App() {
         open={settingsOpen}
         settings={gameSettings}
         onChange={setGameSettings}
+        onRecomputeAdjacency={() => setAdjacencyRecomputeRequested(true)}
+        adjacencyNeedsComputation={needsAdjacencyComputation}
         onClose={() => setSettingsOpen(false)}
       />
 
@@ -3277,6 +5126,7 @@ function App() {
         provinces={provinces}
         buildings={buildings}
         companies={companies}
+        routeTypes={logistics.routeTypes}
         agreements={diplomacyAgreements}
         proposals={diplomacyProposals}
         turn={turn}
@@ -3293,6 +5143,7 @@ function App() {
         industries={industries}
         buildings={buildings}
         companies={companies}
+        routeTypes={logistics.routeTypes}
         onAccept={(id) => {
           acceptDiplomacyProposal(id);
           setDiplomacyInboxOpen(false);
@@ -3315,9 +5166,11 @@ function App() {
         continents={continents}
         regions={regions}
         cultures={cultures}
+        resourceCategories={resourceCategories}
         resources={resources}
         buildings={buildings}
         industries={industries}
+        routeTypes={logistics.routeTypes}
         companies={companies}
         onClose={() => setAdminOpen(false)}
         onAssignOwner={assignOwner}
@@ -3339,9 +5192,43 @@ function App() {
         onAddContinent={addContinent}
         onAddRegion={addRegion}
         onAddCulture={addCulture}
+        onAddResourceCategory={addResourceCategory}
         onAddResource={addResource}
         onAddBuilding={addBuilding}
         onAddIndustry={addIndustry}
+        onAddRouteType={(
+          name,
+          color,
+          lineWidth,
+          dashPattern,
+          constructionCostPerSegment,
+          allowProvinceSkipping,
+          requiredBuildingIds,
+          landscape,
+          requiredBuildingsMode,
+          allowAllLandscapes,
+          marketAccessCategoryIds,
+          allowAllMarketCategories,
+          transportCapacityPerLevelByCategory,
+        ) =>
+          addLogisticsRouteType({
+            name,
+            color,
+            lineWidth,
+            dashPattern,
+            constructionCostPerSegment,
+            allowProvinceSkipping,
+            requiredBuildingIds,
+            landscape,
+            requiredBuildingsMode,
+            allowAllLandscapes,
+            marketAccessCategoryIds,
+            allowAllMarketCategories,
+            transportCapacityPerLevelByCategory,
+          })
+        }
+        onUpdateRouteType={updateLogisticsRouteType}
+        onDeleteRouteType={deleteLogisticsRouteType}
         onUpdateIndustryIcon={updateIndustryIcon}
         onUpdateIndustryColor={updateIndustryColor}
         onAddCompany={addCompany}
@@ -3374,12 +5261,15 @@ function App() {
         onUpdateResourceColor={(id, color) =>
           updateTraitColor(setResources, id, color)
         }
+        onUpdateResourceCategoryColor={updateResourceCategoryColor}
+        onUpdateResourceCategory={updateResourceCategory}
         onDeleteClimate={deleteClimate}
         onDeleteReligion={deleteReligion}
         onDeleteLandscape={deleteLandscape}
         onDeleteContinent={deleteContinent}
         onDeleteRegion={deleteRegion}
         onDeleteCulture={deleteCulture}
+        onDeleteResourceCategory={deleteResourceCategory}
         onDeleteResource={deleteResource}
         onDeleteBuilding={deleteBuilding}
         onDeleteIndustry={deleteIndustry}
@@ -3391,4 +5281,6 @@ function App() {
 }
 
 export default App;
+
+
 
