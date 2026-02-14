@@ -17,7 +17,7 @@ import IndustryModal from './components/IndustryModal';
 import DiplomacyModal from './components/DiplomacyModal';
 import DiplomacyProposalsModal from './components/DiplomacyProposalsModal';
 import LogisticsModal from './components/LogisticsModal';
-import MarketsModal from './components/MarketsModal';
+import MarketModal from './components/MarketModal';
 import {
   createDefaultLogisticsState,
   ensureBaseLogisticsNodes,
@@ -5588,7 +5588,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           setLogisticsRoutePlannerActive(true);
         }}
       />
-      <MarketsModal
+      <MarketModal
         open={marketsOpen}
         countries={countries}
         markets={markets}
