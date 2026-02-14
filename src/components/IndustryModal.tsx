@@ -1687,21 +1687,23 @@ export default function IndustryModal({
                                         warehouseRows.map((row) => (
                                           <div
                                             key={`warehouse-${card.key}-${row.id}`}
-                                            className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                            className="w-full rounded border border-white/20 bg-white/5 px-2 py-1"
                                           >
-                                            <span className="flex items-center gap-1.5">
-                                              {row.iconDataUrl ? (
-                                                <img
-                                                  src={row.iconDataUrl}
-                                                  alt=""
-                                                  className="w-3.5 h-3.5 rounded object-cover border border-white/10"
-                                                />
-                                              ) : (
-                                                <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
-                                              )}
-                                              <span>{row.name}</span>
-                                            </span>
-                                            <span>{row.actual.toFixed(2)}</span>
+                                            <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                              <span className="flex items-center gap-1.5">
+                                                {row.iconDataUrl ? (
+                                                  <img
+                                                    src={row.iconDataUrl}
+                                                    alt=""
+                                                    className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                  />
+                                                ) : (
+                                                  <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                                )}
+                                                <span>{row.name}</span>
+                                              </span>
+                                              <span className="text-cyan-200">{row.actual.toFixed(2)}</span>
+                                            </div>
                                           </div>
                                         ))
                                       ) : (
@@ -1710,7 +1712,7 @@ export default function IndustryModal({
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                        Потребление (макс / факт)
+                                        Потребление (факт / макс)
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                           План и факт потребления ресурсов за ход.
                                         </span>
@@ -1719,21 +1721,30 @@ export default function IndustryModal({
                                         consumptionRows.map((row) => (
                                           <div
                                             key={`consume-${card.key}-${row.id}`}
-                                            className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                            className="w-full rounded border border-white/20 bg-white/5 px-2 py-1"
                                           >
-                                            <span className="flex items-center gap-1.5">
-                                              {row.iconDataUrl ? (
-                                                <img
-                                                  src={row.iconDataUrl}
-                                                  alt=""
-                                                  className="w-3.5 h-3.5 rounded object-cover border border-white/10"
-                                                />
-                                              ) : (
-                                                <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
-                                              )}
-                                              <span>{row.name}</span>
-                                            </span>
-                                            <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                            <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                              <span className="flex items-center gap-1.5">
+                                                {row.iconDataUrl ? (
+                                                  <img
+                                                    src={row.iconDataUrl}
+                                                    alt=""
+                                                    className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                  />
+                                                ) : (
+                                                  <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                                )}
+                                                <span>{row.name}</span>
+                                              </span>
+                                              <span className="inline-flex items-center gap-1">
+                                                <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                                  факт {row.actual.toFixed(2)}
+                                                </span>
+                                                <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
+                                                  макс {row.planned.toFixed(2)}
+                                                </span>
+                                              </span>
+                                            </div>
                                           </div>
                                         ))
                                       ) : (
@@ -1742,7 +1753,7 @@ export default function IndustryModal({
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                        Добыча (макс / факт)
+                                        Добыча (факт / макс)
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                           План и факт добычи ресурсов за ход.
                                         </span>
@@ -1751,21 +1762,30 @@ export default function IndustryModal({
                                         extractionRows.map((row) => (
                                           <div
                                             key={`extract-${card.key}-${row.id}`}
-                                            className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                            className="w-full rounded border border-white/20 bg-white/5 px-2 py-1"
                                           >
-                                            <span className="flex items-center gap-1.5">
-                                              {row.iconDataUrl ? (
-                                                <img
-                                                  src={row.iconDataUrl}
-                                                  alt=""
-                                                  className="w-3.5 h-3.5 rounded object-cover border border-white/10"
-                                                />
-                                              ) : (
-                                                <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
-                                              )}
-                                              <span>{row.name}</span>
-                                            </span>
-                                            <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                            <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                              <span className="flex items-center gap-1.5">
+                                                {row.iconDataUrl ? (
+                                                  <img
+                                                    src={row.iconDataUrl}
+                                                    alt=""
+                                                    className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                  />
+                                                ) : (
+                                                  <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                                )}
+                                                <span>{row.name}</span>
+                                              </span>
+                                              <span className="inline-flex items-center gap-1">
+                                                <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                                  факт {row.actual.toFixed(2)}
+                                                </span>
+                                                <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
+                                                  макс {row.planned.toFixed(2)}
+                                                </span>
+                                              </span>
+                                            </div>
                                           </div>
                                         ))
                                       ) : (
@@ -1774,7 +1794,7 @@ export default function IndustryModal({
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                        Производство (макс / факт)
+                                        Производство (факт / макс)
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                           План и факт производства ресурсов за ход.
                                         </span>
@@ -1783,21 +1803,30 @@ export default function IndustryModal({
                                         productionRows.map((row) => (
                                           <div
                                             key={`produce-${card.key}-${row.id}`}
-                                            className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                            className="w-full rounded border border-white/20 bg-white/5 px-2 py-1"
                                           >
-                                            <span className="flex items-center gap-1.5">
-                                              {row.iconDataUrl ? (
-                                                <img
-                                                  src={row.iconDataUrl}
-                                                  alt=""
-                                                  className="w-3.5 h-3.5 rounded object-cover border border-white/10"
-                                                />
-                                              ) : (
-                                                <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
-                                              )}
-                                              <span>{row.name}</span>
-                                            </span>
-                                            <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                            <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                              <span className="flex items-center gap-1.5">
+                                                {row.iconDataUrl ? (
+                                                  <img
+                                                    src={row.iconDataUrl}
+                                                    alt=""
+                                                    className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                  />
+                                                ) : (
+                                                  <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                                )}
+                                                <span>{row.name}</span>
+                                              </span>
+                                              <span className="inline-flex items-center gap-1">
+                                                <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                                  факт {row.actual.toFixed(2)}
+                                                </span>
+                                                <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
+                                                  макс {row.planned.toFixed(2)}
+                                                </span>
+                                              </span>
+                                            </div>
                                           </div>
                                         ))
                                       ) : (
@@ -2242,21 +2271,23 @@ export default function IndustryModal({
                                   warehouseRows.map((row) => (
                                     <div
                                       key={`warehouse-mobile-${card.key}-${row.id}`}
-                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                      className="w-full rounded border border-white/20 bg-white/5 px-2 py-1"
                                     >
-                                      <span className="flex items-center gap-1.5">
-                                        {row.iconDataUrl ? (
-                                          <img
-                                            src={row.iconDataUrl}
-                                            alt=""
-                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
-                                          />
-                                        ) : (
-                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
-                                        )}
-                                        <span>{row.name}</span>
-                                      </span>
-                                      <span>{row.actual.toFixed(2)}</span>
+                                      <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                        <span className="flex items-center gap-1.5">
+                                          {row.iconDataUrl ? (
+                                            <img
+                                              src={row.iconDataUrl}
+                                              alt=""
+                                              className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                            />
+                                          ) : (
+                                            <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                          )}
+                                          <span>{row.name}</span>
+                                        </span>
+                                        <span className="text-cyan-200">{row.actual.toFixed(2)}</span>
+                                      </div>
                                     </div>
                                   ))
                                 ) : (
@@ -2265,7 +2296,7 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                  Потребление (макс / факт)
+                                  Потребление (факт / макс)
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и факт потребления ресурсов за ход.
                                   </span>
@@ -2274,21 +2305,30 @@ export default function IndustryModal({
                                   consumptionRows.map((row) => (
                                     <div
                                       key={`consume-mobile-${card.key}-${row.id}`}
-                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                      className="w-full rounded border border-white/20 bg-white/5 px-2 py-1"
                                     >
-                                      <span className="flex items-center gap-1.5">
-                                        {row.iconDataUrl ? (
-                                          <img
-                                            src={row.iconDataUrl}
-                                            alt=""
-                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
-                                          />
-                                        ) : (
-                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
-                                        )}
-                                        <span>{row.name}</span>
-                                      </span>
-                                      <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                      <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                        <span className="flex items-center gap-1.5">
+                                          {row.iconDataUrl ? (
+                                            <img
+                                              src={row.iconDataUrl}
+                                              alt=""
+                                              className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                            />
+                                          ) : (
+                                            <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                          )}
+                                          <span>{row.name}</span>
+                                        </span>
+                                        <span className="inline-flex items-center gap-1">
+                                          <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                            факт {row.actual.toFixed(2)}
+                                          </span>
+                                          <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
+                                            макс {row.planned.toFixed(2)}
+                                          </span>
+                                        </span>
+                                      </div>
                                     </div>
                                   ))
                                 ) : (
@@ -2297,7 +2337,7 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                  Закуплено за ход (макс / факт)
+                                  Закуплено за ход (факт / макс)
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и факт закупки ресурсов за ход.
                                   </span>
@@ -2320,7 +2360,14 @@ export default function IndustryModal({
                                         )}
                                         <span>{row.name}</span>
                                       </span>
-                                      <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                      <span className="inline-flex items-center gap-1">
+                                        <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                          факт {row.actual.toFixed(2)}
+                                        </span>
+                                        <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
+                                          макс {row.planned.toFixed(2)}
+                                        </span>
+                                      </span>
                                     </div>
                                   ))
                                 ) : (
@@ -2329,7 +2376,7 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                  Добыча (макс / факт)
+                                  Добыча (факт / макс)
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и факт добычи ресурсов за ход.
                                   </span>
@@ -2338,21 +2385,30 @@ export default function IndustryModal({
                                   extractionRows.map((row) => (
                                     <div
                                       key={`extract-mobile-${card.key}-${row.id}`}
-                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                      className="w-full rounded border border-white/20 bg-white/5 px-2 py-1"
                                     >
-                                      <span className="flex items-center gap-1.5">
-                                        {row.iconDataUrl ? (
-                                          <img
-                                            src={row.iconDataUrl}
-                                            alt=""
-                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
-                                          />
-                                        ) : (
-                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
-                                        )}
-                                        <span>{row.name}</span>
-                                      </span>
-                                      <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                      <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                        <span className="flex items-center gap-1.5">
+                                          {row.iconDataUrl ? (
+                                            <img
+                                              src={row.iconDataUrl}
+                                              alt=""
+                                              className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                            />
+                                          ) : (
+                                            <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                          )}
+                                          <span>{row.name}</span>
+                                        </span>
+                                        <span className="inline-flex items-center gap-1">
+                                          <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                            факт {row.actual.toFixed(2)}
+                                          </span>
+                                          <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
+                                            макс {row.planned.toFixed(2)}
+                                          </span>
+                                        </span>
+                                      </div>
                                     </div>
                                   ))
                                 ) : (
@@ -2361,7 +2417,7 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                  Производство (макс / факт)
+                                  Производство (факт / макс)
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и факт производства ресурсов за ход.
                                   </span>
@@ -2370,21 +2426,30 @@ export default function IndustryModal({
                                   productionRows.map((row) => (
                                     <div
                                       key={`produce-mobile-${card.key}-${row.id}`}
-                                      className="flex items-center justify-between text-[11px] text-white/70 tabular-nums"
+                                      className="w-full rounded border border-white/20 bg-white/5 px-2 py-1"
                                     >
-                                      <span className="flex items-center gap-1.5">
-                                        {row.iconDataUrl ? (
-                                          <img
-                                            src={row.iconDataUrl}
-                                            alt=""
-                                            className="w-3.5 h-3.5 rounded object-cover border border-white/10"
-                                          />
-                                        ) : (
-                                          <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
-                                        )}
-                                        <span>{row.name}</span>
-                                      </span>
-                                      <span>{row.planned.toFixed(2)} / {row.actual.toFixed(2)}</span>
+                                      <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                        <span className="flex items-center gap-1.5">
+                                          {row.iconDataUrl ? (
+                                            <img
+                                              src={row.iconDataUrl}
+                                              alt=""
+                                              className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                            />
+                                          ) : (
+                                            <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                          )}
+                                          <span>{row.name}</span>
+                                        </span>
+                                        <span className="inline-flex items-center gap-1">
+                                          <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                            факт {row.actual.toFixed(2)}
+                                          </span>
+                                          <span className="rounded border border-white/20 bg-white/5 px-1.5 py-0.5 text-white/70">
+                                            макс {row.planned.toFixed(2)}
+                                          </span>
+                                        </span>
+                                      </div>
                                     </div>
                                   ))
                                 ) : (
