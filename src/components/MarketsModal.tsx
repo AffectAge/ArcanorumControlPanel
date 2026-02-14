@@ -87,6 +87,21 @@ const getSparklinePath = (values: number[], width = 84, height = 22) => {
     .join(' ');
 };
 
+const MetricHeading = ({
+  label,
+  hint,
+}: {
+  label: string;
+  hint: string;
+}) => (
+  <div className="group relative inline-flex items-center gap-1 text-white/45">
+    <span>{label}</span>
+    <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+      {hint}
+    </div>
+  </div>
+);
+
 export default function MarketsModal({
   open,
   countries,
@@ -729,9 +744,11 @@ export default function MarketsModal({
                 ) : (
                   <>
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <div className="text-white/85 text-sm font-semibold mb-2 inline-flex items-center gap-2">
-                        <BarChart3 className="w-4 h-4" />
-                        Биржа товаров
+                      <div className="group relative text-white/85 text-sm font-semibold mb-2 inline-flex items-center gap-2">
+                        <span>Биржа товаров</span>
+                        <span className="pointer-events-none absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] font-normal text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                          Карточки ресурсов с ключевыми метриками рынка.
+                        </span>
                       </div>
                       <div className="space-y-2">
                         {goodsStats.rows.map((row) => (
@@ -795,51 +812,87 @@ export default function MarketsModal({
 
                             <div className="mt-3 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 text-xs tabular-nums">
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Цена рынка</div>
+                                <MetricHeading
+                                  label="Цена рынка"
+                                  hint="Рыночная стоимость запасов этого ресурса в вашем рынке."
+                                />
                                 <div className="text-amber-200">{row.marketValue.toFixed(2)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Спрос</div>
+                                <MetricHeading
+                                  label="Спрос"
+                                  hint="Суммарное потребление ресурса зданиями рынка за ход."
+                                />
                                 <div className="text-rose-200">{row.marketDemand.toFixed(0)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Предложение</div>
+                                <MetricHeading
+                                  label="Предложение"
+                                  hint="Доступный объём: фактическое производство плюс запасы складов."
+                                />
                                 <div className="text-teal-200">{row.marketOffer.toFixed(0)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Произв. факт</div>
+                                <MetricHeading
+                                  label="Произв. факт"
+                                  hint="Реально произведённый объём ресурса за последний ход."
+                                />
                                 <div className="text-teal-200">{row.marketProductionFact.toFixed(0)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Произв. макс</div>
+                                <MetricHeading
+                                  label="Произв. макс"
+                                  hint="Теоретический максимум выпуска при полной эффективности."
+                                />
                                 <div className="text-cyan-200">{row.marketProductionMax.toFixed(0)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Объем рынка</div>
+                                <MetricHeading
+                                  label="Объем рынка"
+                                  hint="Текущие складские запасы ресурса внутри вашего рынка."
+                                />
                                 <div className="text-emerald-200">{row.marketSupply.toFixed(0)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Месторождения</div>
+                                <MetricHeading
+                                  label="Месторождения"
+                                  hint="Суммарный объём ресурса в месторождениях стран вашего рынка."
+                                />
                                 <div className="text-violet-200">{row.depositSupply.toFixed(0)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Стоимость мест.</div>
+                                <MetricHeading
+                                  label="Стоимость мест."
+                                  hint="Оценка месторождений по текущей цене за единицу."
+                                />
                                 <div className="text-fuchsia-200">{row.depositValue.toFixed(2)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Мировой объем</div>
+                                <MetricHeading
+                                  label="Мировой объем"
+                                  hint="Все складские запасы ресурса по миру."
+                                />
                                 <div className="text-white/75">{row.worldMarketSupply.toFixed(0)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Доля рынка</div>
+                                <MetricHeading
+                                  label="Доля рынка"
+                                  hint="Процент запасов вашего рынка от мирового объёма."
+                                />
                                 <div className="text-sky-200">{row.marketShare.toFixed(1)}%</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Мировые запасы</div>
+                                <MetricHeading
+                                  label="Мировые запасы"
+                                  hint="Суммарный объём месторождений ресурса по всему миру."
+                                />
                                 <div className="text-violet-200">{row.worldDeposits.toFixed(0)}</div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <div className="text-white/45">Доля месторожд.</div>
+                                <MetricHeading
+                                  label="Доля месторожд."
+                                  hint="Процент месторождений вашего рынка от мирового объёма."
+                                />
                                 <div className="text-fuchsia-200">{row.depositShare.toFixed(1)}%</div>
                               </div>
                             </div>
