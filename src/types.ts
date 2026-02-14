@@ -184,6 +184,10 @@ export type GameSettings = {
   demolitionCostPercent?: number;
   diplomacyProposalExpireTurns?: number;
   marketCapitalGraceTurns?: number;
+  marketDefaultResourceBasePrice?: number;
+  marketPriceSmoothing?: number;
+  marketPriceHistoryLength?: number;
+  marketPriceEpsilon?: number;
   startingColonizationPoints?: number;
   startingConstructionPoints?: number;
   sciencePointsPerTurn?: number;

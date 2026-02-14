@@ -68,7 +68,7 @@ const createId = () =>
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const DEFAULT_RESOURCE_BASE_PRICE = 1;
-const MARKET_PRICE_SMOOTHING = 0.15;
+const MARKET_PRICE_SMOOTHING = 0.30;
 const MARKET_PRICE_HISTORY_LENGTH = 10;
 const MARKET_PRICE_EPSILON = 0.0001;
 
@@ -107,13 +107,14 @@ const normalizeOptionalResourcePrice = (value: unknown): number | undefined => {
 const normalizeResourcePriceHistory = (
   value: unknown,
   fallback: number,
+  historyLength = MARKET_PRICE_HISTORY_LENGTH,
 ): number[] => {
   if (!Array.isArray(value)) return [fallback];
   const normalized = value
     .map((item) => normalizeResourcePrice(item, fallback))
     .filter((item) => Number.isFinite(item) && item > 0);
   if (normalized.length === 0) return [fallback];
-  return normalized.slice(-MARKET_PRICE_HISTORY_LENGTH);
+  return normalized.slice(-Math.max(1, Math.floor(historyLength)));
 };
 
 const computeNextMarketPrice = (params: {
@@ -124,6 +125,8 @@ const computeNextMarketPrice = (params: {
   marketVolume: number;
   minMarketPrice?: number;
   maxMarketPrice?: number;
+  smoothing?: number;
+  epsilon?: number;
 }) => {
   const {
     currentPrice,
@@ -133,19 +136,23 @@ const computeNextMarketPrice = (params: {
     marketVolume,
     minMarketPrice,
     maxMarketPrice,
+    smoothing,
+    epsilon,
   } = params;
+  const safeSmoothing = clamp01(smoothing ?? MARKET_PRICE_SMOOTHING);
+  const safeEpsilon = Math.max(0, epsilon ?? MARKET_PRICE_EPSILON);
 
   const offer = Math.max(0, productionFact) + Math.max(0, marketVolume);
   const ratio = (Math.max(0, demand) + 1) / (offer + 1);
   let targetPrice =
-    Math.abs(Math.max(0, demand) - offer) <= MARKET_PRICE_EPSILON
+    Math.abs(Math.max(0, demand) - offer) <= safeEpsilon
       ? basePrice
       : currentPrice * ratio;
 
   if (minMarketPrice != null) targetPrice = Math.max(targetPrice, minMarketPrice);
   if (maxMarketPrice != null) targetPrice = Math.min(targetPrice, maxMarketPrice);
 
-  let nextPrice = currentPrice + (targetPrice - currentPrice) * MARKET_PRICE_SMOOTHING;
+  let nextPrice = currentPrice + (targetPrice - currentPrice) * safeSmoothing;
   if (minMarketPrice != null) nextPrice = Math.max(nextPrice, minMarketPrice);
   if (maxMarketPrice != null) nextPrice = Math.min(nextPrice, maxMarketPrice);
 
@@ -429,6 +436,10 @@ function App() {
     demolitionCostPercent: 20,
     eventLogRetainTurns: 3,
     marketCapitalGraceTurns: 3,
+    marketDefaultResourceBasePrice: DEFAULT_RESOURCE_BASE_PRICE,
+    marketPriceSmoothing: MARKET_PRICE_SMOOTHING,
+    marketPriceHistoryLength: MARKET_PRICE_HISTORY_LENGTH,
+    marketPriceEpsilon: MARKET_PRICE_EPSILON,
     startingColonizationPoints: 100,
     startingConstructionPoints: 100,
     sciencePointsPerTurn: 0,
@@ -544,6 +555,21 @@ function App() {
   const [constructionModalOpen, setConstructionModalOpen] = useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>(
     undefined,
+  );
+  const marketDefaultResourceBasePrice = Math.max(
+    0.01,
+    gameSettings.marketDefaultResourceBasePrice ?? DEFAULT_RESOURCE_BASE_PRICE,
+  );
+  const marketPriceSmoothing = clamp01(
+    gameSettings.marketPriceSmoothing ?? MARKET_PRICE_SMOOTHING,
+  );
+  const marketPriceHistoryLength = Math.max(
+    1,
+    Math.floor(gameSettings.marketPriceHistoryLength ?? MARKET_PRICE_HISTORY_LENGTH),
+  );
+  const marketPriceEpsilon = Math.max(
+    0,
+    gameSettings.marketPriceEpsilon ?? MARKET_PRICE_EPSILON,
   );
   const pendingMarketPriceMetricsRef = useRef<{
     demandByMarketAndResource: Map<string, Record<string, number>>;
@@ -1687,7 +1713,7 @@ function App() {
         resources.forEach((resource) => {
           const basePrice = normalizeResourcePrice(
             resource.basePrice,
-            DEFAULT_RESOURCE_BASE_PRICE,
+            marketDefaultResourceBasePrice,
           );
           const currentPrice = normalizeResourcePrice(
             market.priceByResourceId?.[resource.id],
@@ -1704,6 +1730,8 @@ function App() {
             marketVolume: resourceMarketVolume,
             minMarketPrice: resource.minMarketPrice,
             maxMarketPrice: resource.maxMarketPrice,
+            smoothing: marketPriceSmoothing,
+            epsilon: marketPriceEpsilon,
           });
         });
         const nextHistory: Record<string, number[]> = Object.fromEntries(
@@ -1713,10 +1741,11 @@ function App() {
             const prevHistory = normalizeResourcePriceHistory(
               market.priceHistoryByResourceId?.[resource.id],
               nextPrice,
+              marketPriceHistoryLength,
             );
             return [
               resource.id,
-              [...prevHistory, nextPrice].slice(-MARKET_PRICE_HISTORY_LENGTH),
+              [...prevHistory, nextPrice].slice(-marketPriceHistoryLength),
             ];
           }),
         );
@@ -2484,7 +2513,7 @@ function App() {
               resource.id,
               normalizeResourcePrice(
                 market.priceByResourceId?.[resource.id],
-                resourceBasePriceById.get(resource.id) ?? DEFAULT_RESOURCE_BASE_PRICE,
+                resourceBasePriceById.get(resource.id) ?? marketDefaultResourceBasePrice,
               ),
             ]),
           );
@@ -2496,6 +2525,7 @@ function App() {
                 normalizeResourcePriceHistory(
                   market.priceHistoryByResourceId?.[resource.id],
                   currentPrice,
+                  marketPriceHistoryLength,
                 ),
               ];
             }),
@@ -2589,6 +2619,10 @@ function App() {
       eventLogRetainTurns: 3,
       diplomacyProposalExpireTurns: 3,
       marketCapitalGraceTurns: 3,
+      marketDefaultResourceBasePrice: DEFAULT_RESOURCE_BASE_PRICE,
+      marketPriceSmoothing: MARKET_PRICE_SMOOTHING,
+      marketPriceHistoryLength: MARKET_PRICE_HISTORY_LENGTH,
+      marketPriceEpsilon: MARKET_PRICE_EPSILON,
       startingColonizationPoints: 100,
       startingConstructionPoints: 100,
       sciencePointsPerTurn: 0,
@@ -2718,6 +2752,10 @@ function App() {
       eventLogRetainTurns: 3,
       diplomacyProposalExpireTurns: 3,
       marketCapitalGraceTurns: 3,
+      marketDefaultResourceBasePrice: DEFAULT_RESOURCE_BASE_PRICE,
+      marketPriceSmoothing: MARKET_PRICE_SMOOTHING,
+      marketPriceHistoryLength: MARKET_PRICE_HISTORY_LENGTH,
+      marketPriceEpsilon: MARKET_PRICE_EPSILON,
       startingColonizationPoints: 100,
       startingConstructionPoints: 100,
       sciencePointsPerTurn: 0,
@@ -4763,7 +4801,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     minMarketPrice?: number,
     maxMarketPrice?: number,
   ) => {
-    const normalizedBasePrice = normalizeResourcePrice(basePrice);
+    const normalizedBasePrice = normalizeResourcePrice(
+      basePrice,
+      marketDefaultResourceBasePrice,
+    );
     const normalizedMin = normalizeOptionalResourcePrice(minMarketPrice);
     const normalizedMax = normalizeOptionalResourcePrice(maxMarketPrice);
     const boundedMin =
@@ -4822,13 +4863,13 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       maxMarketPrice?: number;
     },
   ) => {
-    let nextBasePrice = DEFAULT_RESOURCE_BASE_PRICE;
+    let nextBasePrice = marketDefaultResourceBasePrice;
     setResources((prev) =>
       prev.map((item) => {
         if (item.id !== resourceId) return item;
         const basePrice = normalizeResourcePrice(
           patch.basePrice ?? item.basePrice,
-          DEFAULT_RESOURCE_BASE_PRICE,
+          marketDefaultResourceBasePrice,
         );
         const minPriceRaw = normalizeOptionalResourcePrice(
           patch.minMarketPrice ?? item.minMarketPrice,
@@ -4864,6 +4905,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           [resourceId]: normalizeResourcePriceHistory(
             market.priceHistoryByResourceId?.[resourceId],
             current,
+            marketPriceHistoryLength,
           ),
         };
         return {
