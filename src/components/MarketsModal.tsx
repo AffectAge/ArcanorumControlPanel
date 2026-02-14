@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -183,7 +183,7 @@ export default function MarketsModal({
       return;
     }
     if (!newMarketName && activeCountry) {
-      setNewMarketName(`Р С‹РЅРѕРє ${activeCountry.name}`);
+      setNewMarketName(`Рынок ${activeCountry.name}`);
     }
     setCapitalProvinceIdDraft((prev) => prev || ownCountryProvinceIds[0] || '');
     setMarketColorDraft((prev) => prev || activeCountry?.color || '#22c55e');
@@ -346,6 +346,7 @@ export default function MarketsModal({
       const supplyFact = marketProductionFact.get(resource.id) ?? 0;
       const warehouseStock = Math.max(0, warehouse[resource.id] ?? 0);
       const totalMarketStock = Math.max(0, marketBuildingVolume.get(resource.id) ?? 0);
+      const marketOffer = supplyFact + totalMarketStock;
       const marketPrice = Math.max(
         0.01,
         Number(
@@ -415,6 +416,7 @@ export default function MarketsModal({
         marketDemand: demand,
         marketProductionFact: supplyFact,
         marketProductionMax: supplyMax,
+        marketOffer,
         marketSupply: totalMarketStock,
         depositSupply: deposits,
         worldMarketSupply: worldMarketAmount,
@@ -461,9 +463,9 @@ export default function MarketsModal({
               <Globe2 className="w-5 h-5 text-white/70" />
             </div>
             <div>
-              <div className="text-white text-lg font-semibold">Р С‹РЅРєРё</div>
+              <div className="text-white text-lg font-semibold">Рынки</div>
               <div className="text-white/60 text-sm">
-                РЈРїСЂР°РІР»РµРЅРёРµ С‚РѕР»СЊРєРѕ СЃРІРѕРёРј СЂС‹РЅРєРѕРј
+                Управление только своим рынком
               </div>
             </div>
           </div>
@@ -485,7 +487,7 @@ export default function MarketsModal({
                   : 'bg-white/5 border-white/10 text-white/70 hover:border-emerald-400/30'
               }`}
             >
-              РњРѕР№ СЂС‹РЅРѕРє
+              Мой рынок
             </button>
             <button
               onClick={() => setTab('goods')}
@@ -495,7 +497,7 @@ export default function MarketsModal({
                   : 'bg-white/5 border-white/10 text-white/70 hover:border-sky-400/30'
               }`}
             >
-              РўРѕРІР°СЂС‹ Рё С‚РѕСЂРіРѕРІР»СЏ
+              Товары и торговля
             </button>
           </div>
 
@@ -504,13 +506,13 @@ export default function MarketsModal({
               <div className="max-w-4xl space-y-4">
                 {!activeCountryId ? (
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white/60 text-sm">
-                    Р’С‹Р±РµСЂРёС‚Рµ Р°РєС‚РёРІРЅСѓСЋ СЃС‚СЂР°РЅСѓ.
+                    Выберите активную страну.
                   </div>
                 ) : !memberMarket ? (
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                    <div className="text-white/85 text-sm font-semibold">РЎРѕР·РґР°РЅРёРµ СЂС‹РЅРєР°</div>
+                    <div className="text-white/85 text-sm font-semibold">Создание рынка</div>
                     <label className="flex flex-col gap-1 text-white/70 text-sm">
-                      РќР°Р·РІР°РЅРёРµ
+                      Название
                       <input
                         type="text"
                         value={newMarketName}
@@ -519,14 +521,14 @@ export default function MarketsModal({
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-white/70 text-sm">
-                      РЎС‚РѕР»РёС†Р° СЂС‹РЅРєР°
+                      Столица рынка
                       <select
                         value={capitalProvinceIdDraft}
                         onChange={(event) => setCapitalProvinceIdDraft(event.target.value)}
                         className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
                       >
                         <option value="" className="bg-[#0b111b] text-white">
-                          Р’С‹Р±РµСЂРёС‚Рµ РїСЂРѕРІРёРЅС†РёСЋ
+                          Выберите провинцию
                         </option>
                         {ownCountryProvinceIds.map((provinceId) => (
                           <option
@@ -540,7 +542,7 @@ export default function MarketsModal({
                       </select>
                     </label>
                     <label className="flex flex-col gap-1 text-white/70 text-sm">
-                      Р¦РІРµС‚ СЂС‹РЅРєР°
+                      Цвет рынка
                       <input
                         type="color"
                         value={marketColorDraft}
@@ -549,7 +551,7 @@ export default function MarketsModal({
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-white/70 text-sm">
-                      Р›РѕРіРѕС‚РёРї СЂС‹РЅРєР°
+                      Логотип рынка
                       <input
                         type="file"
                         accept="image/*"
@@ -559,14 +561,14 @@ export default function MarketsModal({
                     </label>
                     {ownCountryProvinceIds.length === 0 && (
                       <div className="text-rose-200/90 text-xs">
-                        РЈ СЃС‚СЂР°РЅС‹ РЅРµС‚ РїСЂРѕРІРёРЅС†РёР№ РґР»СЏ СЃС‚РѕР»РёС†С‹ СЂС‹РЅРєР°.
+                        У страны нет провинций для столицы рынка.
                       </div>
                     )}
                     <button
                       onClick={() =>
                         onCreateMarket({
                           actorCountryId: activeCountryId,
-                          name: newMarketName.trim() || `Р С‹РЅРѕРє ${activeCountry?.name ?? ''}`,
+                          name: newMarketName.trim() || `Рынок ${activeCountry?.name ?? ''}`,
                           leaderCountryId: activeCountryId,
                           memberCountryIds: [activeCountryId],
                           color: marketColorDraft,
@@ -582,37 +584,37 @@ export default function MarketsModal({
                       }`}
                     >
                       <Plus className="w-4 h-4" />
-                      РЎРѕР·РґР°С‚СЊ СЂС‹РЅРѕРє
+                      Создать рынок
                     </button>
                   </div>
                 ) : !ownMarket ? (
                   <div className="rounded-xl border border-amber-400/30 bg-amber-500/5 p-4 space-y-3">
-                    <div className="text-white/85 text-sm font-semibold">РЈС‡Р°СЃС‚РёРµ РІ СЂС‹РЅРєРµ</div>
+                    <div className="text-white/85 text-sm font-semibold">Участие в рынке</div>
                     <div className="text-white/70 text-sm">
-                      РЎС‚СЂР°РЅР° СЃРѕСЃС‚РѕРёС‚ РІ СЂС‹РЅРєРµ: <span className="text-amber-200">{memberMarket.name}</span>
+                      Страна состоит в рынке: <span className="text-amber-200">{memberMarket.name}</span>
                     </div>
                     <div className="text-white/55 text-xs">
-                      РџРѕРєР° СЃС‚СЂР°РЅР° СЃРѕСЃС‚РѕРёС‚ РІ СЂС‹РЅРєРµ, СЃРѕР·РґР°С‚СЊ СЃРІРѕР№ СЂС‹РЅРѕРє РЅРµР»СЊР·СЏ.
+                      Пока страна состоит в рынке, создать свой рынок нельзя.
                     </div>
                     <button
                       onClick={() => onLeaveMarket(activeCountryId, memberMarket.id)}
                       className="h-9 px-3 rounded-lg border border-rose-400/35 bg-rose-500/10 text-rose-200 text-sm inline-flex items-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" />
-                      Р’С‹Р№С‚Рё РёР· СЂС‹РЅРєР°
+                      Выйти из рынка
                     </button>
                   </div>
                 ) : (
                   <>
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                      <div className="text-white/85 text-sm font-semibold">РџР°СЂР°РјРµС‚СЂС‹ СЂС‹РЅРєР°</div>
+                      <div className="text-white/85 text-sm font-semibold">Параметры рынка</div>
                       {!canEditOwnMarket && (
                         <div className="text-amber-200/90 text-xs">
-                          РџР°СЂР°РјРµС‚СЂС‹ РјРѕР¶РµС‚ РјРµРЅСЏС‚СЊ С‚РѕР»СЊРєРѕ СЃРѕР·РґР°С‚РµР»СЊ СЂС‹РЅРєР°.
+                          Параметры может менять только создатель рынка.
                         </div>
                       )}
                       <label className="flex flex-col gap-1 text-white/70 text-sm">
-                        РќР°Р·РІР°РЅРёРµ
+                        Название
                         <input
                           type="text"
                           value={marketNameDraft}
@@ -622,7 +624,7 @@ export default function MarketsModal({
                         />
                       </label>
                       <label className="flex flex-col gap-1 text-white/70 text-sm">
-                        РЎС‚РѕР»РёС†Р° СЂС‹РЅРєР°
+                        Столица рынка
                         <select
                           value={capitalProvinceIdDraft}
                           onChange={(event) => setCapitalProvinceIdDraft(event.target.value)}
@@ -630,7 +632,7 @@ export default function MarketsModal({
                           className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60 disabled:opacity-60"
                         >
                           <option value="" className="bg-[#0b111b] text-white">
-                            Р’С‹Р±РµСЂРёС‚Рµ РїСЂРѕРІРёРЅС†РёСЋ
+                            Выберите провинцию
                           </option>
                           {ownCountryProvinceIds.map((provinceId) => (
                             <option
@@ -644,7 +646,7 @@ export default function MarketsModal({
                         </select>
                       </label>
                       <label className="flex flex-col gap-1 text-white/70 text-sm">
-                        Р¦РІРµС‚ СЂС‹РЅРєР°
+                        Цвет рынка
                         <input
                           type="color"
                           value={marketColorDraft}
@@ -654,7 +656,7 @@ export default function MarketsModal({
                         />
                       </label>
                       <label className="flex flex-col gap-1 text-white/70 text-sm">
-                        Р›РѕРіРѕС‚РёРї СЂС‹РЅРєР°
+                        Логотип рынка
                         <input
                           type="file"
                           accept="image/*"
@@ -687,7 +689,7 @@ export default function MarketsModal({
                           }`}
                         >
                           <Save className="w-4 h-4" />
-                          РЎРѕС…СЂР°РЅРёС‚СЊ
+                          Сохранить
                         </button>
                         <button
                           onClick={() => onDeleteMarket(ownMarket.id, activeCountryId)}
@@ -699,13 +701,13 @@ export default function MarketsModal({
                           }`}
                         >
                           <Trash2 className="w-4 h-4" />
-                          РЈРґР°Р»РёС‚СЊ СЂС‹РЅРѕРє
+                          Удалить рынок
                         </button>
                       </div>
                     </div>
 
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-                      <div className="text-white/85 text-sm font-semibold mb-2">РЈС‡Р°СЃС‚РЅРёРєРё СЂС‹РЅРєР°</div>
+                      <div className="text-white/85 text-sm font-semibold mb-2">Участники рынка</div>
                       <div className="space-y-2">
                         {ownMarket.memberCountryIds.map((memberId) => {
                           const country = countries.find((item) => item.id === memberId);
@@ -738,10 +740,10 @@ export default function MarketsModal({
                                   disabled={!canEditOwnMarket}
                                   className="h-7 px-2 rounded-md border border-red-400/30 bg-red-500/10 text-red-200 text-xs disabled:opacity-50"
                                 >
-                                  РЈР±СЂР°С‚СЊ
+                                  Убрать
                                 </button>
                               ) : (
-                                <span className="text-[11px] text-emerald-200/80">Р¦РµРЅС‚СЂ СЂС‹РЅРєР°</span>
+                                <span className="text-[11px] text-emerald-200/80">Центр рынка</span>
                               )}
                             </div>
                           );
@@ -751,10 +753,10 @@ export default function MarketsModal({
 
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                       <div className="text-white/85 text-sm font-semibold mb-2">
-                        РџСЂРёРіР»Р°С€РµРЅРёРµ СЃС‚СЂР°РЅ РґРѕРіРѕРІРѕСЂРѕРј
+                        Приглашение стран договором
                       </div>
                       <div className="text-white/55 text-xs mb-3">
-                        РќРѕРІС‹Рµ СЃС‚СЂР°РЅС‹ РґРѕР±Р°РІР»СЏСЋС‚СЃСЏ С‚РѕР»СЊРєРѕ С‡РµСЂРµР· РґРёРїР»РѕРјР°С‚РёС‡РµСЃРєРѕРµ РїСЂРµРґР»РѕР¶РµРЅРёРµ.
+                        Новые страны добавляются только через дипломатическое предложение.
                       </div>
                       <div className="space-y-2">
                         {inviteCandidates.length > 0 ? (
@@ -785,13 +787,13 @@ export default function MarketsModal({
                                   }`}
                                 >
                                   <Send className="w-3.5 h-3.5" />
-                                  {pending ? 'РЈР¶Рµ РѕС‚РїСЂР°РІР»РµРЅРѕ' : 'РџСЂРёРіР»Р°СЃРёС‚СЊ'}
+                                  {pending ? 'Уже отправлено' : 'Пригласить'}
                                 </button>
                               </div>
                             );
                           })
                         ) : (
-                          <div className="text-white/50 text-sm">РќРµС‚ РґРѕСЃС‚СѓРїРЅС‹С… СЃС‚СЂР°РЅ РґР»СЏ РїСЂРёРіР»Р°С€РµРЅРёСЏ.</div>
+                          <div className="text-white/50 text-sm">Нет доступных стран для приглашения.</div>
                         )}
                       </div>
                     </div>
@@ -849,7 +851,7 @@ export default function MarketsModal({
                         Ресурсы автоматически появляются на бирже. Склад - общий буфер рынка для покупок и продаж.
                       </div>
                       <div className="overflow-x-auto rounded-lg border border-white/10">
-                        <table className="min-w-[1960px] w-full text-xs">
+                        <table className="min-w-[2060px] w-full text-xs">
                           <thead className="bg-black/45 text-white/70">
                             <tr>
                               <ExchangeHeader
@@ -875,11 +877,15 @@ export default function MarketsModal({
                                 help="Сумма максимального потребления этого ресурса зданиями рынка за ход."
                               />
                               <ExchangeHeader
-                                label="Предложение (факт)"
+                                label="Предложение"
+                                help="Сумма Производства (факт) и Объема рынка. Это общее предложение, которое используется в расчете цены."
+                              />
+                              <ExchangeHeader
+                                label="Производство (факт)"
                                 help="Фактическая добыча и производство ресурса зданиями рынка за последний ход. Участвует в расчете цены как часть предложения."
                               />
                               <ExchangeHeader
-                                label="Предложение (макс)"
+                                label="Производство (макс)"
                                 help="Максимально возможная добыча и производство по настройкам зданий рынка. В расчете цены не участвует."
                               />
                               <ExchangeHeader
@@ -995,6 +1001,9 @@ export default function MarketsModal({
                                 </td>
                                 <td className="px-3 py-2 text-right text-rose-200">
                                   {row.marketDemand.toFixed(0)}
+                                </td>
+                                <td className="px-3 py-2 text-right text-teal-200">
+                                  {row.marketOffer.toFixed(0)}
                                 </td>
                                 <td className="px-3 py-2 text-right text-teal-200">
                                   {row.marketProductionFact.toFixed(0)}
