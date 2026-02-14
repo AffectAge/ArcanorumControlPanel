@@ -122,6 +122,19 @@ const normalizeResourcePriceHistory = (
   return normalized.slice(-Math.max(1, Math.floor(historyLength)));
 };
 
+const normalizeResourceAmountHistory = (
+  value: unknown,
+  fallback = 0,
+  historyLength = MARKET_PRICE_HISTORY_LENGTH,
+): number[] => {
+  if (!Array.isArray(value)) return [Math.max(0, fallback)];
+  const normalized = value
+    .map((item) => (Number.isFinite(item) ? Math.max(0, Number(item)) : NaN))
+    .filter((item) => Number.isFinite(item));
+  if (normalized.length === 0) return [Math.max(0, fallback)];
+  return normalized.slice(-Math.max(1, Math.floor(historyLength)));
+};
+
 const computeNextMarketPrice = (params: {
   currentPrice: number;
   basePrice: number;
@@ -587,6 +600,7 @@ function App() {
     demandByMarketAndResource: Map<string, Record<string, number>>;
     factualSupplyByMarketAndResource: Map<string, Record<string, number>>;
     marketVolumeByMarketAndResource: Map<string, Record<string, number>>;
+    productionMaxByMarketAndResource: Map<string, Record<string, number>>;
   } | null>(null);
 
   const ensureMarketsMapLayer = useCallback((layers: MapLayer[]) => {
@@ -926,6 +940,18 @@ function App() {
               const initialPrice = normalizeResourcePrice(resource.basePrice);
               return [resource.id, [initialPrice]];
             }),
+          ),
+          demandHistoryByResourceId: Object.fromEntries(
+            resources.map((resource) => [resource.id, [0]]),
+          ),
+          offerHistoryByResourceId: Object.fromEntries(
+            resources.map((resource) => [resource.id, [0]]),
+          ),
+          productionFactHistoryByResourceId: Object.fromEntries(
+            resources.map((resource) => [resource.id, [0]]),
+          ),
+          productionMaxHistoryByResourceId: Object.fromEntries(
+            resources.map((resource) => [resource.id, [0]]),
           ),
           capitalProvinceId: payload.capitalProvinceId,
           capitalLostSinceTurn: undefined,
@@ -1713,6 +1739,7 @@ function App() {
     demandByMarketAndResource: Map<string, Record<string, number>>;
     factualSupplyByMarketAndResource: Map<string, Record<string, number>>;
     marketVolumeByMarketAndResource: Map<string, Record<string, number>>;
+    productionMaxByMarketAndResource: Map<string, Record<string, number>>;
   }) => {
     setMarkets((prev) =>
       prev.map((market) => {
@@ -1721,6 +1748,8 @@ function App() {
           metrics.factualSupplyByMarketAndResource.get(market.id) ?? {};
         const marketVolume =
           metrics.marketVolumeByMarketAndResource.get(market.id) ?? {};
+        const productionMax =
+          metrics.productionMaxByMarketAndResource.get(market.id) ?? {};
         const nextPrices: Record<string, number> = {};
         resources.forEach((resource) => {
           const basePrice = normalizeResourcePrice(
@@ -1761,10 +1790,72 @@ function App() {
             ];
           }),
         );
+        const nextDemandHistory: Record<string, number[]> = Object.fromEntries(
+          resources.map((resource) => {
+            const resourceDemand = Math.max(0, demand[resource.id] ?? 0);
+            const prevHistory = normalizeResourceAmountHistory(
+              market.demandHistoryByResourceId?.[resource.id],
+              resourceDemand,
+              marketPriceHistoryLength,
+            );
+            return [
+              resource.id,
+              [...prevHistory, resourceDemand].slice(-marketPriceHistoryLength),
+            ];
+          }),
+        );
+        const nextOfferHistory: Record<string, number[]> = Object.fromEntries(
+          resources.map((resource) => {
+            const resourceSupplyFact = Math.max(0, factualSupply[resource.id] ?? 0);
+            const resourceMarketVolume = Math.max(0, marketVolume[resource.id] ?? 0);
+            const resourceOffer = resourceSupplyFact + resourceMarketVolume;
+            const prevHistory = normalizeResourceAmountHistory(
+              market.offerHistoryByResourceId?.[resource.id],
+              resourceOffer,
+              marketPriceHistoryLength,
+            );
+            return [
+              resource.id,
+              [...prevHistory, resourceOffer].slice(-marketPriceHistoryLength),
+            ];
+          }),
+        );
+        const nextProductionFactHistory: Record<string, number[]> = Object.fromEntries(
+          resources.map((resource) => {
+            const resourceSupplyFact = Math.max(0, factualSupply[resource.id] ?? 0);
+            const prevHistory = normalizeResourceAmountHistory(
+              market.productionFactHistoryByResourceId?.[resource.id],
+              resourceSupplyFact,
+              marketPriceHistoryLength,
+            );
+            return [
+              resource.id,
+              [...prevHistory, resourceSupplyFact].slice(-marketPriceHistoryLength),
+            ];
+          }),
+        );
+        const nextProductionMaxHistory: Record<string, number[]> = Object.fromEntries(
+          resources.map((resource) => {
+            const resourceProductionMax = Math.max(0, productionMax[resource.id] ?? 0);
+            const prevHistory = normalizeResourceAmountHistory(
+              market.productionMaxHistoryByResourceId?.[resource.id],
+              resourceProductionMax,
+              marketPriceHistoryLength,
+            );
+            return [
+              resource.id,
+              [...prevHistory, resourceProductionMax].slice(-marketPriceHistoryLength),
+            ];
+          }),
+        );
         return {
           ...market,
           priceByResourceId: nextPrices,
           priceHistoryByResourceId: nextHistory,
+          demandHistoryByResourceId: nextDemandHistory,
+          offerHistoryByResourceId: nextOfferHistory,
+          productionFactHistoryByResourceId: nextProductionFactHistory,
+          productionMaxHistoryByResourceId: nextProductionMaxHistory,
         };
       }),
     );
@@ -1791,6 +1882,10 @@ function App() {
       const demandByMarketAndResource = new Map<string, Record<string, number>>();
       const factualSupplyCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
       const marketVolumeCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
+      const productionMaxCurrentTurnByMarketAndResource = new Map<
+        string,
+        Record<string, number>
+      >();
       Object.values(prev).forEach((province) => {
         if (!province.ownerCountryId) return;
         const market = marketByCountry.get(province.ownerCountryId);
@@ -2066,6 +2161,25 @@ function App() {
       const buyerMarketId = buyer.ownerCountryId
         ? marketByCountry.get(buyer.ownerCountryId)?.id
         : undefined;
+      if (buyerMarketId) {
+        const productionMax =
+          productionMaxCurrentTurnByMarketAndResource.get(buyerMarketId) ?? {};
+        Object.entries(extraction ?? {}).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          productionMax[resourceId] = Math.max(
+            0,
+            (productionMax[resourceId] ?? 0) + amount,
+          );
+        });
+        Object.entries(production ?? {}).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          productionMax[resourceId] = Math.max(
+            0,
+            (productionMax[resourceId] ?? 0) + amount,
+          );
+        });
+        productionMaxCurrentTurnByMarketAndResource.set(buyerMarketId, productionMax);
+      }
       const collectMarketVolume = () => {
         if (!buyerMarketId) return;
         const marketVolume =
@@ -2165,6 +2279,7 @@ function App() {
       demandByMarketAndResource,
       factualSupplyByMarketAndResource: factualSupplyCurrentTurnByMarketAndResource,
       marketVolumeByMarketAndResource: marketVolumeCurrentTurnByMarketAndResource,
+      productionMaxByMarketAndResource: productionMaxCurrentTurnByMarketAndResource,
     };
       return next;
     });
@@ -2616,6 +2731,46 @@ function App() {
               ];
             }),
           );
+          const normalizedDemandHistory = Object.fromEntries(
+            normalizedLoadedResources.map((resource) => [
+              resource.id,
+              normalizeResourceAmountHistory(
+                market.demandHistoryByResourceId?.[resource.id],
+                0,
+                marketPriceHistoryLength,
+              ),
+            ]),
+          );
+          const normalizedOfferHistory = Object.fromEntries(
+            normalizedLoadedResources.map((resource) => [
+              resource.id,
+              normalizeResourceAmountHistory(
+                market.offerHistoryByResourceId?.[resource.id],
+                0,
+                marketPriceHistoryLength,
+              ),
+            ]),
+          );
+          const normalizedProductionFactHistory = Object.fromEntries(
+            normalizedLoadedResources.map((resource) => [
+              resource.id,
+              normalizeResourceAmountHistory(
+                market.productionFactHistoryByResourceId?.[resource.id],
+                0,
+                marketPriceHistoryLength,
+              ),
+            ]),
+          );
+          const normalizedProductionMaxHistory = Object.fromEntries(
+            normalizedLoadedResources.map((resource) => [
+              resource.id,
+              normalizeResourceAmountHistory(
+                market.productionMaxHistoryByResourceId?.[resource.id],
+                0,
+                marketPriceHistoryLength,
+              ),
+            ]),
+          );
           return {
             ...market,
             creatorCountryId:
@@ -2640,6 +2795,10 @@ function App() {
             ),
             priceByResourceId: normalizedPrices,
             priceHistoryByResourceId: normalizedHistory,
+            demandHistoryByResourceId: normalizedDemandHistory,
+            offerHistoryByResourceId: normalizedOfferHistory,
+            productionFactHistoryByResourceId: normalizedProductionFactHistory,
+            productionMaxHistoryByResourceId: normalizedProductionMaxHistory,
             capitalProvinceId:
               market.capitalProvinceId &&
               validProvinceIds.has(market.capitalProvinceId)
@@ -4933,6 +5092,22 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           ...(market.priceHistoryByResourceId ?? {}),
           [resourceId]: [normalizedBasePrice],
         },
+        demandHistoryByResourceId: {
+          ...(market.demandHistoryByResourceId ?? {}),
+          [resourceId]: [0],
+        },
+        offerHistoryByResourceId: {
+          ...(market.offerHistoryByResourceId ?? {}),
+          [resourceId]: [0],
+        },
+        productionFactHistoryByResourceId: {
+          ...(market.productionFactHistoryByResourceId ?? {}),
+          [resourceId]: [0],
+        },
+        productionMaxHistoryByResourceId: {
+          ...(market.productionMaxHistoryByResourceId ?? {}),
+          [resourceId]: [0],
+        },
       })),
     );
   };
@@ -5010,10 +5185,46 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             marketPriceHistoryLength,
           ),
         };
+        const nextDemandHistory = {
+          ...(market.demandHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourceAmountHistory(
+            market.demandHistoryByResourceId?.[resourceId],
+            0,
+            marketPriceHistoryLength,
+          ),
+        };
+        const nextOfferHistory = {
+          ...(market.offerHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourceAmountHistory(
+            market.offerHistoryByResourceId?.[resourceId],
+            0,
+            marketPriceHistoryLength,
+          ),
+        };
+        const nextProductionFactHistory = {
+          ...(market.productionFactHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourceAmountHistory(
+            market.productionFactHistoryByResourceId?.[resourceId],
+            0,
+            marketPriceHistoryLength,
+          ),
+        };
+        const nextProductionMaxHistory = {
+          ...(market.productionMaxHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourceAmountHistory(
+            market.productionMaxHistoryByResourceId?.[resourceId],
+            0,
+            marketPriceHistoryLength,
+          ),
+        };
         return {
           ...market,
           priceByResourceId: nextPrices,
           priceHistoryByResourceId: nextHistory,
+          demandHistoryByResourceId: nextDemandHistory,
+          offerHistoryByResourceId: nextOfferHistory,
+          productionFactHistoryByResourceId: nextProductionFactHistory,
+          productionMaxHistoryByResourceId: nextProductionMaxHistory,
         };
       }),
     );
@@ -5165,15 +5376,54 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         const hasHistory = Boolean(
           market.priceHistoryByResourceId && id in market.priceHistoryByResourceId,
         );
-        if (!hasPrice && !hasHistory) return market;
+        const hasDemandHistory = Boolean(
+          market.demandHistoryByResourceId && id in market.demandHistoryByResourceId,
+        );
+        const hasOfferHistory = Boolean(
+          market.offerHistoryByResourceId && id in market.offerHistoryByResourceId,
+        );
+        const hasProductionFactHistory = Boolean(
+          market.productionFactHistoryByResourceId &&
+            id in market.productionFactHistoryByResourceId,
+        );
+        const hasProductionMaxHistory = Boolean(
+          market.productionMaxHistoryByResourceId &&
+            id in market.productionMaxHistoryByResourceId,
+        );
+        if (
+          !hasPrice &&
+          !hasHistory &&
+          !hasDemandHistory &&
+          !hasOfferHistory &&
+          !hasProductionFactHistory &&
+          !hasProductionMaxHistory
+        ) {
+          return market;
+        }
         const nextPrices = { ...(market.priceByResourceId ?? {}) };
         const nextHistory = { ...(market.priceHistoryByResourceId ?? {}) };
+        const nextDemandHistory = { ...(market.demandHistoryByResourceId ?? {}) };
+        const nextOfferHistory = { ...(market.offerHistoryByResourceId ?? {}) };
+        const nextProductionFactHistory = {
+          ...(market.productionFactHistoryByResourceId ?? {}),
+        };
+        const nextProductionMaxHistory = {
+          ...(market.productionMaxHistoryByResourceId ?? {}),
+        };
         delete nextPrices[id];
         delete nextHistory[id];
+        delete nextDemandHistory[id];
+        delete nextOfferHistory[id];
+        delete nextProductionFactHistory[id];
+        delete nextProductionMaxHistory[id];
         return {
           ...market,
           priceByResourceId: nextPrices,
           priceHistoryByResourceId: nextHistory,
+          demandHistoryByResourceId: nextDemandHistory,
+          offerHistoryByResourceId: nextOfferHistory,
+          productionFactHistoryByResourceId: nextProductionFactHistory,
+          productionMaxHistoryByResourceId: nextProductionMaxHistory,
         };
       }),
     );

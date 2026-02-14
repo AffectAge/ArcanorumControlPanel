@@ -154,6 +154,10 @@ export type Market = {
   warehouseByResourceId?: Record<string, number>;
   priceByResourceId?: Record<string, number>;
   priceHistoryByResourceId?: Record<string, number[]>;
+  demandHistoryByResourceId?: Record<string, number[]>;
+  offerHistoryByResourceId?: Record<string, number[]>;
+  productionFactHistoryByResourceId?: Record<string, number[]>;
+  productionMaxHistoryByResourceId?: Record<string, number[]>;
   capitalProvinceId?: string;
   capitalLostSinceTurn?: number;
   createdTurn?: number;

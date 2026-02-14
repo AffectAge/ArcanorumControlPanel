@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowDown,
-  ArrowUp,
   BarChart3,
   Globe2,
-  Minus,
   Plus,
   Save,
   Send,
@@ -66,8 +63,10 @@ type MarketsModalProps = {
 type MarketsTab = 'market' | 'goods';
 
 const PRICE_TREND_EPSILON = 0.0001;
+const GRAPH_WIDTH = 84;
+const GRAPH_HEIGHT = 24;
 
-const getSparklinePath = (values: number[], width = 84, height = 22) => {
+const getSparklinePath = (values: number[], width = GRAPH_WIDTH, height = GRAPH_HEIGHT) => {
   if (values.length === 0) return '';
   if (values.length === 1) {
     const y = height / 2;
@@ -87,20 +86,109 @@ const getSparklinePath = (values: number[], width = 84, height = 22) => {
     .join(' ');
 };
 
-const MetricHeading = ({
-  label,
-  hint,
+const MiniGraphCard = ({
+  title,
+  value,
+  valueClassName,
+  borderClassName,
+  bgClassName,
+  values,
+  stroke,
+  ariaLabel,
+  tooltip,
 }: {
-  label: string;
-  hint: string;
+  title: string;
+  value: string;
+  valueClassName: string;
+  borderClassName: string;
+  bgClassName: string;
+  values: number[];
+  stroke: string;
+  ariaLabel: string;
+  tooltip: string;
 }) => (
-  <div className="group relative inline-flex items-center gap-1 text-white/45">
-    <span>{label}</span>
-    <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-      {hint}
+  <div
+    className={`group relative min-h-[86px] rounded-md border px-2 py-1.5 min-w-[116px] flex flex-col justify-between ${borderClassName} ${bgClassName}`}
+  >
+    <div className="text-[10px] text-white/80 leading-none mb-1">{title}</div>
+    <div className="inline-flex items-center justify-between gap-2 w-full">
+      <span className={`text-xs tabular-nums ${valueClassName}`}>{value}</span>
+      <svg
+        viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
+        className="h-6 w-[84px]"
+        aria-label={ariaLabel}
+      >
+        <path
+          d={getSparklinePath(values, GRAPH_WIDTH, GRAPH_HEIGHT)}
+          fill="none"
+          stroke={stroke}
+          strokeWidth="1.7"
+          strokeLinecap="round"
+        />
+      </svg>
     </div>
+    <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-56 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+      {tooltip}
+    </span>
   </div>
 );
+
+const ShareDonut = ({
+  label,
+  value,
+  pathColor,
+  amount,
+  amountLabel,
+  secondaryAmountLabel,
+  secondaryAmount,
+  description,
+}: {
+  label: string;
+  value: number;
+  pathColor: string;
+  amount: number;
+  amountLabel: string;
+  secondaryAmountLabel: string;
+  secondaryAmount: number;
+  description: string;
+}) => {
+  const normalized = Math.max(0, Math.min(100, value));
+  const pieBackground = `conic-gradient(${pathColor} 0% ${normalized}%, rgba(255,255,255,0.08) ${normalized}% 100%)`;
+  return (
+    <div className="group relative inline-flex flex-col items-center gap-1 min-w-[116px] rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5">
+      <div className="relative h-8 w-[84px] transition-transform duration-150 group-hover:scale-105">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="relative h-[30px] w-[30px]">
+            <div
+              className="absolute inset-0 rounded-full border border-white/20 shadow-[inset_0_0_10px_rgba(255,255,255,0.1)]"
+              style={{ background: pieBackground }}
+            />
+            <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.2),transparent_48%)]" />
+            <div className="absolute inset-[5px] rounded-full border border-white/15 bg-[#09101a]/95" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[8px] font-medium text-white/90 tabular-nums">
+                {normalized.toFixed(0)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <span className="text-[10px] text-white/60 leading-none">{label}</span>
+      <span className="text-[10px] text-white/85 tabular-nums leading-none">
+        {amountLabel}: {amount.toFixed(0)}
+      </span>
+      <span className="text-[9px] text-white/50 tabular-nums leading-none">
+        {secondaryAmountLabel}: {secondaryAmount.toFixed(0)}
+      </span>
+      <span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-60 -translate-x-1/2 rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        {description}
+        <br />
+        {amountLabel}: {amount.toFixed(0)} | {secondaryAmountLabel}: {secondaryAmount.toFixed(0)}
+        {' '}({normalized.toFixed(1)}%)
+      </span>
+    </div>
+  );
+};
 
 export default function MarketsModal({
   open,
@@ -343,6 +431,60 @@ export default function MarketsModal({
         marketPriceHistory.push(marketPrice);
       }
       const normalizedPriceHistory = marketPriceHistory.slice(-10);
+      const demandHistoryRaw = (
+        memberMarket?.demandHistoryByResourceId?.[resource.id] ?? []
+      ).filter((item) => Number.isFinite(item) && Number(item) >= 0) as number[];
+      const marketDemandHistory =
+        demandHistoryRaw.length > 0 ? [...demandHistoryRaw.slice(-10)] : [demand];
+      if (
+        marketDemandHistory.length === 0 ||
+        Math.abs(marketDemandHistory[marketDemandHistory.length - 1] - demand) >
+          PRICE_TREND_EPSILON
+      ) {
+        marketDemandHistory.push(demand);
+      }
+      const normalizedDemandHistory = marketDemandHistory.slice(-10);
+      const offerHistoryRaw = (
+        memberMarket?.offerHistoryByResourceId?.[resource.id] ?? []
+      ).filter((item) => Number.isFinite(item) && Number(item) >= 0) as number[];
+      const marketOfferHistory =
+        offerHistoryRaw.length > 0 ? [...offerHistoryRaw.slice(-10)] : [marketOffer];
+      if (
+        marketOfferHistory.length === 0 ||
+        Math.abs(marketOfferHistory[marketOfferHistory.length - 1] - marketOffer) >
+          PRICE_TREND_EPSILON
+      ) {
+        marketOfferHistory.push(marketOffer);
+      }
+      const normalizedOfferHistory = marketOfferHistory.slice(-10);
+      const productionFactHistoryRaw = (
+        memberMarket?.productionFactHistoryByResourceId?.[resource.id] ?? []
+      ).filter((item) => Number.isFinite(item) && Number(item) >= 0) as number[];
+      const marketProductionFactHistory =
+        productionFactHistoryRaw.length > 0
+          ? [...productionFactHistoryRaw.slice(-10)]
+          : [supplyFact];
+      if (
+        marketProductionFactHistory.length === 0 ||
+        Math.abs(marketProductionFactHistory[marketProductionFactHistory.length - 1] - supplyFact) >
+          PRICE_TREND_EPSILON
+      ) {
+        marketProductionFactHistory.push(supplyFact);
+      }
+      const normalizedProductionFactHistory = marketProductionFactHistory.slice(-10);
+      const productionMaxHistoryRaw = (
+        memberMarket?.productionMaxHistoryByResourceId?.[resource.id] ?? []
+      ).filter((item) => Number.isFinite(item) && Number(item) >= 0) as number[];
+      const marketProductionMaxHistory =
+        productionMaxHistoryRaw.length > 0 ? [...productionMaxHistoryRaw.slice(-10)] : [supplyMax];
+      if (
+        marketProductionMaxHistory.length === 0 ||
+        Math.abs(marketProductionMaxHistory[marketProductionMaxHistory.length - 1] - supplyMax) >
+          PRICE_TREND_EPSILON
+      ) {
+        marketProductionMaxHistory.push(supplyMax);
+      }
+      const normalizedProductionMaxHistory = marketProductionMaxHistory.slice(-10);
       const previousPrice =
         normalizedPriceHistory.length > 1
           ? normalizedPriceHistory[normalizedPriceHistory.length - 2]
@@ -362,6 +504,7 @@ export default function MarketsModal({
         resourceId: resource.id,
         resourceName: resource.name,
         resourceColor: resource.color,
+        resourceIconDataUrl: resource.iconDataUrl,
         marketPrice,
         marketPriceHistory: normalizedPriceHistory,
         priceTrend,
@@ -370,7 +513,11 @@ export default function MarketsModal({
         marketDemand: demand,
         marketProductionFact: supplyFact,
         marketProductionMax: supplyMax,
+        marketProductionFactHistory: normalizedProductionFactHistory,
+        marketProductionMaxHistory: normalizedProductionMaxHistory,
         marketOffer,
+        marketDemandHistory: normalizedDemandHistory,
+        marketOfferHistory: normalizedOfferHistory,
         marketSupply: totalMarketStock,
         depositSupply: deposits,
         worldMarketSupply: worldMarketAmount,
@@ -380,12 +527,20 @@ export default function MarketsModal({
       };
     });
 
+    const maxWorldDeposits = Math.max(1, ...rows.map((row) => row.worldDeposits));
+    const maxWorldMarketSupply = Math.max(1, ...rows.map((row) => row.worldMarketSupply));
+    const normalizedRows = rows.map((row) => ({
+      ...row,
+      worldDepositsRelative: (row.worldDeposits / maxWorldDeposits) * 100,
+      worldMarketSupplyRelative: (row.worldMarketSupply / maxWorldMarketSupply) * 100,
+    }));
+
     const warehouseTotal = Object.values(warehouse).reduce(
       (acc, value) => acc + (Number.isFinite(value) ? Math.max(0, value) : 0),
       0,
     );
 
-    return { rows, warehouseTotal };
+    return { rows: normalizedRows, warehouseTotal };
   }, [memberMarket, provinces, resources, buildings]);
   if (!open) return null;
 
@@ -761,139 +916,124 @@ export default function MarketsModal({
                                 <span className="text-white/50 text-xs tabular-nums">
                                   {row.index}.
                                 </span>
-                                <span
-                                  className="w-2.5 h-2.5 rounded-full"
-                                  style={{ backgroundColor: row.resourceColor }}
-                                />
+                                {row.resourceIconDataUrl ? (
+                                  <img
+                                    src={row.resourceIconDataUrl}
+                                    alt={row.resourceName}
+                                    className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                                  />
+                                ) : (
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full"
+                                    style={{ backgroundColor: row.resourceColor }}
+                                  />
+                                )}
                                 <span className="text-sm">{row.resourceName}</span>
                               </div>
-                              <div
-                                className={`inline-flex flex-col items-end gap-1 rounded-md border px-2 py-1 ${
-                                  row.priceTrend === 'up'
-                                    ? 'text-emerald-200 border-emerald-400/40 bg-emerald-500/15'
-                                    : row.priceTrend === 'down'
-                                      ? 'text-rose-200 border-rose-400/40 bg-rose-500/15'
-                                      : 'text-white/90 border-white/25 bg-white/10'
-                                }`}
-                              >
-                                <span className="inline-flex items-center gap-1 text-sm tabular-nums">
-                                  {row.priceTrend === 'up' ? (
-                                    <ArrowUp className="w-3 h-3" />
-                                  ) : row.priceTrend === 'down' ? (
-                                    <ArrowDown className="w-3 h-3" />
-                                  ) : (
-                                    <Minus className="w-3 h-3" />
-                                  )}
-                                  Цена: {row.marketPrice.toFixed(2)}
-                                </span>
-                                <div className="rounded border border-white/15 bg-black/35 px-1.5 py-0.5">
-                                  <svg
-                                    viewBox="0 0 84 22"
-                                    className="h-5 w-[84px]"
-                                    aria-label="График цены за 10 ходов"
-                                  >
-                                    <path
-                                      d={getSparklinePath(row.marketPriceHistory)}
-                                      fill="none"
-                                      stroke={
-                                        row.priceTrend === 'up'
-                                          ? '#34d399'
-                                          : row.priceTrend === 'down'
-                                            ? '#fb7185'
-                                            : '#f8fafc'
-                                      }
-                                      strokeWidth="1.8"
-                                      strokeLinecap="round"
-                                    />
-                                  </svg>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 text-xs tabular-nums">
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Цена рынка"
-                                  hint="Рыночная стоимость запасов этого ресурса в вашем рынке."
+                              <div className="flex flex-wrap items-center justify-end gap-2">
+                                <MiniGraphCard
+                                  title="Цена за ед."
+                                  value={row.marketPrice.toFixed(2)}
+                                  valueClassName="text-yellow-200"
+                                  borderClassName="border-yellow-400/35"
+                                  bgClassName="bg-yellow-500/10"
+                                  values={row.marketPriceHistory}
+                                  stroke={
+                                    row.priceTrend === 'up'
+                                      ? '#34d399'
+                                      : row.priceTrend === 'down'
+                                        ? '#fb7185'
+                                        : '#fde047'
+                                  }
+                                  ariaLabel="График цены за единицу за 10 ходов"
+                                  tooltip="Цена одной единицы ресурса в вашем рынке за последние 10 ходов."
                                 />
-                                <div className="text-amber-200">{row.marketValue.toFixed(2)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Спрос"
-                                  hint="Суммарное потребление ресурса зданиями рынка за ход."
+                                <MiniGraphCard
+                                  title="Цена рынка"
+                                  value={row.marketValue.toFixed(2)}
+                                  valueClassName="text-amber-200"
+                                  borderClassName="border-amber-400/35"
+                                  bgClassName="bg-amber-500/10"
+                                  values={row.marketPriceHistory.map((price) => row.marketSupply * price)}
+                                  stroke="#f59e0b"
+                                  ariaLabel="График цены рынка за 10 ходов"
+                                  tooltip="Оценка запасов ресурса в вашем рынке: объем в хранилищах × цена за единицу."
                                 />
-                                <div className="text-rose-200">{row.marketDemand.toFixed(0)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Предложение"
-                                  hint="Доступный объём: фактическое производство плюс запасы складов."
+                                <MiniGraphCard
+                                  title="Стоимость мест."
+                                  value={row.depositValue.toFixed(2)}
+                                  valueClassName="text-fuchsia-200"
+                                  borderClassName="border-fuchsia-400/35"
+                                  bgClassName="bg-fuchsia-500/10"
+                                  values={row.marketPriceHistory.map((price) => row.depositSupply * price)}
+                                  stroke="#e879f9"
+                                  ariaLabel="График стоимости месторождений за 10 ходов"
+                                  tooltip="Оценка ваших месторождений по текущей цене ресурса за последние 10 ходов."
                                 />
-                                <div className="text-teal-200">{row.marketOffer.toFixed(0)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Произв. факт"
-                                  hint="Реально произведённый объём ресурса за последний ход."
+                                <MiniGraphCard
+                                  title="Спрос"
+                                  value={row.marketDemand.toFixed(0)}
+                                  valueClassName="text-rose-200"
+                                  borderClassName="border-rose-400/35"
+                                  bgClassName="bg-rose-500/10"
+                                  values={row.marketDemandHistory}
+                                  stroke="#fb7185"
+                                  ariaLabel="График спроса за 10 ходов"
+                                  tooltip="Сколько ресурса в сумме потребляют здания рынка за ход."
                                 />
-                                <div className="text-teal-200">{row.marketProductionFact.toFixed(0)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Произв. макс"
-                                  hint="Теоретический максимум выпуска при полной эффективности."
+                                <MiniGraphCard
+                                  title="Предложение"
+                                  value={row.marketOffer.toFixed(0)}
+                                  valueClassName="text-teal-200"
+                                  borderClassName="border-teal-400/35"
+                                  bgClassName="bg-teal-500/10"
+                                  values={row.marketOfferHistory}
+                                  stroke="#2dd4bf"
+                                  ariaLabel="График предложения за 10 ходов"
+                                  tooltip="Доступный объем ресурса: фактическое производство + складские запасы."
                                 />
-                                <div className="text-cyan-200">{row.marketProductionMax.toFixed(0)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Объем рынка"
-                                  hint="Текущие складские запасы ресурса внутри вашего рынка."
+                                <MiniGraphCard
+                                  title="Произв. факт"
+                                  value={row.marketProductionFact.toFixed(0)}
+                                  valueClassName="text-emerald-200"
+                                  borderClassName="border-emerald-400/35"
+                                  bgClassName="bg-emerald-500/10"
+                                  values={row.marketProductionFactHistory}
+                                  stroke="#34d399"
+                                  ariaLabel="График фактического производства за 10 ходов"
+                                  tooltip="Реально произведенный объем ресурса (добыча + производство) за ход."
                                 />
-                                <div className="text-emerald-200">{row.marketSupply.toFixed(0)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Месторождения"
-                                  hint="Суммарный объём ресурса в месторождениях стран вашего рынка."
+                                <MiniGraphCard
+                                  title="Произв. макс"
+                                  value={row.marketProductionMax.toFixed(0)}
+                                  valueClassName="text-cyan-200"
+                                  borderClassName="border-cyan-400/35"
+                                  bgClassName="bg-cyan-500/10"
+                                  values={row.marketProductionMaxHistory}
+                                  stroke="#22d3ee"
+                                  ariaLabel="График максимального производства за 10 ходов"
+                                  tooltip="Теоретический максимум производства при 100% эффективности зданий."
                                 />
-                                <div className="text-violet-200">{row.depositSupply.toFixed(0)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Стоимость мест."
-                                  hint="Оценка месторождений по текущей цене за единицу."
+                                <ShareDonut
+                                  label="Доля месторождений"
+                                  value={row.depositShare}
+                                  pathColor="rgba(232, 121, 249, 0.95)"
+                                  amount={row.depositSupply}
+                                  amountLabel="Ваши"
+                                  secondaryAmountLabel="В мире"
+                                  secondaryAmount={row.worldDeposits}
+                                  description="Доля ваших месторождений этого ресурса от мировых запасов."
                                 />
-                                <div className="text-fuchsia-200">{row.depositValue.toFixed(2)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Мировой объем"
-                                  hint="Все складские запасы ресурса по миру."
+                                <ShareDonut
+                                  label="Доля объема рынка"
+                                  value={row.marketShare}
+                                  pathColor="rgba(125, 211, 252, 0.95)"
+                                  amount={row.marketSupply}
+                                  amountLabel="Ваш"
+                                  secondaryAmountLabel="В мире"
+                                  secondaryAmount={row.worldMarketSupply}
+                                  description="Доля запасов вашего рынка от суммарного мирового объема на складах."
                                 />
-                                <div className="text-white/75">{row.worldMarketSupply.toFixed(0)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Доля рынка"
-                                  hint="Процент запасов вашего рынка от мирового объёма."
-                                />
-                                <div className="text-sky-200">{row.marketShare.toFixed(1)}%</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Мировые запасы"
-                                  hint="Суммарный объём месторождений ресурса по всему миру."
-                                />
-                                <div className="text-violet-200">{row.worldDeposits.toFixed(0)}</div>
-                              </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5">
-                                <MetricHeading
-                                  label="Доля месторожд."
-                                  hint="Процент месторождений вашего рынка от мирового объёма."
-                                />
-                                <div className="text-fuchsia-200">{row.depositShare.toFixed(1)}%</div>
                               </div>
                             </div>
                           </div>
