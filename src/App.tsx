@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Handshake } from 'lucide-react';
 import TopBar from './components/TopBar';
 import LeftToolbar from './components/LeftToolbar';
@@ -545,6 +545,11 @@ function App() {
   const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>(
     undefined,
   );
+  const pendingMarketPriceMetricsRef = useRef<{
+    demandByMarketAndResource: Map<string, Record<string, number>>;
+    factualSupplyByMarketAndResource: Map<string, Record<string, number>>;
+    marketVolumeByMarketAndResource: Map<string, Record<string, number>>;
+  } | null>(null);
 
   const ensureMarketsMapLayer = useCallback((layers: MapLayer[]) => {
     if (layers.some((layer) => layer.id === 'markets')) return layers;
@@ -1666,6 +1671,64 @@ function App() {
       ? owner.countryId || provinceOwnerCountryId
       : companies.find((company) => company.id === owner.companyId)?.countryId;
 
+  const applyMarketPriceTurn = (metrics: {
+    demandByMarketAndResource: Map<string, Record<string, number>>;
+    factualSupplyByMarketAndResource: Map<string, Record<string, number>>;
+    marketVolumeByMarketAndResource: Map<string, Record<string, number>>;
+  }) => {
+    setMarkets((prev) =>
+      prev.map((market) => {
+        const demand = metrics.demandByMarketAndResource.get(market.id) ?? {};
+        const factualSupply =
+          metrics.factualSupplyByMarketAndResource.get(market.id) ?? {};
+        const marketVolume =
+          metrics.marketVolumeByMarketAndResource.get(market.id) ?? {};
+        const nextPrices: Record<string, number> = {};
+        resources.forEach((resource) => {
+          const basePrice = normalizeResourcePrice(
+            resource.basePrice,
+            DEFAULT_RESOURCE_BASE_PRICE,
+          );
+          const currentPrice = normalizeResourcePrice(
+            market.priceByResourceId?.[resource.id],
+            basePrice,
+          );
+          const resourceDemand = Math.max(0, demand[resource.id] ?? 0);
+          const resourceSupplyFact = Math.max(0, factualSupply[resource.id] ?? 0);
+          const resourceMarketVolume = Math.max(0, marketVolume[resource.id] ?? 0);
+          nextPrices[resource.id] = computeNextMarketPrice({
+            currentPrice,
+            basePrice,
+            demand: resourceDemand,
+            productionFact: resourceSupplyFact,
+            marketVolume: resourceMarketVolume,
+            minMarketPrice: resource.minMarketPrice,
+            maxMarketPrice: resource.maxMarketPrice,
+          });
+        });
+        const nextHistory: Record<string, number[]> = Object.fromEntries(
+          resources.map((resource) => {
+            const basePrice = normalizeResourcePrice(resource.basePrice);
+            const nextPrice = normalizeResourcePrice(nextPrices[resource.id], basePrice);
+            const prevHistory = normalizeResourcePriceHistory(
+              market.priceHistoryByResourceId?.[resource.id],
+              nextPrice,
+            );
+            return [
+              resource.id,
+              [...prevHistory, nextPrice].slice(-MARKET_PRICE_HISTORY_LENGTH),
+            ];
+          }),
+        );
+        return {
+          ...market,
+          priceByResourceId: nextPrices,
+          priceHistoryByResourceId: nextHistory,
+        };
+      }),
+    );
+  };
+
   const applyBuildingEconomyTurn = () => {
     type BuildingRuntime = {
       provinceId: string;
@@ -1683,361 +1746,313 @@ function App() {
         marketByCountry.set(countryId, market);
       });
     });
-    const demandByMarketAndResource = new Map<string, Record<string, number>>();
-    const factualSupplyCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
-    const marketVolumeCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
-    Object.values(provinces).forEach((province) => {
-      if (!province.ownerCountryId) return;
-      const market = marketByCountry.get(province.ownerCountryId);
-      if (!market) return;
-      const demand = demandByMarketAndResource.get(market.id) ?? {};
-      (province.buildingsBuilt ?? []).forEach((entry) => {
-        const inactiveByProductivity =
-          Number.isFinite(entry.lastProductivity) &&
-          Number(entry.lastProductivity) <= 0;
-        if (inactiveByProductivity) return;
-        const definition = definitionById.get(entry.buildingId);
-        Object.entries(definition?.consumptionByResourceId ?? {}).forEach(
-          ([resourceId, amount]) => {
-            if (!Number.isFinite(amount) || amount <= 0) return;
-            demand[resourceId] = Math.max(0, (demand[resourceId] ?? 0) + amount);
-          },
-        );
-      });
-      demandByMarketAndResource.set(market.id, demand);
-    });
-
     setProvinces((prev) => {
+      const demandByMarketAndResource = new Map<string, Record<string, number>>();
+      const factualSupplyCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
+      const marketVolumeCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
+      Object.values(prev).forEach((province) => {
+        if (!province.ownerCountryId) return;
+        const market = marketByCountry.get(province.ownerCountryId);
+        if (!market) return;
+        const demand = demandByMarketAndResource.get(market.id) ?? {};
+        (province.buildingsBuilt ?? []).forEach((entry) => {
+          const inactiveByProductivity =
+            Number.isFinite(entry.lastProductivity) &&
+            Number(entry.lastProductivity) <= 0;
+          if (inactiveByProductivity) return;
+          const definition = definitionById.get(entry.buildingId);
+          Object.entries(definition?.consumptionByResourceId ?? {}).forEach(
+            ([resourceId, amount]) => {
+              if (!Number.isFinite(amount) || amount <= 0) return;
+              demand[resourceId] = Math.max(0, (demand[resourceId] ?? 0) + amount);
+            },
+          );
+        });
+        demandByMarketAndResource.set(market.id, demand);
+      });
+
       const hasBuiltBuildings = Object.values(prev).some(
         (province) => (province.buildingsBuilt?.length ?? 0) > 0,
       );
-      if (!hasBuiltBuildings) return prev;
+      if (!hasBuiltBuildings) {
+        pendingMarketPriceMetricsRef.current = null;
+        return prev;
+      }
 
       const next: ProvinceRecord = {};
       const runtime: BuildingRuntime[] = [];
 
       Object.entries(prev).forEach(([provinceId, province]) => {
-        const nextBuilt = (province.buildingsBuilt ?? []).map((entry) => {
-          const definition = definitionById.get(entry.buildingId);
-          const startingDucats = normalizePositiveNumber(definition?.startingDucats) ?? 0;
-          return {
-            ...entry,
-            owner:
-              entry.owner.type === 'state'
-                ? {
-                    type: 'state' as const,
-                    countryId: entry.owner.countryId || province.ownerCountryId || 'state',
-                  }
-                : entry.owner,
-            warehouseByResourceId: {
-              ...(normalizeResourceMap(entry.warehouseByResourceId) ?? {}),
-            },
-            ducats:
-              Number.isFinite(entry.ducats) && Number(entry.ducats) >= 0
-                ? Number(entry.ducats)
-                : startingDucats,
-            lastProductivity:
-              Number.isFinite(entry.lastProductivity)
-                ? clamp01(Number(entry.lastProductivity))
-                : 1,
-            lastPurchaseNeedByResourceId: undefined,
-            lastPurchasedByResourceId: undefined,
-            lastPurchaseCostDucats: 0,
-            lastConsumedByResourceId: {},
-            lastExtractedByResourceId: {},
-            lastProducedByResourceId: {},
-          };
-        });
-
-        next[provinceId] = {
-          ...province,
-          buildingsBuilt: nextBuilt,
+      const nextBuilt = (province.buildingsBuilt ?? []).map((entry) => {
+        const definition = definitionById.get(entry.buildingId);
+        const startingDucats = normalizePositiveNumber(definition?.startingDucats) ?? 0;
+        return {
+          ...entry,
+          owner:
+            entry.owner.type === 'state'
+              ? {
+                  type: 'state' as const,
+                  countryId: entry.owner.countryId || province.ownerCountryId || 'state',
+                }
+              : entry.owner,
+          warehouseByResourceId: {
+            ...(normalizeResourceMap(entry.warehouseByResourceId) ?? {}),
+          },
+          ducats:
+            Number.isFinite(entry.ducats) && Number(entry.ducats) >= 0
+              ? Number(entry.ducats)
+              : startingDucats,
+          lastProductivity:
+            Number.isFinite(entry.lastProductivity)
+              ? clamp01(Number(entry.lastProductivity))
+              : 1,
+          lastPurchaseNeedByResourceId: undefined,
+          lastPurchasedByResourceId: undefined,
+          lastPurchaseCostDucats: 0,
+          lastConsumedByResourceId: {},
+          lastExtractedByResourceId: {},
+          lastProducedByResourceId: {},
         };
-
-        nextBuilt.forEach((entry) => {
-          const ownerCountryId = getOwnerCountryIdForBuilding(
-            entry.owner,
-            province.ownerCountryId,
-          );
-          runtime.push({
-            provinceId,
-            provinceOwnerCountryId: province.ownerCountryId,
-            entry,
-            definition: definitionById.get(entry.buildingId),
-            ownerCountryId,
-          });
-        });
       });
 
-      runtime.forEach((buyer) => {
-        const consumption = normalizeResourceMap(buyer.definition?.consumptionByResourceId);
-        const extraction = normalizeResourceMap(buyer.definition?.extractionByResourceId);
-        const production = normalizeResourceMap(buyer.definition?.productionByResourceId);
-        const consumptionEntries = Object.entries(consumption ?? {});
-        const buyerWarehouse = buyer.entry.warehouseByResourceId ?? {};
-        const buyerMarket = buyer.ownerCountryId
-          ? marketByCountry.get(buyer.ownerCountryId)
-          : undefined;
-        const purchaseNeedByResourceId: Record<string, number> = {};
-        const actualPurchasedByResourceId: Record<string, number> = {};
-        let purchaseCostDucats = 0;
+      next[provinceId] = {
+        ...province,
+        buildingsBuilt: nextBuilt,
+      };
 
-        if (consumptionEntries.length > 0 && buyerMarket) {
-          consumptionEntries.forEach(([resourceId, requiredAmount]) => {
-            let shortage = Math.max(
-              0,
-              requiredAmount - Math.max(0, buyerWarehouse[resourceId] ?? 0),
-            );
-            if (shortage > 0) {
-              purchaseNeedByResourceId[resourceId] = shortage;
-            }
-            if (shortage <= 0) return;
-
-            const prioritizedSellers = runtime
-              .filter((seller) => seller !== buyer)
-              .sort((a, b) => {
-                const aOwnCountry =
-                  Boolean(buyer.ownerCountryId) &&
-                  a.provinceOwnerCountryId === buyer.ownerCountryId;
-                const bOwnCountry =
-                  Boolean(buyer.ownerCountryId) &&
-                  b.provinceOwnerCountryId === buyer.ownerCountryId;
-                if (aOwnCountry === bOwnCountry) return 0;
-                return aOwnCountry ? -1 : 1;
-              });
-
-            for (const seller of prioritizedSellers) {
-              if (seller === buyer) continue;
-              if (
-                !seller.provinceOwnerCountryId ||
-                !buyerMarket.memberCountryIds.includes(seller.provinceOwnerCountryId)
-              ) {
-                continue;
-              }
-              if (shortage <= 0) break;
-
-              const sellerWarehouse = seller.entry.warehouseByResourceId ?? {};
-              const sellerStock = Math.max(0, sellerWarehouse[resourceId] ?? 0);
-              if (sellerStock <= 0) continue;
-              const buyerMarketPrices = buyerMarket.priceByResourceId ?? {};
-              const unitPrice = normalizeResourcePrice(
-                buyerMarketPrices[resourceId],
-                normalizeResourcePrice(resourceById.get(resourceId)?.basePrice),
-              );
-
-              const buyerFunds = Math.max(0, buyer.entry.ducats ?? 0);
-              const affordable = Math.floor(buyerFunds / unitPrice);
-              if (affordable <= 0) break;
-
-              const amount = Math.min(shortage, sellerStock, affordable);
-              if (amount <= 0) continue;
-
-              buyerWarehouse[resourceId] = Math.max(
-                0,
-                (buyerWarehouse[resourceId] ?? 0) + amount,
-              );
-              sellerWarehouse[resourceId] = Math.max(
-                0,
-                (sellerWarehouse[resourceId] ?? 0) - amount,
-              );
-              if (sellerWarehouse[resourceId] <= 0) {
-                delete sellerWarehouse[resourceId];
-              }
-              seller.entry.warehouseByResourceId = sellerWarehouse;
-              buyer.entry.ducats = Math.max(
-                0,
-                (buyer.entry.ducats ?? 0) - amount * unitPrice,
-              );
-              actualPurchasedByResourceId[resourceId] = Math.max(
-                0,
-                (actualPurchasedByResourceId[resourceId] ?? 0) + amount,
-              );
-              purchaseCostDucats += amount * unitPrice;
-              seller.entry.ducats = Math.max(
-                0,
-                (seller.entry.ducats ?? 0) + amount * unitPrice,
-              );
-              shortage -= amount;
-            }
-          });
-        }
-
-        let productivity = 1;
-        const actualConsumedByResourceId: Record<string, number> = {};
-        const actualExtractedByResourceId: Record<string, number> = {};
-        const actualProducedByResourceId: Record<string, number> = {};
-        if (consumptionEntries.length > 0) {
-          productivity = consumptionEntries.reduce((minRatio, [resourceId, requiredAmount]) => {
-            if (requiredAmount <= 0) return minRatio;
-            const available = Math.max(0, buyerWarehouse[resourceId] ?? 0);
-            return Math.min(minRatio, available / requiredAmount);
-          }, 1);
-          productivity = Number.isFinite(productivity) ? clamp01(productivity) : 0;
-
-          consumptionEntries.forEach(([resourceId, requiredAmount]) => {
-            const amountToConsume = requiredAmount * productivity;
-            if (amountToConsume <= 0) return;
-            actualConsumedByResourceId[resourceId] = amountToConsume;
-            const remaining = Math.max(0, (buyerWarehouse[resourceId] ?? 0) - amountToConsume);
-            if (remaining > 0) {
-              buyerWarehouse[resourceId] = remaining;
-            } else {
-              delete buyerWarehouse[resourceId];
-            }
-          });
-        }
-
-        buyer.entry.lastProductivity = productivity;
-        buyer.entry.lastPurchaseNeedByResourceId = normalizeResourceMap(
-          purchaseNeedByResourceId,
+      nextBuilt.forEach((entry) => {
+        const ownerCountryId = getOwnerCountryIdForBuilding(
+          entry.owner,
+          province.ownerCountryId,
         );
-        buyer.entry.lastPurchasedByResourceId = normalizeResourceMap(
-          actualPurchasedByResourceId,
-        );
-        buyer.entry.lastPurchaseCostDucats = Math.max(0, purchaseCostDucats);
-        buyer.entry.lastConsumedByResourceId = normalizeResourceMap(actualConsumedByResourceId);
-        buyer.entry.warehouseByResourceId = buyerWarehouse;
-        const buyerMarketId = buyer.ownerCountryId
-          ? marketByCountry.get(buyer.ownerCountryId)?.id
-          : undefined;
-        if (buyerMarketId) {
-          const marketVolume =
-            marketVolumeCurrentTurnByMarketAndResource.get(buyerMarketId) ?? {};
-          Object.entries(buyerWarehouse).forEach(([resourceId, amount]) => {
-            if (!Number.isFinite(amount) || amount <= 0) return;
-            marketVolume[resourceId] = Math.max(
-              0,
-              (marketVolume[resourceId] ?? 0) + amount,
-            );
-          });
-          marketVolumeCurrentTurnByMarketAndResource.set(buyerMarketId, marketVolume);
-        }
-        if (productivity <= 0) {
-          buyer.entry.lastExtractedByResourceId = undefined;
-          buyer.entry.lastProducedByResourceId = undefined;
-          return;
-        }
+        runtime.push({
+          provinceId,
+          provinceOwnerCountryId: province.ownerCountryId,
+          entry,
+          definition: definitionById.get(entry.buildingId),
+          ownerCountryId,
+        });
+      });
+    });
 
-        const provinceForExtraction = next[buyer.provinceId];
-        const provinceResourceAmounts = {
-          ...(provinceForExtraction.resourceAmounts ?? {}),
-        };
-        let provinceAmountsChanged = false;
-        Object.entries(extraction ?? {}).forEach(([resourceId, baseAmount]) => {
-          const plannedExtraction = baseAmount * productivity;
-          if (plannedExtraction <= 0) return;
-          const provinceStock = Math.max(0, provinceResourceAmounts[resourceId] ?? 0);
-          const extracted = Math.min(plannedExtraction, provinceStock);
-          if (extracted <= 0) return;
-          actualExtractedByResourceId[resourceId] = extracted;
-          buyerWarehouse[resourceId] = Math.max(
+    runtime.forEach((buyer) => {
+      const consumption = normalizeResourceMap(buyer.definition?.consumptionByResourceId);
+      const extraction = normalizeResourceMap(buyer.definition?.extractionByResourceId);
+      const production = normalizeResourceMap(buyer.definition?.productionByResourceId);
+      const consumptionEntries = Object.entries(consumption ?? {});
+      const buyerWarehouse = buyer.entry.warehouseByResourceId ?? {};
+      const buyerMarket = buyer.ownerCountryId
+        ? marketByCountry.get(buyer.ownerCountryId)
+        : undefined;
+      const purchaseNeedByResourceId: Record<string, number> = {};
+      const actualPurchasedByResourceId: Record<string, number> = {};
+      let purchaseCostDucats = 0;
+
+      if (consumptionEntries.length > 0 && buyerMarket) {
+        consumptionEntries.forEach(([resourceId, requiredAmount]) => {
+          let shortage = Math.max(
             0,
-            (buyerWarehouse[resourceId] ?? 0) + extracted,
+            requiredAmount - Math.max(0, buyerWarehouse[resourceId] ?? 0),
           );
-          const provinceRemaining = Math.max(0, provinceStock - extracted);
-          if (provinceRemaining > 0) {
-            provinceResourceAmounts[resourceId] = provinceRemaining;
-          } else {
-            delete provinceResourceAmounts[resourceId];
+          if (shortage > 0) {
+            purchaseNeedByResourceId[resourceId] = shortage;
           }
-          provinceAmountsChanged = true;
-        });
-        if (provinceAmountsChanged) {
-          provinceForExtraction.resourceAmounts = provinceResourceAmounts;
-        }
+          if (shortage <= 0) return;
 
-        Object.entries(production ?? {}).forEach(([resourceId, baseAmount]) => {
-          const produced = baseAmount * productivity;
-          if (produced <= 0) return;
-          actualProducedByResourceId[resourceId] = produced;
-          buyerWarehouse[resourceId] = Math.max(
+          const prioritizedSellers = runtime
+            .filter((seller) => seller !== buyer)
+            .sort((a, b) => {
+              const aOwnCountry =
+                Boolean(buyer.ownerCountryId) &&
+                a.provinceOwnerCountryId === buyer.ownerCountryId;
+              const bOwnCountry =
+                Boolean(buyer.ownerCountryId) &&
+                b.provinceOwnerCountryId === buyer.ownerCountryId;
+              if (aOwnCountry === bOwnCountry) return 0;
+              return aOwnCountry ? -1 : 1;
+            });
+
+          for (const seller of prioritizedSellers) {
+            if (seller === buyer) continue;
+            if (
+              !seller.provinceOwnerCountryId ||
+              !buyerMarket.memberCountryIds.includes(seller.provinceOwnerCountryId)
+            ) {
+              continue;
+            }
+            if (shortage <= 0) break;
+
+            const sellerWarehouse = seller.entry.warehouseByResourceId ?? {};
+            const sellerStock = Math.max(0, sellerWarehouse[resourceId] ?? 0);
+            if (sellerStock <= 0) continue;
+            const buyerMarketPrices = buyerMarket.priceByResourceId ?? {};
+            const unitPrice = normalizeResourcePrice(
+              buyerMarketPrices[resourceId],
+              normalizeResourcePrice(resourceById.get(resourceId)?.basePrice),
+            );
+
+            const buyerFunds = Math.max(0, buyer.entry.ducats ?? 0);
+            const affordable = Math.floor(buyerFunds / unitPrice);
+            if (affordable <= 0) break;
+
+            const amount = Math.min(shortage, sellerStock, affordable);
+            if (amount <= 0) continue;
+
+            buyerWarehouse[resourceId] = Math.max(
+              0,
+              (buyerWarehouse[resourceId] ?? 0) + amount,
+            );
+            sellerWarehouse[resourceId] = Math.max(
+              0,
+              (sellerWarehouse[resourceId] ?? 0) - amount,
+            );
+            if (sellerWarehouse[resourceId] <= 0) {
+              delete sellerWarehouse[resourceId];
+            }
+            seller.entry.warehouseByResourceId = sellerWarehouse;
+            buyer.entry.ducats = Math.max(
+              0,
+              (buyer.entry.ducats ?? 0) - amount * unitPrice,
+            );
+            actualPurchasedByResourceId[resourceId] = Math.max(
+              0,
+              (actualPurchasedByResourceId[resourceId] ?? 0) + amount,
+            );
+            purchaseCostDucats += amount * unitPrice;
+            seller.entry.ducats = Math.max(
+              0,
+              (seller.entry.ducats ?? 0) + amount * unitPrice,
+            );
+            shortage -= amount;
+          }
+        });
+      }
+
+      let productivity = 1;
+      const actualConsumedByResourceId: Record<string, number> = {};
+      const actualExtractedByResourceId: Record<string, number> = {};
+      const actualProducedByResourceId: Record<string, number> = {};
+      if (consumptionEntries.length > 0) {
+        productivity = consumptionEntries.reduce((minRatio, [resourceId, requiredAmount]) => {
+          if (requiredAmount <= 0) return minRatio;
+          const available = Math.max(0, buyerWarehouse[resourceId] ?? 0);
+          return Math.min(minRatio, available / requiredAmount);
+        }, 1);
+        productivity = Number.isFinite(productivity) ? clamp01(productivity) : 0;
+
+        consumptionEntries.forEach(([resourceId, requiredAmount]) => {
+          const amountToConsume = requiredAmount * productivity;
+          if (amountToConsume <= 0) return;
+          actualConsumedByResourceId[resourceId] = amountToConsume;
+          const remaining = Math.max(0, (buyerWarehouse[resourceId] ?? 0) - amountToConsume);
+          if (remaining > 0) {
+            buyerWarehouse[resourceId] = remaining;
+          } else {
+            delete buyerWarehouse[resourceId];
+          }
+        });
+      }
+
+      const buyerMarketId = buyer.ownerCountryId
+        ? marketByCountry.get(buyer.ownerCountryId)?.id
+        : undefined;
+      const collectMarketVolume = () => {
+        if (!buyerMarketId) return;
+        const marketVolume =
+          marketVolumeCurrentTurnByMarketAndResource.get(buyerMarketId) ?? {};
+        Object.entries(buyerWarehouse).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          marketVolume[resourceId] = Math.max(
             0,
-            (buyerWarehouse[resourceId] ?? 0) + produced,
+            (marketVolume[resourceId] ?? 0) + amount,
           );
         });
-        if (buyerMarketId) {
-          const marketSupply =
-            factualSupplyCurrentTurnByMarketAndResource.get(buyerMarketId) ?? {};
-          Object.entries(actualExtractedByResourceId).forEach(([resourceId, amount]) => {
-            if (!Number.isFinite(amount) || amount <= 0) return;
-            marketSupply[resourceId] = Math.max(
-              0,
-              (marketSupply[resourceId] ?? 0) + amount,
-            );
-          });
-          Object.entries(actualProducedByResourceId).forEach(([resourceId, amount]) => {
-            if (!Number.isFinite(amount) || amount <= 0) return;
-            marketSupply[resourceId] = Math.max(
-              0,
-              (marketSupply[resourceId] ?? 0) + amount,
-            );
-          });
-          factualSupplyCurrentTurnByMarketAndResource.set(buyerMarketId, marketSupply);
-        }
-        buyer.entry.lastExtractedByResourceId = normalizeResourceMap(actualExtractedByResourceId);
-        buyer.entry.lastProducedByResourceId = normalizeResourceMap(actualProducedByResourceId);
-      });
+        marketVolumeCurrentTurnByMarketAndResource.set(buyerMarketId, marketVolume);
+      };
+      buyer.entry.lastProductivity = productivity;
+      buyer.entry.lastPurchaseNeedByResourceId = normalizeResourceMap(
+        purchaseNeedByResourceId,
+      );
+      buyer.entry.lastPurchasedByResourceId = normalizeResourceMap(
+        actualPurchasedByResourceId,
+      );
+      buyer.entry.lastPurchaseCostDucats = Math.max(0, purchaseCostDucats);
+      buyer.entry.lastConsumedByResourceId = normalizeResourceMap(actualConsumedByResourceId);
+      buyer.entry.warehouseByResourceId = buyerWarehouse;
+      if (productivity <= 0) {
+        collectMarketVolume();
+        buyer.entry.lastExtractedByResourceId = undefined;
+        buyer.entry.lastProducedByResourceId = undefined;
+        return;
+      }
 
+      const provinceForExtraction = next[buyer.provinceId];
+      const provinceResourceAmounts = {
+        ...(provinceForExtraction.resourceAmounts ?? {}),
+      };
+      let provinceAmountsChanged = false;
+      Object.entries(extraction ?? {}).forEach(([resourceId, baseAmount]) => {
+        const plannedExtraction = baseAmount * productivity;
+        if (plannedExtraction <= 0) return;
+        const provinceStock = Math.max(0, provinceResourceAmounts[resourceId] ?? 0);
+        const extracted = Math.min(plannedExtraction, provinceStock);
+        if (extracted <= 0) return;
+        actualExtractedByResourceId[resourceId] = extracted;
+        buyerWarehouse[resourceId] = Math.max(
+          0,
+          (buyerWarehouse[resourceId] ?? 0) + extracted,
+        );
+        const provinceRemaining = Math.max(0, provinceStock - extracted);
+        if (provinceRemaining > 0) {
+          provinceResourceAmounts[resourceId] = provinceRemaining;
+        } else {
+          delete provinceResourceAmounts[resourceId];
+        }
+        provinceAmountsChanged = true;
+      });
+      if (provinceAmountsChanged) {
+        provinceForExtraction.resourceAmounts = provinceResourceAmounts;
+      }
+
+      Object.entries(production ?? {}).forEach(([resourceId, baseAmount]) => {
+        const produced = baseAmount * productivity;
+        if (produced <= 0) return;
+        actualProducedByResourceId[resourceId] = produced;
+        buyerWarehouse[resourceId] = Math.max(
+          0,
+          (buyerWarehouse[resourceId] ?? 0) + produced,
+        );
+      });
+      if (buyerMarketId) {
+        const marketSupply =
+          factualSupplyCurrentTurnByMarketAndResource.get(buyerMarketId) ?? {};
+        Object.entries(actualExtractedByResourceId).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          marketSupply[resourceId] = Math.max(
+            0,
+            (marketSupply[resourceId] ?? 0) + amount,
+          );
+        });
+        Object.entries(actualProducedByResourceId).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          marketSupply[resourceId] = Math.max(
+            0,
+            (marketSupply[resourceId] ?? 0) + amount,
+          );
+        });
+        factualSupplyCurrentTurnByMarketAndResource.set(buyerMarketId, marketSupply);
+      }
+      collectMarketVolume();
+      buyer.entry.lastExtractedByResourceId = normalizeResourceMap(actualExtractedByResourceId);
+      buyer.entry.lastProducedByResourceId = normalizeResourceMap(actualProducedByResourceId);
+    });
+    pendingMarketPriceMetricsRef.current = {
+      demandByMarketAndResource,
+      factualSupplyByMarketAndResource: factualSupplyCurrentTurnByMarketAndResource,
+      marketVolumeByMarketAndResource: marketVolumeCurrentTurnByMarketAndResource,
+    };
       return next;
     });
-    const nextMarketPricesByMarketId = new Map<string, Record<string, number>>();
-    markets.forEach((market) => {
-      const demand = demandByMarketAndResource.get(market.id) ?? {};
-      const factualSupply =
-        factualSupplyCurrentTurnByMarketAndResource.get(market.id) ?? {};
-      const marketVolume =
-        marketVolumeCurrentTurnByMarketAndResource.get(market.id) ?? {};
-      const nextPrices: Record<string, number> = {};
-      resources.forEach((resource) => {
-        const basePrice = normalizeResourcePrice(resource.basePrice, DEFAULT_RESOURCE_BASE_PRICE);
-        const currentPrice = normalizeResourcePrice(
-          market.priceByResourceId?.[resource.id],
-          basePrice,
-        );
-        const resourceDemand = Math.max(0, demand[resource.id] ?? 0);
-        const resourceSupplyFact = Math.max(0, factualSupply[resource.id] ?? 0);
-        const resourceMarketVolume = Math.max(0, marketVolume[resource.id] ?? 0);
-        nextPrices[resource.id] = computeNextMarketPrice({
-          currentPrice,
-          basePrice,
-          demand: resourceDemand,
-          productionFact: resourceSupplyFact,
-          marketVolume: resourceMarketVolume,
-          minMarketPrice: resource.minMarketPrice,
-          maxMarketPrice: resource.maxMarketPrice,
-        });
-      });
-      nextMarketPricesByMarketId.set(market.id, nextPrices);
-    });
-    if (nextMarketPricesByMarketId.size > 0) {
-      setMarkets((prev) =>
-        prev.map((market) => {
-          const nextPrices =
-            nextMarketPricesByMarketId.get(market.id) ??
-            market.priceByResourceId ??
-            {};
-          const nextHistory: Record<string, number[]> = Object.fromEntries(
-            resources.map((resource) => {
-              const basePrice = normalizeResourcePrice(resource.basePrice);
-              const nextPrice = normalizeResourcePrice(nextPrices[resource.id], basePrice);
-              const prevHistory = normalizeResourcePriceHistory(
-                market.priceHistoryByResourceId?.[resource.id],
-                nextPrice,
-              );
-              return [
-                resource.id,
-                [...prevHistory, nextPrice].slice(-MARKET_PRICE_HISTORY_LENGTH),
-              ];
-            }),
-          );
-          return {
-            ...market,
-            priceByResourceId: nextPrices,
-            priceHistoryByResourceId: nextHistory,
-          };
-        }),
-      );
-    }
   };
 
   const endTurn = () => {
@@ -2060,7 +2075,6 @@ function App() {
         applyColonizationTurn(country.id);
         applyConstructionTurn(country.id);
       });
-      applyBuildingEconomyTurn();
     }
     setActiveCountryId(nextId);
     if (wraps) {
@@ -2291,6 +2305,14 @@ function App() {
           setMarkets(nextMarkets);
         }
       }
+      applyBuildingEconomyTurn();
+      setProvinces((prev) => {
+        const metrics = pendingMarketPriceMetricsRef.current;
+        if (!metrics) return prev;
+        pendingMarketPriceMetricsRef.current = null;
+        Promise.resolve().then(() => applyMarketPriceTurn(metrics));
+        return prev;
+      });
     }
   };
 
