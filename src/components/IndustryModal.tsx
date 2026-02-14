@@ -1712,7 +1712,7 @@ export default function IndustryModal({
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                        Потребление (факт / макс)
+                                        Потребление
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                           План и факт потребления ресурсов за ход.
                                         </span>
@@ -1753,7 +1753,7 @@ export default function IndustryModal({
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                        Добыча (факт / макс)
+                                        Добыча
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                           План и факт добычи ресурсов за ход.
                                         </span>
@@ -1794,7 +1794,7 @@ export default function IndustryModal({
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                        Производство (факт / макс)
+                                        Производство 
                                         <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                           План и факт производства ресурсов за ход.
                                         </span>
@@ -2296,7 +2296,7 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                  Потребление (факт / макс)
+                                  Потребление
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и факт потребления ресурсов за ход.
                                   </span>
@@ -2337,7 +2337,7 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                  Закуплено за ход (факт / макс)
+                                  Закуплено за ход
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и факт закупки ресурсов за ход.
                                   </span>
@@ -2376,7 +2376,7 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                  Добыча (факт / макс)
+                                  Добыча
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и факт добычи ресурсов за ход.
                                   </span>
@@ -2417,7 +2417,7 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
-                                  Производство (факт / макс)
+                                  Производство 
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и факт производства ресурсов за ход.
                                   </span>
