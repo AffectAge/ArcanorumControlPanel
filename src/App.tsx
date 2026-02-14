@@ -269,6 +269,20 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
                 Number(entry.lastPurchaseCostDucats) >= 0
                   ? Number(entry.lastPurchaseCostDucats)
                   : 0,
+              lastPurchaseCostByResourceId: normalizeResourceMap(
+                entry.lastPurchaseCostByResourceId,
+              ),
+              lastSoldByResourceId: normalizeResourceMap(
+                entry.lastSoldByResourceId,
+              ),
+              lastSalesRevenueDucats:
+                Number.isFinite(entry.lastSalesRevenueDucats) &&
+                Number(entry.lastSalesRevenueDucats) >= 0
+                  ? Number(entry.lastSalesRevenueDucats)
+                  : 0,
+              lastSalesRevenueByResourceId: normalizeResourceMap(
+                entry.lastSalesRevenueByResourceId,
+              ),
               lastConsumedByResourceId: normalizeResourceMap(
                 entry.lastConsumedByResourceId,
               ),
@@ -296,6 +310,10 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
             lastPurchaseNeedByResourceId: undefined,
             lastPurchasedByResourceId: undefined,
             lastPurchaseCostDucats: 0,
+            lastPurchaseCostByResourceId: undefined,
+            lastSoldByResourceId: undefined,
+            lastSalesRevenueDucats: 0,
+            lastSalesRevenueByResourceId: undefined,
             lastConsumedByResourceId: undefined,
             lastExtractedByResourceId: undefined,
             lastProducedByResourceId: undefined,
@@ -321,6 +339,10 @@ const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
               lastPurchaseNeedByResourceId: undefined,
               lastPurchasedByResourceId: undefined,
               lastPurchaseCostDucats: 0,
+              lastPurchaseCostByResourceId: undefined,
+              lastSoldByResourceId: undefined,
+              lastSalesRevenueDucats: 0,
+              lastSalesRevenueByResourceId: undefined,
               lastConsumedByResourceId: undefined,
               lastExtractedByResourceId: undefined,
               lastProducedByResourceId: undefined,
@@ -1960,6 +1982,10 @@ function App() {
           lastPurchaseNeedByResourceId: undefined,
           lastPurchasedByResourceId: undefined,
           lastPurchaseCostDucats: 0,
+          lastPurchaseCostByResourceId: undefined,
+          lastSoldByResourceId: undefined,
+          lastSalesRevenueDucats: 0,
+          lastSalesRevenueByResourceId: undefined,
           lastConsumedByResourceId: {},
           lastExtractedByResourceId: {},
           lastProducedByResourceId: {},
@@ -1997,6 +2023,7 @@ function App() {
         : undefined;
       const purchaseNeedByResourceId: Record<string, number> = {};
       const actualPurchasedByResourceId: Record<string, number> = {};
+      const purchaseCostByResourceId: Record<string, number> = {};
       let purchaseCostDucats = 0;
 
       if (consumptionEntries.length > 0 && buyerMarket) {
@@ -2099,10 +2126,34 @@ function App() {
               (actualPurchasedByResourceId[resourceId] ?? 0) + amount,
             );
             purchaseCostDucats += amount * unitPrice;
+            purchaseCostByResourceId[resourceId] = Math.max(
+              0,
+              (purchaseCostByResourceId[resourceId] ?? 0) + amount * unitPrice,
+            );
             seller.entry.ducats = Math.max(
               0,
               (seller.entry.ducats ?? 0) + amount * unitPrice,
             );
+            const sellerSoldByResourceId = {
+              ...(seller.entry.lastSoldByResourceId ?? {}),
+            };
+            sellerSoldByResourceId[resourceId] = Math.max(
+              0,
+              (sellerSoldByResourceId[resourceId] ?? 0) + amount,
+            );
+            seller.entry.lastSoldByResourceId = sellerSoldByResourceId;
+            seller.entry.lastSalesRevenueDucats = Math.max(
+              0,
+              (seller.entry.lastSalesRevenueDucats ?? 0) + amount * unitPrice,
+            );
+            const sellerRevenueByResourceId = {
+              ...(seller.entry.lastSalesRevenueByResourceId ?? {}),
+            };
+            sellerRevenueByResourceId[resourceId] = Math.max(
+              0,
+              (sellerRevenueByResourceId[resourceId] ?? 0) + amount * unitPrice,
+            );
+            seller.entry.lastSalesRevenueByResourceId = sellerRevenueByResourceId;
             shortage -= amount;
             if (resourceCategoryId) {
               const consumedInfrastructure = amount * infrastructureCostPerUnit;
@@ -2201,6 +2252,9 @@ function App() {
         actualPurchasedByResourceId,
       );
       buyer.entry.lastPurchaseCostDucats = Math.max(0, purchaseCostDucats);
+      buyer.entry.lastPurchaseCostByResourceId = normalizeResourceMap(
+        purchaseCostByResourceId,
+      );
       buyer.entry.lastConsumedByResourceId = normalizeResourceMap(actualConsumedByResourceId);
       buyer.entry.warehouseByResourceId = buyerWarehouse;
       if (productivity <= 0) {

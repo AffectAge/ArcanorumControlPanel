@@ -380,6 +380,10 @@ export type BuiltBuilding = {
   lastPurchaseNeedByResourceId?: Record<string, number>;
   lastPurchasedByResourceId?: Record<string, number>;
   lastPurchaseCostDucats?: number;
+  lastPurchaseCostByResourceId?: Record<string, number>;
+  lastSoldByResourceId?: Record<string, number>;
+  lastSalesRevenueDucats?: number;
+  lastSalesRevenueByResourceId?: Record<string, number>;
   lastConsumedByResourceId?: Record<string, number>;
   lastExtractedByResourceId?: Record<string, number>;
   lastProducedByResourceId?: Record<string, number>;

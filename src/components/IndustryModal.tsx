@@ -915,6 +915,7 @@ export default function IndustryModal({
   const [filterIndustryId, setFilterIndustryId] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'construction' | 'built'>('all');
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterEconomy, setFilterEconomy] = useState<'all' | 'profitable' | 'loss'>('all');
   const [sortBy, setSortBy] = useState<'building' | 'province' | 'company' | 'industry'>(
     'building',
   );
@@ -977,6 +978,26 @@ export default function IndustryModal({
     }));
   };
 
+  const getTradeRows = (
+    amounts?: Record<string, number>,
+    sums?: Record<string, number>,
+  ) => {
+    const ids = Array.from(
+      new Set([...Object.keys(amounts ?? {}), ...Object.keys(sums ?? {})]),
+    )
+      .filter((id) => Math.max(0, amounts?.[id] ?? 0) > 0 || Math.max(0, sums?.[id] ?? 0) > 0)
+      .sort((a, b) =>
+        (resourceNameById.get(a) ?? a).localeCompare(resourceNameById.get(b) ?? b),
+      );
+    return ids.map((id) => ({
+      id,
+      name: resourceNameById.get(id) ?? id,
+      iconDataUrl: resourceIconById.get(id),
+      amount: Math.max(0, amounts?.[id] ?? 0),
+      sum: Math.max(0, sums?.[id] ?? 0),
+    }));
+  };
+
   const cards = useMemo(() => {
     const builtCards = rows.flatMap((province) =>
       (province.buildingsBuilt ?? []).map((entry, index) => ({
@@ -997,6 +1018,8 @@ export default function IndustryModal({
           activeDiplomacyAgreements,
           buildings,
         ),
+        ducatsDelta:
+          (entry.lastSalesRevenueDucats ?? 0) - (entry.lastPurchaseCostDucats ?? 0),
       })),
     );
 
@@ -1021,6 +1044,7 @@ export default function IndustryModal({
               activeDiplomacyAgreements,
               buildings,
             ),
+            ducatsDelta: 0,
           })),
       ),
     );
@@ -1045,6 +1069,7 @@ export default function IndustryModal({
         countryId: province.ownerCountryId,
         progress: undefined as number | undefined,
         isActive: true,
+        ducatsDelta: 0,
       }));
 
     return [...builtCards, ...constructionCards, ...emptyCards];
@@ -1079,6 +1104,11 @@ export default function IndustryModal({
       if (filterStatus !== 'all' && card.kind !== filterStatus) return false;
       if (filterActive === 'active' && !card.isActive) return false;
       if (filterActive === 'inactive' && card.isActive) return false;
+      if (filterEconomy !== 'all') {
+        if (card.kind !== 'built') return false;
+        if (filterEconomy === 'profitable' && card.ducatsDelta <= 0) return false;
+        if (filterEconomy === 'loss' && card.ducatsDelta >= 0) return false;
+      }
       return true;
     });
 
@@ -1130,6 +1160,7 @@ export default function IndustryModal({
     filterIndustryId,
     filterStatus,
     filterActive,
+    filterEconomy,
     sortBy,
     companies,
     buildings,
@@ -1174,7 +1205,7 @@ export default function IndustryModal({
         </div>
 
         <div className="p-4 space-y-3 flex-1 min-h-0">
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
             <label className="flex flex-col gap-2 text-white/70 text-xs">
               Фильтр по зданию
               <select
@@ -1330,6 +1361,26 @@ export default function IndustryModal({
                 </option>
               </select>
             </label>
+            <label className="flex flex-col gap-2 text-white/70 text-xs">
+              Экономика
+              <select
+                value={filterEconomy}
+                onChange={(event) =>
+                  setFilterEconomy(event.target.value as 'all' | 'profitable' | 'loss')
+                }
+                className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
+              >
+                <option value="all" className="bg-[#0b111b] text-white">
+                  Все
+                </option>
+                <option value="profitable" className="bg-[#0b111b] text-white">
+                  Доходные
+                </option>
+                <option value="loss" className="bg-[#0b111b] text-white">
+                  Убыточные
+                </option>
+              </select>
+            </label>
           </div>
 
           <div className="flex items-center justify-between gap-3 text-white/60 text-xs">
@@ -1347,6 +1398,7 @@ export default function IndustryModal({
                   setFilterIndustryId('');
                   setFilterStatus('all');
                   setFilterActive('all');
+                  setFilterEconomy('all');
                 }}
                 className="h-8 px-3 rounded-lg border border-white/10 bg-black/40 text-white/60 text-xs hover:border-emerald-400/40 hover:text-emerald-300"
               >
@@ -1466,6 +1518,16 @@ export default function IndustryModal({
                         const productivityPercent = Math.round(
                           Math.max(0, Math.min(1, builtEntry?.lastProductivity ?? 0)) * 100,
                         );
+                        const ducatsDelta =
+                          (builtEntry?.lastSalesRevenueDucats ?? 0) -
+                          (builtEntry?.lastPurchaseCostDucats ?? 0);
+                        const ducatsDeltaBadgeClass =
+                          ducatsDelta > 0
+                            ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200'
+                            : ducatsDelta < 0
+                              ? 'border-rose-400/35 bg-rose-500/15 text-rose-200'
+                              : 'border-white/20 bg-white/10 text-white/85';
+                        const ducatsDeltaLabel = `${ducatsDelta > 0 ? '+' : ''}${ducatsDelta.toFixed(1)} /ход`;
                         const warehouseRows = getEconomyRows(
                           builtEntry?.warehouseByResourceId,
                           builtEntry?.warehouseByResourceId,
@@ -1477,6 +1539,14 @@ export default function IndustryModal({
                         const purchaseRows = getEconomyRows(
                           builtEntry?.lastPurchaseNeedByResourceId,
                           builtEntry?.lastPurchasedByResourceId,
+                        );
+                        const purchasedTradeRows = getTradeRows(
+                          builtEntry?.lastPurchasedByResourceId,
+                          builtEntry?.lastPurchaseCostByResourceId,
+                        );
+                        const soldTradeRows = getTradeRows(
+                          builtEntry?.lastSoldByResourceId,
+                          builtEntry?.lastSalesRevenueByResourceId,
                         );
                         const extractionRows = getEconomyRows(
                           building?.extractionByResourceId,
@@ -1673,6 +1743,14 @@ export default function IndustryModal({
                                           Текущий запас дукатов здания.
                                         </span>
                                       </span>
+                                      <span
+                                        className={`relative group rounded-lg border px-2 py-0.5 tabular-nums ${ducatsDeltaBadgeClass}`}
+                                      >
+                                        {ducatsDeltaLabel}
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                          Изменение дукатов за ход: продажи минус закупки.
+                                        </span>
+                                      </span>
                                     </div>
                                   </div>
                                   <div className="space-y-2">
@@ -1709,6 +1787,79 @@ export default function IndustryModal({
                                       ) : (
                                         <div className="text-white/45 text-[11px]">пусто</div>
                                       )}
+                                    </div>
+                                    <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                      <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                        Торговля за ход
+                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                          Какие ресурсы были куплены и проданы зданием за последний ход.
+                                        </span>
+                                      </div>
+                                      {purchasedTradeRows.length > 0 ? (
+                                        purchasedTradeRows.map((row) => (
+                                          <div
+                                            key={`trade-buy-${card.key}-${row.id}`}
+                                            className="w-full rounded border border-emerald-400/30 bg-emerald-500/5 px-2 py-1"
+                                          >
+                                            <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                              <span className="flex items-center gap-1.5">
+                                                {row.iconDataUrl ? (
+                                                  <img
+                                                    src={row.iconDataUrl}
+                                                    alt=""
+                                                    className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                  />
+                                                ) : (
+                                                  <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                                )}
+                                                <span>{row.name}</span>
+                                              </span>
+                                              <span className="inline-flex items-center gap-1">
+                                                <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                                  куплено {row.amount.toFixed(1)}
+                                                </span>
+                                                <span className="rounded border border-cyan-400/35 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200">
+                                                  -{row.sum.toFixed(1)} дук.
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))
+                                      ) : null}
+                                      {soldTradeRows.length > 0 ? (
+                                        soldTradeRows.map((row) => (
+                                          <div
+                                            key={`trade-sell-${card.key}-${row.id}`}
+                                            className="w-full rounded border border-sky-400/30 bg-sky-500/5 px-2 py-1"
+                                          >
+                                            <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                              <span className="flex items-center gap-1.5">
+                                                {row.iconDataUrl ? (
+                                                  <img
+                                                    src={row.iconDataUrl}
+                                                    alt=""
+                                                    className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                                  />
+                                                ) : (
+                                                  <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                                )}
+                                                <span>{row.name}</span>
+                                              </span>
+                                              <span className="inline-flex items-center gap-1">
+                                                <span className="rounded border border-sky-400/35 bg-sky-500/10 px-1.5 py-0.5 text-sky-200">
+                                                  продано {row.amount.toFixed(1)}
+                                                </span>
+                                                <span className="rounded border border-violet-400/35 bg-violet-500/10 px-1.5 py-0.5 text-violet-200">
+                                                  +{row.sum.toFixed(1)} дук.
+                                                </span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))
+                                      ) : null}
+                                      {purchasedTradeRows.length === 0 && soldTradeRows.length === 0 ? (
+                                        <div className="text-white/45 text-[11px]">сделок не было</div>
+                                      ) : null}
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
@@ -1750,6 +1901,17 @@ export default function IndustryModal({
                                       ) : (
                                         <div className="text-white/45 text-[11px]">не настроено</div>
                                       )}
+                                      <div className="pt-1 border-t border-white/10 flex items-center justify-between text-[11px] tabular-nums">
+                                        <span className="relative group text-white/55">
+                                          Затраты на закупку
+                                          <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                            Сколько дукатов здание потратило на покупку ресурсов за последний ход.
+                                          </span>
+                                        </span>
+                                        <span className="text-white-200">
+                                          {(builtEntry?.lastPurchaseCostDucats ?? 0).toFixed(1)} дук.
+                                        </span>
+                                      </div>
                                     </div>
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
@@ -2000,6 +2162,16 @@ export default function IndustryModal({
                   const productivityPercent = Math.round(
                     Math.max(0, Math.min(1, builtEntry?.lastProductivity ?? 0)) * 100,
                   );
+                  const ducatsDelta =
+                    (builtEntry?.lastSalesRevenueDucats ?? 0) -
+                    (builtEntry?.lastPurchaseCostDucats ?? 0);
+                  const ducatsDeltaBadgeClass =
+                    ducatsDelta > 0
+                      ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200'
+                      : ducatsDelta < 0
+                        ? 'border-rose-400/35 bg-rose-500/15 text-rose-200'
+                        : 'border-white/20 bg-white/10 text-white/85';
+                  const ducatsDeltaLabel = `${ducatsDelta > 0 ? '+' : ''}${ducatsDelta.toFixed(1)} /ход`;
                   const warehouseRows = getEconomyRows(
                     builtEntry?.warehouseByResourceId,
                     builtEntry?.warehouseByResourceId,
@@ -2011,6 +2183,14 @@ export default function IndustryModal({
                   const purchaseRows = getEconomyRows(
                     builtEntry?.lastPurchaseNeedByResourceId,
                     builtEntry?.lastPurchasedByResourceId,
+                  );
+                  const purchasedTradeRows = getTradeRows(
+                    builtEntry?.lastPurchasedByResourceId,
+                    builtEntry?.lastPurchaseCostByResourceId,
+                  );
+                  const soldTradeRows = getTradeRows(
+                    builtEntry?.lastSoldByResourceId,
+                    builtEntry?.lastSalesRevenueByResourceId,
                   );
                   const extractionRows = getEconomyRows(
                     building?.extractionByResourceId,
@@ -2251,10 +2431,12 @@ export default function IndustryModal({
                                     Текущий запас дукатов здания.
                                   </span>
                                 </span>
-                                <span className="relative group rounded-full border border-cyan-400/35 bg-cyan-500/15 px-2 py-0.5 text-cyan-200 tabular-nums">
-                                  -{(builtEntry?.lastPurchaseCostDucats ?? 0).toFixed(1)} закуп
+                                <span
+                                  className={`relative group rounded-full border px-2 py-0.5 tabular-nums ${ducatsDeltaBadgeClass}`}
+                                >
+                                  {ducatsDeltaLabel}
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Потрачено на закупки в этом ходу.
+                                    Изменение дукатов за ход: продажи минус закупки.
                                   </span>
                                 </span>
                               </div>
@@ -2296,6 +2478,79 @@ export default function IndustryModal({
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
+                                  Торговля за ход
+                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
+                                    Какие ресурсы были куплены и проданы зданием за последний ход.
+                                  </span>
+                                </div>
+                                {purchasedTradeRows.length > 0 ? (
+                                  purchasedTradeRows.map((row) => (
+                                    <div
+                                      key={`trade-buy-mobile-${card.key}-${row.id}`}
+                                      className="w-full rounded border border-emerald-400/30 bg-emerald-500/5 px-2 py-1"
+                                    >
+                                      <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                        <span className="flex items-center gap-1.5">
+                                          {row.iconDataUrl ? (
+                                            <img
+                                              src={row.iconDataUrl}
+                                              alt=""
+                                              className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                            />
+                                          ) : (
+                                            <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                          )}
+                                          <span>{row.name}</span>
+                                        </span>
+                                        <span className="inline-flex items-center gap-1">
+                                          <span className="rounded border border-emerald-400/35 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-200">
+                                            куплено {row.amount.toFixed(1)}
+                                          </span>
+                                          <span className="rounded border border-cyan-400/35 bg-cyan-500/10 px-1.5 py-0.5 text-cyan-200">
+                                            -{row.sum.toFixed(1)} дук.
+                                          </span>
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : null}
+                                {soldTradeRows.length > 0 ? (
+                                  soldTradeRows.map((row) => (
+                                    <div
+                                      key={`trade-sell-mobile-${card.key}-${row.id}`}
+                                      className="w-full rounded border border-sky-400/30 bg-sky-500/5 px-2 py-1"
+                                    >
+                                      <div className="flex items-center justify-between text-[11px] text-white/70 tabular-nums">
+                                        <span className="flex items-center gap-1.5">
+                                          {row.iconDataUrl ? (
+                                            <img
+                                              src={row.iconDataUrl}
+                                              alt=""
+                                              className="w-3.5 h-3.5 rounded object-cover border border-white/10"
+                                            />
+                                          ) : (
+                                            <span className="w-3.5 h-3.5 rounded-full border border-white/15 bg-white/10" />
+                                          )}
+                                          <span>{row.name}</span>
+                                        </span>
+                                        <span className="inline-flex items-center gap-1">
+                                          <span className="rounded border border-sky-400/35 bg-sky-500/10 px-1.5 py-0.5 text-sky-200">
+                                            продано {row.amount.toFixed(1)}
+                                          </span>
+                                          <span className="rounded border border-violet-400/35 bg-violet-500/10 px-1.5 py-0.5 text-violet-200">
+                                            +{row.sum.toFixed(1)} дук.
+                                          </span>
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : null}
+                                {purchasedTradeRows.length === 0 && soldTradeRows.length === 0 ? (
+                                  <div className="text-white/45 text-[11px]">сделок не было</div>
+                                ) : null}
+                              </div>
+                              <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
+                                <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
                                   Потребление
                                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100 normal-case tracking-normal">
                                     План и фактическое потребление ресурсов за ход.
@@ -2334,6 +2589,17 @@ export default function IndustryModal({
                                 ) : (
                                   <div className="text-white/45 text-[11px]">не настроено</div>
                                 )}
+                                <div className="pt-1 border-t border-white/10 flex items-center justify-between text-[11px] tabular-nums">
+                                  <span className="relative group text-white/55">
+                                    Затраты на закупку
+                                    <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                      Сколько дукатов здание потратило на покупку ресурсов за последний ход.
+                                    </span>
+                                  </span>
+                                  <span className="text-cyan-200">
+                                    {(builtEntry?.lastPurchaseCostDucats ?? 0).toFixed(1)} дук.
+                                  </span>
+                                </div>
                               </div>
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
