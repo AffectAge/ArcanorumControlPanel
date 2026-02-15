@@ -1,23 +1,39 @@
-import { Swords, Bird, TrendingUp, Lightbulb } from 'lucide-react';
+import { Factory, ShoppingCart, TrendingUp, Lightbulb } from 'lucide-react';
 import { useState } from 'react';
 import Tooltip from './Tooltip';
 
 const tools = [
-  { id: 'select', icon: Swords, label: 'Select' },
-  { id: 'diplomacy', icon: Bird, label: 'Diplomacy' },
+  { id: 'industry', icon: Factory, label: 'Индустрия' },
+  { id: 'markets', icon: ShoppingCart, label: 'Товары и торговля' },
   { id: 'economy', icon: TrendingUp, label: 'Economy' },
   { id: 'tech', icon: Lightbulb, label: 'Tech' },
 ];
 
-export default function LeftToolbar() {
-  const [activeTool, setActiveTool] = useState('select');
+type LeftToolbarProps = {
+  onOpenIndustry: () => void;
+  onOpenMarkets: () => void;
+};
+
+export default function LeftToolbar({
+  onOpenIndustry,
+  onOpenMarkets,
+}: LeftToolbarProps) {
+  const [activeTool, setActiveTool] = useState('industry');
 
   return (
     <div className="absolute left-4 top-20 flex flex-col gap-3 z-40 animate-slideRight">
       {tools.map((tool, index) => (
         <Tooltip key={tool.id} label={tool.label}>
           <button
-            onClick={() => setActiveTool(tool.id)}
+            onClick={() => {
+              setActiveTool(tool.id);
+              if (tool.id === 'industry') {
+                onOpenIndustry();
+              }
+              if (tool.id === 'markets') {
+                onOpenMarkets();
+              }
+            }}
             className={`
               w-11 h-11 rounded-xl backdrop-blur-xl border transition-all duration-200 flex items-center justify-center group
               ${

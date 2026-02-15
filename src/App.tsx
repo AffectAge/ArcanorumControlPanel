@@ -5744,7 +5744,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           Предложения ({pendingDiplomacyProposals.length})
         </button>
       )}
-      <LeftToolbar />
+      <LeftToolbar
+        onOpenIndustry={() => setIndustryOpen(true)}
+        onOpenMarkets={() => setMarketsOpen(true)}
+      />
       {logisticsRoutePlannerActive && (
         <div className="absolute left-1/2 -translate-x-1/2 bottom-24 z-40 rounded-xl border border-cyan-400/40 bg-[#08131f]/90 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-900/30">
           <div className="px-2">

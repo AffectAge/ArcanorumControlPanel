@@ -652,15 +652,41 @@ export default function MarketsModal({
                         className="h-9 rounded-lg bg-black/40 border border-white/10 p-1"
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-white/70 text-sm">
-                      Логотип рынка
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(event) => handleLogoUpload(event.target.files?.[0])}
-                        className="text-xs text-white/70 file:mr-3 file:h-8 file:px-3 file:rounded-md file:border file:border-white/10 file:bg-black/30 file:text-white/80"
-                      />
-                    </label>
+                    <div className="flex flex-col gap-1 text-white/70 text-sm">
+                      <span>Логотип рынка</span>
+                      <div className="rounded-lg border border-white/10 bg-black/30 p-2 flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-lg border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center">
+                          {marketLogoDraft ? (
+                            <img src={marketLogoDraft} alt="Логотип рынка" className="w-full h-full object-cover" />
+                          ) : (
+                            <Globe2 className="w-5 h-5 text-white/40" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <label className="h-8 px-3 rounded-lg border border-white/15 bg-black/40 text-white/80 text-xs inline-flex items-center cursor-pointer hover:border-emerald-400/40 hover:text-emerald-200 transition-colors">
+                            {marketLogoDraft ? 'Заменить' : 'Выбрать'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(event) => handleLogoUpload(event.target.files?.[0])}
+                              className="hidden"
+                            />
+                          </label>
+                          {marketLogoDraft && (
+                            <button
+                              type="button"
+                              onClick={() => setMarketLogoDraft(undefined)}
+                              className="h-8 px-3 rounded-lg border border-rose-400/35 bg-rose-500/10 text-rose-200 text-xs inline-flex items-center hover:bg-rose-500/20 transition-colors"
+                            >
+                              Удалить
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-white/45">
+                        PNG/JPG/WebP. Лучше использовать квадратное изображение.
+                      </div>
+                    </div>
                     {ownCountryProvinceIds.length === 0 && (
                       <div className="text-rose-200/90 text-xs">
                         У страны нет провинций для столицы рынка.
@@ -757,21 +783,53 @@ export default function MarketsModal({
                           className="h-9 rounded-lg bg-black/40 border border-white/10 p-1 disabled:opacity-60"
                         />
                       </label>
-                      <label className="flex flex-col gap-1 text-white/70 text-sm">
-                        Логотип рынка
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={!canEditOwnMarket}
-                          onChange={(event) => handleLogoUpload(event.target.files?.[0])}
-                          className="text-xs text-white/70 file:mr-3 file:h-8 file:px-3 file:rounded-md file:border file:border-white/10 file:bg-black/30 file:text-white/80 disabled:opacity-60"
-                        />
-                      </label>
-                      {marketLogoDraft && (
-                        <div className="w-16 h-16 rounded-lg border border-white/10 bg-black/30 overflow-hidden">
-                          <img src={marketLogoDraft} alt="Market logo" className="w-full h-full object-cover" />
+                      <div className="flex flex-col gap-1 text-white/70 text-sm">
+                        <span>Логотип рынка</span>
+                        <div className="rounded-lg border border-white/10 bg-black/30 p-2 flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-lg border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center">
+                            {marketLogoDraft ? (
+                              <img src={marketLogoDraft} alt="Логотип рынка" className="w-full h-full object-cover" />
+                            ) : (
+                              <Globe2 className="w-5 h-5 text-white/40" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <label
+                              className={`h-8 px-3 rounded-lg border text-xs inline-flex items-center transition-colors ${
+                                canEditOwnMarket
+                                  ? 'border-white/15 bg-black/40 text-white/80 cursor-pointer hover:border-emerald-400/40 hover:text-emerald-200'
+                                  : 'border-white/10 bg-black/20 text-white/40 cursor-not-allowed'
+                              }`}
+                            >
+                              {marketLogoDraft ? 'Заменить' : 'Выбрать'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={!canEditOwnMarket}
+                                onChange={(event) => handleLogoUpload(event.target.files?.[0])}
+                                className="hidden"
+                              />
+                            </label>
+                            {marketLogoDraft && (
+                              <button
+                                type="button"
+                                onClick={() => setMarketLogoDraft(undefined)}
+                                disabled={!canEditOwnMarket}
+                                className={`h-8 px-3 rounded-lg border text-xs inline-flex items-center transition-colors ${
+                                  canEditOwnMarket
+                                    ? 'border-rose-400/35 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20'
+                                    : 'border-white/10 bg-black/20 text-white/40 cursor-not-allowed'
+                                }`}
+                              >
+                                Удалить
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      )}
+                        <div className="text-[11px] text-white/45">
+                          PNG/JPG/WebP. Лучше использовать квадратное изображение.
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() =>
