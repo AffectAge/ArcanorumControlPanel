@@ -37,6 +37,17 @@ type MapViewProps = {
   logisticsEdges: LogisticsEdge[];
   logisticsRouteTypes: LogisticsRouteType[];
   logisticsRouteProvinceIds?: string[];
+  logisticsRouteEditMode?: boolean;
+  logisticsRouteEditInsertAfterIndex?: number | null;
+  logisticsRouteAddCandidateProvinceIds?: string[];
+  logisticsRouteAddCandidateLinkByProvinceId?: Record<string, string>;
+  logisticsRouteAddableNodeIndexes?: number[];
+  logisticsRouteRemovableNodeIndexes?: number[];
+  onRouteNodeControlClick?: (
+    provinceId: string,
+    index: number,
+    action: 'add' | 'remove',
+  ) => void;
   marketCapitals?: {
     provinceId: string;
     marketId: string;
@@ -223,6 +234,13 @@ export default function MapView({
   logisticsEdges,
   logisticsRouteTypes,
   logisticsRouteProvinceIds = [],
+  logisticsRouteEditMode = false,
+  logisticsRouteEditInsertAfterIndex = null,
+  logisticsRouteAddCandidateProvinceIds = [],
+  logisticsRouteAddCandidateLinkByProvinceId = {},
+  logisticsRouteAddableNodeIndexes = [],
+  logisticsRouteRemovableNodeIndexes = [],
+  onRouteNodeControlClick,
   marketCapitals = [],
   selectedResourceId,
   onSelectResource,
@@ -538,6 +556,7 @@ export default function MapView({
     while (overlay.firstChild) {
       overlay.removeChild(overlay.firstChild);
     }
+    overlay.setAttribute('pointer-events', 'none');
 
     const provinceCenters = new Map<string, { x: number; y: number }>();
     Array.from(svg.querySelectorAll('path')).forEach((path) => {
@@ -712,6 +731,163 @@ export default function MapView({
           overlay?.appendChild(previewLine);
         }
       }
+
+      if (
+        logisticsRouteEditMode &&
+        logisticsRouteProvinceIds.length > 0 &&
+        onRouteNodeControlClick
+      ) {
+        const controlsGroup = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'g',
+        );
+        controlsGroup.setAttribute('pointer-events', 'all');
+        overlay?.appendChild(controlsGroup);
+
+        logisticsRouteProvinceIds.forEach((provinceId, index) => {
+          const center = provinceCenters.get(provinceId);
+          if (!center) return;
+          const canAddAtNode = logisticsRouteAddableNodeIndexes.includes(index);
+          const canRemoveAtNode = logisticsRouteRemovableNodeIndexes.includes(index);
+          const plusActive = logisticsRouteEditInsertAfterIndex === index;
+
+          if (canAddAtNode) {
+            const addButton = document.createElementNS(
+              'http://www.w3.org/2000/svg',
+              'g',
+            );
+            addButton.setAttribute('cursor', 'pointer');
+            addButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              onRouteNodeControlClick(provinceId, index, 'add');
+            });
+            const addBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            addBg.setAttribute('cx', `${center.x - 4.4}`);
+            addBg.setAttribute('cy', `${center.y - 6.4}`);
+            addBg.setAttribute('r', '2.5');
+            addBg.setAttribute(
+              'fill',
+              plusActive ? 'rgba(16,185,129,0.92)' : 'rgba(10,15,26,0.9)',
+            );
+            addBg.setAttribute(
+              'stroke',
+              plusActive ? 'rgba(167,243,208,0.95)' : 'rgba(148,163,184,0.65)',
+            );
+            addBg.setAttribute('stroke-width', '0.45');
+            const addText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            addText.setAttribute('x', `${center.x - 4.4}`);
+            addText.setAttribute('y', `${center.y - 5.5}`);
+            addText.setAttribute('text-anchor', 'middle');
+            addText.setAttribute('fill', '#f8fafc');
+            addText.setAttribute('font-size', '3');
+            addText.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+            addText.textContent = '+';
+            addButton.appendChild(addBg);
+            addButton.appendChild(addText);
+            controlsGroup.appendChild(addButton);
+          }
+
+          if (canRemoveAtNode) {
+            const removeButton = document.createElementNS(
+              'http://www.w3.org/2000/svg',
+              'g',
+            );
+            removeButton.setAttribute('cursor', 'pointer');
+            removeButton.addEventListener('click', (event) => {
+              event.stopPropagation();
+              onRouteNodeControlClick(provinceId, index, 'remove');
+            });
+            const removeBg = document.createElementNS(
+              'http://www.w3.org/2000/svg',
+              'circle',
+            );
+            removeBg.setAttribute('cx', `${center.x + 4.4}`);
+            removeBg.setAttribute('cy', `${center.y - 6.4}`);
+            removeBg.setAttribute('r', '2.5');
+            removeBg.setAttribute('fill', 'rgba(10,15,26,0.9)');
+            removeBg.setAttribute('stroke', 'rgba(251,113,133,0.7)');
+            removeBg.setAttribute('stroke-width', '0.45');
+            const removeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            removeText.setAttribute('x', `${center.x + 4.4}`);
+            removeText.setAttribute('y', `${center.y - 5.5}`);
+            removeText.setAttribute('text-anchor', 'middle');
+            removeText.setAttribute('fill', '#fecdd3');
+            removeText.setAttribute('font-size', '3');
+            removeText.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+            removeText.textContent = '-';
+            removeButton.appendChild(removeBg);
+            removeButton.appendChild(removeText);
+            controlsGroup.appendChild(removeButton);
+          }
+        });
+
+        logisticsRouteAddCandidateProvinceIds.forEach((provinceId) => {
+          const center = provinceCenters.get(provinceId);
+          if (!center) return;
+          const targetProvinceId =
+            logisticsRouteAddCandidateLinkByProvinceId[provinceId];
+          const targetCenter = targetProvinceId
+            ? provinceCenters.get(targetProvinceId)
+            : undefined;
+          if (targetCenter) {
+            const linkBase = document.createElementNS(
+              'http://www.w3.org/2000/svg',
+              'line',
+            );
+            linkBase.setAttribute('x1', `${center.x}`);
+            linkBase.setAttribute('y1', `${center.y}`);
+            linkBase.setAttribute('x2', `${targetCenter.x}`);
+            linkBase.setAttribute('y2', `${targetCenter.y}`);
+            linkBase.setAttribute('stroke', 'rgba(8,15,26,0.92)');
+            linkBase.setAttribute('stroke-width', '1.7');
+            linkBase.setAttribute('stroke-linecap', 'round');
+            linkBase.setAttribute('opacity', '0.8');
+            controlsGroup.appendChild(linkBase);
+
+            const linkTop = document.createElementNS(
+              'http://www.w3.org/2000/svg',
+              'line',
+            );
+            linkTop.setAttribute('x1', `${center.x}`);
+            linkTop.setAttribute('y1', `${center.y}`);
+            linkTop.setAttribute('x2', `${targetCenter.x}`);
+            linkTop.setAttribute('y2', `${targetCenter.y}`);
+            linkTop.setAttribute('stroke', 'rgba(52,211,153,0.92)');
+            linkTop.setAttribute('stroke-width', '0.9');
+            linkTop.setAttribute('stroke-linecap', 'round');
+            linkTop.setAttribute('stroke-dasharray', '3 2');
+            linkTop.setAttribute('opacity', '0.95');
+            controlsGroup.appendChild(linkTop);
+          }
+          const addButton = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'g',
+          );
+          addButton.setAttribute('cursor', 'pointer');
+          addButton.addEventListener('click', (event) => {
+            event.stopPropagation();
+            onRouteNodeControlClick(provinceId, -1, 'add');
+          });
+          const addBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          addBg.setAttribute('cx', `${center.x}`);
+          addBg.setAttribute('cy', `${center.y}`);
+          addBg.setAttribute('r', '2.6');
+          addBg.setAttribute('fill', 'rgba(16,185,129,0.9)');
+          addBg.setAttribute('stroke', 'rgba(167,243,208,0.95)');
+          addBg.setAttribute('stroke-width', '0.45');
+          const addText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          addText.setAttribute('x', `${center.x}`);
+          addText.setAttribute('y', `${center.y + 0.95}`);
+          addText.setAttribute('text-anchor', 'middle');
+          addText.setAttribute('fill', '#f8fafc');
+          addText.setAttribute('font-size', '3.1');
+          addText.setAttribute('font-family', 'Segoe UI, Arial, sans-serif');
+          addText.textContent = '+';
+          addButton.appendChild(addBg);
+          addButton.appendChild(addText);
+          controlsGroup.appendChild(addButton);
+        });
+      }
     }
 
     const marketsLayerVisible = activeLayerIds.includes('markets');
@@ -796,6 +972,13 @@ export default function MapView({
     logisticsNodes,
     logisticsEdges,
     logisticsRouteProvinceIds,
+    logisticsRouteEditMode,
+    logisticsRouteEditInsertAfterIndex,
+    logisticsRouteAddCandidateProvinceIds,
+    logisticsRouteAddCandidateLinkByProvinceId,
+    logisticsRouteAddableNodeIndexes,
+    logisticsRouteRemovableNodeIndexes,
+    onRouteNodeControlClick,
     logisticsRouteTypes,
     activeLayerIds,
     marketCapitals,

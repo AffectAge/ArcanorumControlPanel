@@ -615,6 +615,11 @@ function App() {
     routeId: string;
     originalProvinceIds: string[];
   } | null>(null);
+  const [logisticsRouteEditAction, setLogisticsRouteEditAction] = useState<
+    'add' | 'remove'
+  >('add');
+  const [logisticsRouteEditInsertAfterIndex, setLogisticsRouteEditInsertAfterIndex] =
+    useState<number | null>(null);
   const [adjacencyRecomputeRequested, setAdjacencyRecomputeRequested] =
     useState(false);
   const [colonizationModalOpen, setColonizationModalOpen] = useState(false);
@@ -3647,19 +3652,381 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     logistics.routeTypes,
   ]);
 
-  const isAgreementActive = (agreement: DiplomacyAgreement) => {
+  const handleRouteEditNodeControlClick = useCallback(
+    (provinceId: string, index: number, action: 'add' | 'remove') => {
+      if (!logisticsRoutePlannerActive || !logisticsRouteEditDraft || !logisticsRouteDraft) {
+        return;
+      }
+      if (action === 'add') {
+        if (index < 0) {
+          const routeType = logistics.routeTypes.find(
+            (item) => item.id === logisticsRouteDraft.routeTypeId,
+          );
+          const province = provinces[provinceId];
+          if (!province) {
+            setRoutePlannerHint('Провинция не найдена в данных карты.');
+            return;
+          }
+          if (!activeCountryId) {
+            setRoutePlannerHint('Выберите активную страну для строительства маршрута.');
+            return;
+          }
+          const provinceOwnerId = province.ownerCountryId;
+          if (!provinceOwnerId) {
+            setRoutePlannerHint('У провинции нет владельца: строительство здесь невозможно.');
+            return;
+          }
+          if (
+            provinceOwnerId !== activeCountryId &&
+            !hasRouteBuildAccessByAgreement(
+              provinceOwnerId,
+              activeCountryId,
+              province.id,
+              logisticsRouteDraft.routeTypeId,
+            )
+          ) {
+            setRoutePlannerHint(
+              'Нет дипломатического доступа для строительства маршрута в этой провинции.',
+            );
+            return;
+          }
+          const requiredBuildingIds = routeType?.requiredBuildingIds ?? [];
+          if (requiredBuildingIds.length > 0) {
+            const builtIds = new Set(
+              (province.buildingsBuilt ?? []).map((entry) => entry.buildingId),
+            );
+            const mode = routeType?.requiredBuildingsMode ?? 'all';
+            if (mode === 'all') {
+              const missing = requiredBuildingIds.filter(
+                (buildingId) => !builtIds.has(buildingId),
+              );
+              if (missing.length > 0) {
+                const missingName = buildings.find((item) => item.id === missing[0])?.name;
+                setRoutePlannerHint(
+                  `В этой провинции не хватает нужного здания: ${missingName ?? missing[0]}.`,
+                );
+                return;
+              }
+            } else {
+              const hasAnyRequired = requiredBuildingIds.some((buildingId) =>
+                builtIds.has(buildingId),
+              );
+              if (!hasAnyRequired) {
+                setRoutePlannerHint('В этой провинции отсутствуют требуемые здания.');
+                return;
+              }
+            }
+          }
+          const landscapeAny = routeType?.landscape?.anyOf ?? [];
+          const landscapeNone = routeType?.landscape?.noneOf ?? [];
+          const provinceLandscapeId = province.landscapeId;
+          if (!(routeType?.allowAllLandscapes ?? true)) {
+            if (
+              landscapeAny.length > 0 &&
+              (!provinceLandscapeId || !landscapeAny.includes(provinceLandscapeId))
+            ) {
+              setRoutePlannerHint(
+                'Ландшафт провинции не подходит для этого типа маршрута.',
+              );
+              return;
+            }
+            if (provinceLandscapeId && landscapeNone.includes(provinceLandscapeId)) {
+              setRoutePlannerHint(
+                'Этот тип маршрута запрещен для выбранного ландшафта.',
+              );
+              return;
+            }
+          }
+          setLogisticsRouteProvinceIds((prev) => {
+            if (prev.includes(provinceId)) {
+              setRoutePlannerHint('Эта провинция уже есть в маршруте.');
+              return prev;
+            }
+            const candidates: { insertAfter: number; score: number }[] = [];
+            const allowSkip = routeType?.allowProvinceSkipping ?? false;
+            const provinceNeighbors = new Set(
+              provinces[provinceId]?.adjacentProvinceIds ?? [],
+            );
+            for (let insertAfter = -1; insertAfter < prev.length; insertAfter += 1) {
+              const leftId = insertAfter >= 0 ? prev[insertAfter] : undefined;
+              const rightId =
+                insertAfter + 1 >= 0 && insertAfter + 1 < prev.length
+                  ? prev[insertAfter + 1]
+                  : undefined;
+              const leftOk = Boolean(leftId) && provinceNeighbors.has(leftId);
+              const rightOk = Boolean(rightId) && provinceNeighbors.has(rightId);
+              if (!allowSkip && !leftOk && !rightOk) continue;
+              const score = Number(leftOk) + Number(rightOk);
+              candidates.push({ insertAfter, score });
+            }
+            if (candidates.length === 0) {
+              setRoutePlannerHint(
+                'Не удалось автоматически вставить провинцию в маршрут с текущими ограничениями.',
+              );
+              return prev;
+            }
+            candidates.sort((a, b) => b.score - a.score || a.insertAfter - b.insertAfter);
+            const chosen = candidates[0];
+            const next = [
+              ...prev.slice(0, chosen.insertAfter + 1),
+              provinceId,
+              ...prev.slice(chosen.insertAfter + 1),
+            ];
+            setLogisticsRouteEditInsertAfterIndex(chosen.insertAfter + 1);
+            setRoutePlannerHint(
+              `Провинция ${provinceId} добавлена в маршрут автоматически.`,
+            );
+            return next;
+          });
+          return;
+        }
+        setLogisticsRouteEditAction('add');
+        setLogisticsRouteEditInsertAfterIndex(index);
+        setRoutePlannerHint(
+          `Выбран узел ${provinceId}. Кликните новую провинцию на карте, чтобы вставить после него.`,
+        );
+        return;
+      }
+      const routeType = logistics.routeTypes.find(
+        (item) => item.id === logisticsRouteDraft.routeTypeId,
+      );
+      setLogisticsRouteProvinceIds((prev) => {
+        if (index <= 0 || index >= prev.length - 1) {
+          setRoutePlannerHint('Начальный и конечный узлы удалять нельзя.');
+          return prev;
+        }
+        const allowSkip = routeType?.allowProvinceSkipping ?? false;
+        const candidatePath = [...prev.slice(0, index), ...prev.slice(index + 1)];
+        const repairedPath = repairRoutePathAdjacency(candidatePath, allowSkip);
+        if (!repairedPath) {
+          setRoutePlannerHint(
+            'Нельзя удалить этот узел: не удалось перепривязать соседние графы маршрута.',
+          );
+          return prev;
+        }
+        setLogisticsRouteEditInsertAfterIndex((current) => {
+          if (current == null) return null;
+          if (current < index) return current;
+          return Math.max(0, current - 1);
+        });
+        setRoutePlannerHint(`Узел ${provinceId} удалён.`);
+        return repairedPath;
+      });
+    },
+    [
+      logisticsRoutePlannerActive,
+      logisticsRouteEditDraft,
+      logisticsRouteDraft,
+      logistics.routeTypes,
+      activeCountryId,
+      hasRouteBuildAccessByAgreement,
+      buildings,
+      provinces,
+    ],
+  );
+
+  const logisticsRouteAddCandidateProvinceIds = useMemo(() => {
+    if (!isLogisticsEditMode || logisticsRouteProvinceIds.length === 0) return [];
+    if (!activeCountryId || !logisticsRouteDraft) return [];
+    const routeType = logistics.routeTypes.find(
+      (item) => item.id === logisticsRouteDraft.routeTypeId,
+    );
+    const routeProvinceSet = new Set(logisticsRouteProvinceIds);
+    const adjacentToRoute = new Set<string>();
+    logisticsRouteProvinceIds.forEach((id) => {
+      const neighbors = provinces[id]?.adjacentProvinceIds ?? [];
+      neighbors.forEach((neighborId) => {
+        if (!routeProvinceSet.has(neighborId)) adjacentToRoute.add(neighborId);
+      });
+    });
+    const requiredBuildingIds = routeType?.requiredBuildingIds ?? [];
+    const requiredBuildingsMode = routeType?.requiredBuildingsMode ?? 'all';
+    const allowAllLandscapes = routeType?.allowAllLandscapes ?? true;
+    const landscapeAny = routeType?.landscape?.anyOf ?? [];
+    const landscapeNone = routeType?.landscape?.noneOf ?? [];
+    const allowSkip = routeType?.allowProvinceSkipping ?? false;
+
+    return Array.from(adjacentToRoute).filter((id) => {
+      const province = provinces[id];
+      if (!province) return false;
+      const provinceOwnerId = province.ownerCountryId;
+      if (!provinceOwnerId) return false;
+      if (
+        provinceOwnerId !== activeCountryId &&
+        !hasRouteBuildAccessByAgreement(
+          provinceOwnerId,
+          activeCountryId,
+          province.id,
+          logisticsRouteDraft.routeTypeId,
+        )
+      ) {
+        return false;
+      }
+      if (requiredBuildingIds.length > 0) {
+        const builtIds = new Set(
+          (province.buildingsBuilt ?? []).map((entry) => entry.buildingId),
+        );
+        if (requiredBuildingsMode === 'all') {
+          const missing = requiredBuildingIds.some((buildingId) => !builtIds.has(buildingId));
+          if (missing) return false;
+        } else {
+          const hasAnyRequired = requiredBuildingIds.some((buildingId) =>
+            builtIds.has(buildingId),
+          );
+          if (!hasAnyRequired) return false;
+        }
+      }
+      const provinceLandscapeId = province.landscapeId;
+      if (!allowAllLandscapes) {
+        if (
+          landscapeAny.length > 0 &&
+          (!provinceLandscapeId || !landscapeAny.includes(provinceLandscapeId))
+        ) {
+          return false;
+        }
+        if (provinceLandscapeId && landscapeNone.includes(provinceLandscapeId)) {
+          return false;
+        }
+      }
+      const provinceNeighbors = new Set(province.adjacentProvinceIds ?? []);
+      for (let insertAfter = -1; insertAfter < logisticsRouteProvinceIds.length; insertAfter += 1) {
+        const leftId = insertAfter >= 0 ? logisticsRouteProvinceIds[insertAfter] : undefined;
+        const rightId =
+          insertAfter + 1 >= 0 && insertAfter + 1 < logisticsRouteProvinceIds.length
+            ? logisticsRouteProvinceIds[insertAfter + 1]
+            : undefined;
+        const leftOk = Boolean(leftId) && provinceNeighbors.has(leftId);
+        const rightOk = Boolean(rightId) && provinceNeighbors.has(rightId);
+        if (allowSkip || leftOk || rightOk) return true;
+      }
+      return false;
+    });
+  }, [
+    isLogisticsEditMode,
+    logisticsRouteProvinceIds,
+    activeCountryId,
+    logisticsRouteDraft,
+    logistics.routeTypes,
+    provinces,
+    hasRouteBuildAccessByAgreement,
+  ]);
+
+  const logisticsRouteAddCandidateLinkByProvinceId = useMemo<
+    Record<string, string>
+  >(() => {
+    if (!isLogisticsEditMode || logisticsRouteProvinceIds.length === 0) return {};
+    const result: Record<string, string> = {};
+    logisticsRouteAddCandidateProvinceIds.forEach((candidateId) => {
+      const candidateNeighbors = new Set(
+        provinces[candidateId]?.adjacentProvinceIds ?? [],
+      );
+      if (candidateNeighbors.size === 0) return;
+      let target =
+        logisticsRouteEditInsertAfterIndex != null
+          ? logisticsRouteProvinceIds[logisticsRouteEditInsertAfterIndex]
+          : undefined;
+      if (!target || !candidateNeighbors.has(target)) {
+        target = logisticsRouteProvinceIds.find((routeProvinceId) =>
+          candidateNeighbors.has(routeProvinceId),
+        );
+      }
+      if (target) {
+        result[candidateId] = target;
+      }
+    });
+    return result;
+  }, [
+    isLogisticsEditMode,
+    logisticsRouteProvinceIds,
+    logisticsRouteAddCandidateProvinceIds,
+    logisticsRouteEditInsertAfterIndex,
+    provinces,
+  ]);
+
+  function repairRoutePathAdjacency(path: string[], allowSkip: boolean): string[] | null {
+    if (allowSkip) return path;
+    const isAdjacent = (a: string, b: string) =>
+      (provinces[a]?.adjacentProvinceIds ?? []).includes(b);
+    const next = [...path];
+    let i = 0;
+    while (i < next.length - 1) {
+      const current = next[i];
+      const following = next[i + 1];
+      if (!current || !following) return null;
+      if (isAdjacent(current, following)) {
+        i += 1;
+        continue;
+      }
+      let swapIndex = -1;
+      for (let j = i + 2; j < next.length; j += 1) {
+        const candidate = next[j];
+        if (candidate && isAdjacent(current, candidate)) {
+          swapIndex = j;
+          break;
+        }
+      }
+      if (swapIndex === -1) return null;
+      const [moved] = next.splice(swapIndex, 1);
+      if (!moved) return null;
+      next.splice(i + 1, 0, moved);
+      i += 1;
+    }
+    return next;
+  }
+
+  const logisticsRouteAddableNodeIndexes = useMemo<number[]>(() => {
+    if (!isLogisticsEditMode || logisticsRouteProvinceIds.length === 0) return [];
+    const addable = new Set<number>();
+    Object.values(logisticsRouteAddCandidateLinkByProvinceId).forEach((targetProvinceId) => {
+      const idx = logisticsRouteProvinceIds.indexOf(targetProvinceId);
+      if (idx >= 0) addable.add(idx);
+    });
+    return Array.from(addable).sort((a, b) => a - b);
+  }, [
+    isLogisticsEditMode,
+    logisticsRouteProvinceIds,
+    logisticsRouteAddCandidateLinkByProvinceId,
+  ]);
+
+  const logisticsRouteRemovableNodeIndexes = useMemo<number[]>(() => {
+    if (!isLogisticsEditMode || logisticsRouteProvinceIds.length < 3) return [];
+    const routeType = logisticsRouteDraft
+      ? logistics.routeTypes.find((item) => item.id === logisticsRouteDraft.routeTypeId)
+      : undefined;
+    const allowSkip = routeType?.allowProvinceSkipping ?? false;
+    const result: number[] = [];
+    for (let index = 1; index < logisticsRouteProvinceIds.length - 1; index += 1) {
+      const candidatePath = [
+        ...logisticsRouteProvinceIds.slice(0, index),
+        ...logisticsRouteProvinceIds.slice(index + 1),
+      ];
+      const repaired = repairRoutePathAdjacency(candidatePath, allowSkip);
+      if (repaired) {
+        result.push(index);
+      }
+    }
+    return result;
+  }, [
+    isLogisticsEditMode,
+    logisticsRouteProvinceIds,
+    logisticsRouteDraft,
+    logistics.routeTypes,
+    provinces,
+  ]);
+
+  function isAgreementActive(agreement: DiplomacyAgreement) {
     if (!agreement.durationTurns || agreement.durationTurns <= 0) return true;
     if (!agreement.startTurn) return true;
     return turn - agreement.startTurn < agreement.durationTurns;
-  };
+  }
 
-  const hasRouteBuildAccessByAgreement = (
+  function hasRouteBuildAccessByAgreement(
     hostCountryId: string,
     guestCountryId: string,
     provinceId: string,
     routeTypeId?: string,
-  ) =>
-    diplomacyAgreements.some((agreement) => {
+  ) {
+    return diplomacyAgreements.some((agreement) => {
       if (!isAgreementActive(agreement)) return false;
       const terms = resolveAgreementTerms(agreement, hostCountryId, guestCountryId);
       if (!terms) return false;
@@ -3675,6 +4042,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       }
       return true;
     });
+  }
 
   const countRouteUsageOnHost = (
     hostCountryId: string,
@@ -5612,6 +5980,15 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           logisticsEdges={logistics.edges}
           logisticsRouteTypes={logistics.routeTypes}
           logisticsRouteProvinceIds={logisticsRouteProvinceIds}
+          logisticsRouteEditMode={isLogisticsEditMode}
+          logisticsRouteEditInsertAfterIndex={logisticsRouteEditInsertAfterIndex}
+          logisticsRouteAddCandidateProvinceIds={logisticsRouteAddCandidateProvinceIds}
+          logisticsRouteAddCandidateLinkByProvinceId={
+            logisticsRouteAddCandidateLinkByProvinceId
+          }
+          logisticsRouteAddableNodeIndexes={logisticsRouteAddableNodeIndexes}
+          logisticsRouteRemovableNodeIndexes={logisticsRouteRemovableNodeIndexes}
+          onRouteNodeControlClick={handleRouteEditNodeControlClick}
           marketCapitals={marketCapitals}
           selectedResourceId={selectedResourceId}
           onSelectResource={setSelectedResourceId}
@@ -5624,10 +6001,16 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           onSelectProvince={(id) => {
             if (logisticsRoutePlannerActive) {
               setLogisticsRouteProvinceIds((prev) => {
-                if (prev[prev.length - 1] === id) return prev;
                 const routeType = logistics.routeTypes.find(
                   (item) => item.id === logisticsRouteDraft?.routeTypeId,
                 );
+                const existingIndex = prev.indexOf(id);
+                if (isLogisticsEditMode) {
+                  if (existingIndex >= 0) {
+                    setRoutePlannerHint('Эта провинция уже есть в маршруте.');
+                    return prev;
+                  }
+                }
                 const province = provinces[id];
                 if (!province) {
                   setRoutePlannerHint('Провинция не найдена в данных карты.');
@@ -5714,6 +6097,36 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                   );
                   return prev;
                 }
+                if (isLogisticsEditMode) {
+                  const insertionAfterIndex = Math.max(
+                    0,
+                    Math.min(
+                      logisticsRouteEditInsertAfterIndex ?? prev.length - 1,
+                      prev.length - 1,
+                    ),
+                  );
+                  const leftId = prev[insertionAfterIndex];
+                  const rightId = prev[insertionAfterIndex + 1];
+                  if (!(routeType?.allowProvinceSkipping ?? false)) {
+                    const newNeighbors = provinces[id]?.adjacentProvinceIds ?? [];
+                    const leftConnected = Boolean(leftId) && newNeighbors.includes(leftId);
+                    const rightConnected = Boolean(rightId) && newNeighbors.includes(rightId);
+                    if (!leftConnected && !rightConnected) {
+                      setRoutePlannerHint(
+                        'Нельзя вставить узел: новая провинция должна граничить хотя бы с одним соседним узлом маршрута.',
+                      );
+                      return prev;
+                    }
+                  }
+                  const next = [
+                    ...prev.slice(0, insertionAfterIndex + 1),
+                    id,
+                    ...prev.slice(insertionAfterIndex + 1),
+                  ];
+                  setLogisticsRouteEditInsertAfterIndex(insertionAfterIndex + 1);
+                  setRoutePlannerHint(`Узел добавлен после ${leftId ?? 'начала маршрута'}.`);
+                  return next;
+                }
                 const lastId = prev[prev.length - 1];
                 if (lastId && !(routeType?.allowProvinceSkipping ?? false)) {
                   const neighbors = provinces[lastId]?.adjacentProvinceIds ?? [];
@@ -5790,7 +6203,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             </div>
             <div className="text-cyan-100/70 text-[11px] leading-tight">
               {isLogisticsEditMode
-                ? 'Добавляйте новые провинции кликом по карте в конец маршрута. Можно удалить последний узел.'
+                ? 'Нажмите + у нужного узла, затем кликните провинцию на карте для вставки. Нажмите - у узла, чтобы удалить его.'
                 : 'Выберите провинции по пути на карте. Нельзя повторять провинции, перескакивать через соседей без разрешения и строить без договоров.'}
             </div>
             <div className="text-cyan-100/75 text-[11px] leading-tight mt-1">
@@ -5801,24 +6214,59 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                 {routePlannerHint}
               </div>
             )}
+            {isLogisticsEditMode && (
+              <div className="mt-2 max-h-28 overflow-y-auto legend-scroll space-y-1">
+                {logisticsRouteProvinceIds.map((provinceId, index) => {
+                  const isEndpoint =
+                    index === 0 || index === logisticsRouteProvinceIds.length - 1;
+                  const isInsertAnchor = logisticsRouteEditInsertAfterIndex === index;
+                  return (
+                    <div
+                      key={`route-edit-node-${provinceId}-${index}`}
+                      className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1 ${
+                        isInsertAnchor
+                          ? 'border-emerald-400/50 bg-emerald-500/10'
+                          : 'border-white/10 bg-black/25'
+                      }`}
+                    >
+                      <span className="text-[11px] text-cyan-100/90 truncate">
+                        {index + 1}. {provinceId}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() =>
+                            handleRouteEditNodeControlClick(provinceId, index, 'add')
+                          }
+                          className={`h-6 w-6 rounded border text-[12px] ${
+                            isInsertAnchor
+                              ? 'border-emerald-300/60 bg-emerald-500/25 text-emerald-100'
+                              : 'border-white/15 bg-black/30 text-white/80 hover:border-emerald-400/40'
+                          }`}
+                          title="Вставить узел после этого"
+                        >
+                          +
+                        </button>
+                        <button
+                          disabled={isEndpoint}
+                          onClick={() =>
+                            handleRouteEditNodeControlClick(provinceId, index, 'remove')
+                          }
+                          className={`h-6 w-6 rounded border text-[12px] ${
+                            isEndpoint
+                              ? 'border-white/10 bg-black/20 text-white/30 cursor-not-allowed'
+                              : 'border-white/15 bg-black/30 text-white/80 hover:border-rose-400/40'
+                          }`}
+                          title="Удалить этот узел"
+                        >
+                          -
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          {isLogisticsEditMode && (
-            <button
-              onClick={() => {
-                setLogisticsRouteProvinceIds((prev) => {
-                  if (prev.length <= 2) {
-                    setRoutePlannerHint('Маршрут должен содержать минимум 2 провинции.');
-                    return prev;
-                  }
-                  setRoutePlannerHint(undefined);
-                  return prev.slice(0, -1);
-                });
-              }}
-              className="h-8 px-3 rounded-lg border border-amber-400/40 bg-amber-500/20 text-amber-100 text-sm"
-            >
-              Удалить последний узел
-            </button>
-          )}
           <button
             onClick={() => {
               if (!logisticsRouteDraft || logisticsRouteProvinceIds.length < 2) {
@@ -5958,6 +6406,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                 setLogisticsRouteProvinceIds([]);
                 setLogisticsRouteDraft(null);
                 setLogisticsRouteEditDraft(null);
+                setLogisticsRouteEditAction('add');
+                setLogisticsRouteEditInsertAfterIndex(null);
                 setRoutePlannerHint(undefined);
                 setLogisticsRoutePlannerActive(false);
                 setLogisticsOpen(true);
@@ -6014,6 +6464,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
               setLogisticsRouteProvinceIds([]);
               setLogisticsRouteDraft(null);
               setLogisticsRouteEditDraft(null);
+              setLogisticsRouteEditAction('add');
+              setLogisticsRouteEditInsertAfterIndex(null);
               setRoutePlannerHint(undefined);
               setLogisticsRoutePlannerActive(false);
               setLogisticsOpen(true);
@@ -6027,6 +6479,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
               setLogisticsRoutePlannerActive(false);
               setLogisticsRouteDraft(null);
               setLogisticsRouteEditDraft(null);
+              setLogisticsRouteEditAction('add');
+              setLogisticsRouteEditInsertAfterIndex(null);
               setLogisticsRouteProvinceIds([]);
               setRoutePlannerHint(undefined);
               setLogisticsOpen(true);
@@ -6260,6 +6714,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           setLogisticsRoutePlannerActive(false);
           setLogisticsRouteDraft(null);
           setLogisticsRouteEditDraft(null);
+          setLogisticsRouteEditAction('add');
+          setLogisticsRouteEditInsertAfterIndex(null);
           setRoutePlannerHint(undefined);
           setLogisticsOpen(true);
         }}
@@ -6281,6 +6737,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           setLogisticsRoutePlannerActive(false);
           setLogisticsRouteDraft(null);
           setLogisticsRouteEditDraft(null);
+          setLogisticsRouteEditAction('add');
+          setLogisticsRouteEditInsertAfterIndex(null);
           setLogisticsRouteProvinceIds([]);
           setRoutePlannerHint(undefined);
         }}
@@ -6290,6 +6748,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             routeTypeId: payload.routeTypeId,
           });
           setLogisticsRouteEditDraft(null);
+          setLogisticsRouteEditAction('add');
+          setLogisticsRouteEditInsertAfterIndex(null);
           setLogisticsRouteProvinceIds([]);
           setRoutePlannerHint(undefined);
           setLogisticsOpen(false);
@@ -6306,6 +6766,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             routeId: targetRoute.id,
             originalProvinceIds: [...targetRoute.provinceIds],
           });
+          setLogisticsRouteEditAction('add');
+          setLogisticsRouteEditInsertAfterIndex(
+            Math.max(0, targetRoute.provinceIds.length - 1),
+          );
           setLogisticsRouteProvinceIds([...targetRoute.provinceIds]);
           setRoutePlannerHint(undefined);
           setLogisticsOpen(false);
