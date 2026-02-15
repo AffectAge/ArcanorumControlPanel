@@ -510,8 +510,10 @@ function App() {
     marketPriceEpsilon:
       startingData.gameSettings.marketPriceEpsilon ?? MARKET_PRICE_EPSILON,
   });
-  const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [selectedProvinceId, setSelectedProvinceId] = useState<string | undefined>(
+    undefined,
+  );
+  const [hoveredProvinceId, setHoveredProvinceId] = useState<string | undefined>(
     undefined,
   );
   const [countries, setCountries] = useState<Country[]>([]);
@@ -5694,12 +5696,11 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                 return [...prev, id];
               });
               setSelectedProvinceId(id);
-              setInfoPanelOpen(false);
               return;
             }
             setSelectedProvinceId(id);
-            setInfoPanelOpen(true);
           }}
+          onHoverProvince={setHoveredProvinceId}
           onContextMenu={(id, x, y) => {
             setSelectedProvinceId(id);
             setContextMenu({ x, y, provinceId: id });
@@ -5908,76 +5909,123 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         </div>
       )}
 
-      {infoPanelOpen && (
+      {(selectedProvinceId ?? hoveredProvinceId) && (
         <InfoPanel
-          province={selectedProvinceId ?? '-'}
+          province={selectedProvinceId ?? hoveredProvinceId ?? '-'}
           owner={
-            selectedProvinceId
+            (selectedProvinceId ?? hoveredProvinceId)
               ? countries.find(
                   (country) =>
-                    country.id === provinces[selectedProvinceId]?.ownerCountryId,
+                    country.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.ownerCountryId,
                 )?.name
               : undefined
           }
           ownerFlagDataUrl={
-            selectedProvinceId
+            (selectedProvinceId ?? hoveredProvinceId)
               ? countries.find(
                   (country) =>
-                    country.id === provinces[selectedProvinceId]?.ownerCountryId,
+                    country.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.ownerCountryId,
                 )?.flagDataUrl
               : undefined
           }
           climate={
-            selectedProvinceId
-              ? climates.find((c) => c.id === provinces[selectedProvinceId]?.climateId)
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? climates.find(
+                  (c) =>
+                    c.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.climateId,
+                )
                   ?.name
               : undefined
           }
           culture={
-            selectedProvinceId
-              ? cultures.find((c) => c.id === provinces[selectedProvinceId]?.cultureId)
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? cultures.find(
+                  (c) =>
+                    c.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.cultureId,
+                )
                   ?.name
               : undefined
           }
           cultureIconDataUrl={
-            selectedProvinceId
-              ? cultures.find((c) => c.id === provinces[selectedProvinceId]?.cultureId)
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? cultures.find(
+                  (c) =>
+                    c.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.cultureId,
+                )
                   ?.iconDataUrl
               : undefined
           }
           landscape={
-            selectedProvinceId
-              ? landscapes.find((l) => l.id === provinces[selectedProvinceId]?.landscapeId)
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? landscapes.find(
+                  (l) =>
+                    l.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.landscapeId,
+                )
                   ?.name
               : undefined
           }
           continent={
-            selectedProvinceId
-              ? continents.find((c) => c.id === provinces[selectedProvinceId]?.continentId)
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? continents.find(
+                  (c) =>
+                    c.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.continentId,
+                )
                   ?.name
               : undefined
           }
           region={
-            selectedProvinceId
-              ? regions.find((r) => r.id === provinces[selectedProvinceId]?.regionId)
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? regions.find(
+                  (r) =>
+                    r.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.regionId,
+                )
                   ?.name
               : undefined
           }
           religion={
-            selectedProvinceId
-              ? religions.find((r) => r.id === provinces[selectedProvinceId]?.religionId)
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? religions.find(
+                  (r) =>
+                    r.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.religionId,
+                )
                   ?.name
               : undefined
           }
           religionIconDataUrl={
-            selectedProvinceId
-              ? religions.find((r) => r.id === provinces[selectedProvinceId]?.religionId)
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? religions.find(
+                  (r) =>
+                    r.id ===
+                    provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                      ?.religionId,
+                )
                   ?.iconDataUrl
               : undefined
           }
           resources={
-            selectedProvinceId
-              ? Object.entries(provinces[selectedProvinceId]?.resourceAmounts ?? {})
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? Object.entries(
+                  provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                    ?.resourceAmounts ?? {},
+                )
                   .filter(([, amount]) => amount > 0)
                   .map(([resourceId, amount]) => {
                     const resource = resources.find((item) => item.id === resourceId);
@@ -5989,30 +6037,33 @@ const layerPaint: MapLayerPaint = useMemo(() => {
               : []
           }
           radiation={
-            selectedProvinceId
-              ? provinces[selectedProvinceId]?.radiation ?? 0
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? provinces[selectedProvinceId ?? hoveredProvinceId ?? '']?.radiation ?? 0
               : undefined
           }
           pollution={
-            selectedProvinceId
-              ? provinces[selectedProvinceId]?.pollution ?? 0
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? provinces[selectedProvinceId ?? hoveredProvinceId ?? '']?.pollution ?? 0
               : undefined
           }
           fertility={
-            selectedProvinceId
-              ? provinces[selectedProvinceId]?.fertility ?? 0
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? provinces[selectedProvinceId ?? hoveredProvinceId ?? '']?.fertility ?? 0
               : undefined
           }
           colonizationAllowed={
-            selectedProvinceId
-              ? !provinces[selectedProvinceId]?.ownerCountryId &&
-                !provinces[selectedProvinceId]?.colonizationDisabled
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? !provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                  ?.ownerCountryId &&
+                !provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                  ?.colonizationDisabled
               : false
           }
-          onClose={() => setInfoPanelOpen(false)}
+          onClose={() => setSelectedProvinceId(undefined)}
           colonizationCost={
-            selectedProvinceId
-              ? provinces[selectedProvinceId]?.colonizationCost
+            (selectedProvinceId ?? hoveredProvinceId)
+              ? provinces[selectedProvinceId ?? hoveredProvinceId ?? '']
+                  ?.colonizationCost
               : undefined
           }
           routeConstructionProgress={selectedProvinceRouteConstructionProgress}
