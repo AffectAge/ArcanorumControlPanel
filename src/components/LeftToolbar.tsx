@@ -21,7 +21,7 @@ export default function LeftToolbar({
   const [activeTool, setActiveTool] = useState('industry');
 
   return (
-    <div className="absolute left-4 top-20 flex flex-col gap-3 z-40 animate-slideRight">
+    <div className="absolute left-4 top-24 flex flex-col gap-3 z-40 animate-slideRight">
       {tools.map((tool, index) => (
         <Tooltip key={tool.id} label={tool.label}>
           <button
@@ -35,11 +35,11 @@ export default function LeftToolbar({
               }
             }}
             className={`
-              w-11 h-11 rounded-xl backdrop-blur-xl border transition-all duration-200 flex items-center justify-center group
+              w-11 h-11 rounded-xl backdrop-blur-xl border transition-all duration-200 flex items-center justify-center group relative
               ${
                 activeTool === tool.id
-                  ? 'bg-emerald-500/20 border-emerald-400/50 shadow-lg shadow-emerald-500/20'
-                  : 'bg-black/40 border-white/10 hover:border-emerald-400/50 hover:bg-emerald-400/10'
+                  ? 'bg-emerald-700 border-emerald-400/70 shadow-lg shadow-emerald-500/20'
+                  : 'bg-[#0b111b] border-white/15 hover:border-emerald-400/50 hover:bg-[#0f1726] hover:scale-110'
               }
             `}
             style={{ animationDelay: `${index * 50}ms` }}

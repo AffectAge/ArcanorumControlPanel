@@ -839,17 +839,17 @@ export default function MapView({
                 <Tooltip key={layer.id} label={layer.name}>
                   <button
                     onClick={() => onToggleLayer(layer.id)}
-                    className={`w-9 h-9 rounded-lg border transition-all duration-200 flex items-center justify-center ${
+                    className={`w-11 h-11 rounded-xl border transition-all duration-200 flex items-center justify-center group relative ${
                       layer.visible
-                        ? 'border-emerald-400/50 bg-emerald-500/15'
-                        : 'border-white/10 bg-white/[0.03] hover:border-emerald-300/40 hover:bg-emerald-500/10'
+                        ? 'bg-emerald-500/20 border-emerald-400/50 shadow-lg shadow-emerald-500/20'
+                        : 'border-white/10 bg-white/[0.03] hover:border-emerald-400/50 hover:bg-emerald-400/10 hover:scale-110'
                     }`}
                   >
                     <Icon
                       className={`w-4 h-4 transition-colors ${
                         layer.visible
                           ? 'text-emerald-400'
-                          : 'text-white/70 hover:text-emerald-300'
+                          : 'text-white/70 group-hover:text-emerald-400'
                       }`}
                     />
                   </button>
