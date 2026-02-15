@@ -103,8 +103,11 @@ const formatCompactNumber = (value: number, smallDigits = 1) => {
 const formatInfrastructureAmount = (value: number) => {
   if (!Number.isFinite(value)) return '0';
   const abs = Math.abs(value);
-  if (abs >= 1000) return formatCompactNumber(value, 2);
-  return formatCompactNumber(value, 2);
+  const digits = abs > 0 && abs < 1 ? 4 : 2;
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  }).format(value);
 };
 
 const getSparklinePath = (values: number[], width = GRAPH_WIDTH, height = GRAPH_HEIGHT) => {
@@ -917,6 +920,27 @@ export default function MarketsModal({
       }))
       .sort((a, b) => b.amount - a.amount);
   }, [memberMarket, resourceCategories]);
+
+  const worldMarketSharedInfrastructureOverviewRows = useMemo(() => {
+    const currentByCategory = new Map(
+      worldMarketSharedInfrastructureRows.map((row) => [row.categoryId, row.amount]),
+    );
+    const consumedByCategory = new Map(
+      worldMarketSharedInfrastructureConsumedRows.map((row) => [row.categoryId, row.amount]),
+    );
+    return resourceCategories.map((category) => ({
+      categoryId: category.id,
+      name: category.name,
+      iconDataUrl: category.iconDataUrl,
+      color: category.color,
+      current: Math.max(0, currentByCategory.get(category.id) ?? 0),
+      consumed: Math.max(0, consumedByCategory.get(category.id) ?? 0),
+    }));
+  }, [
+    resourceCategories,
+    worldMarketSharedInfrastructureRows,
+    worldMarketSharedInfrastructureConsumedRows,
+  ]);
   if (!open) return null;
 
   return (
@@ -1624,44 +1648,19 @@ export default function MarketsModal({
                   </div>
                   {memberMarket ? (
                     <div className="space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {worldMarketSharedInfrastructureRows.map((row) => (
-                          <div
-                            key={`world-market-shared-infra:${row.categoryId}`}
-                            className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between"
-                          >
-                            <span className="inline-flex items-center gap-2 text-white/80 text-sm">
-                              {row.iconDataUrl ? (
-                                <img
-                                  src={row.iconDataUrl}
-                                  alt={row.name}
-                                  className="w-4 h-4 rounded-sm border border-white/20 object-cover"
-                                />
-                              ) : (
-                                <span
-                                  className="w-2.5 h-2.5 rounded-full"
-                                  style={{ backgroundColor: row.color ?? '#94a3b8' }}
-                                />
-                              )}
-                              {row.name}
-                            </span>
-                            <span className="text-emerald-200 text-sm tabular-nums">
-                              {formatInfrastructureAmount(row.amount)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="pt-1">
-                        <div className="text-white/70 text-xs mb-2">
-                          Потребление общей инфраструктуры за прошлый ход
+                      <div className="rounded-lg border border-white/10 bg-black/25 overflow-hidden">
+                        <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 border-b border-white/10 text-[11px] text-white/50 uppercase tracking-wide">
+                          <span>Категория</span>
+                          <span className="text-right">Пул сейчас</span>
+                          <span className="text-right">Расход за прошлый ход</span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                          {worldMarketSharedInfrastructureConsumedRows.map((row) => (
+                        <div className="divide-y divide-white/10">
+                          {worldMarketSharedInfrastructureOverviewRows.map((row) => (
                             <div
-                              key={`world-market-shared-infra-consumed:${row.categoryId}`}
-                              className="rounded-lg border border-amber-400/20 bg-amber-500/5 px-3 py-2 flex items-center justify-between"
+                              key={`world-market-shared-infra-overview:${row.categoryId}`}
+                              className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-sm"
                             >
-                              <span className="inline-flex items-center gap-2 text-white/80 text-sm">
+                              <span className="inline-flex items-center gap-2 text-white/80 min-w-0">
                                 {row.iconDataUrl ? (
                                   <img
                                     src={row.iconDataUrl}
@@ -1674,25 +1673,28 @@ export default function MarketsModal({
                                     style={{ backgroundColor: row.color ?? '#94a3b8' }}
                                   />
                                 )}
-                                {row.name}
+                                <span className="truncate">{row.name}</span>
                               </span>
-                              <span className="text-amber-200 text-sm tabular-nums">
-                                  {formatInfrastructureAmount(row.amount)}
+                              <span className="text-right text-emerald-200 tabular-nums">
+                                {formatInfrastructureAmount(row.current)}
+                              </span>
+                              <span className="text-right text-amber-200 tabular-nums">
+                                {formatInfrastructureAmount(row.consumed)}
                               </span>
                             </div>
                           ))}
                         </div>
-                        <div className="mt-2 text-[11px] text-white/60">
-                          Итого за прошлый ход:{' '}
-                          <span className="text-amber-200 tabular-nums">
-                            {formatInfrastructureAmount(
-                              worldMarketSharedInfrastructureConsumedRows.reduce(
-                                (sum, row) => sum + row.amount,
-                                0,
-                              ),
-                            )}
-                          </span>
-                        </div>
+                      </div>
+                      <div className="text-[11px] text-white/60">
+                        Итого расход за прошлый ход:{' '}
+                        <span className="text-amber-200 tabular-nums">
+                          {formatInfrastructureAmount(
+                            worldMarketSharedInfrastructureOverviewRows.reduce(
+                              (sum, row) => sum + row.consumed,
+                              0,
+                            ),
+                          )}
+                        </span>
                       </div>
                     </div>
                   ) : (
