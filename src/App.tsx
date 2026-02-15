@@ -494,6 +494,7 @@ const initialMapLayers: MapLayer[] = [
   { id: 'pollution', name: 'Загрязнения', visible: false },
   { id: 'colonization', name: 'Колонизация', visible: false },
   { id: 'routes', name: 'Маршруты', visible: true },
+  { id: 'market_links', name: 'Связи рынка', visible: false },
 ];
 
 function App() {
@@ -658,6 +659,9 @@ function App() {
     }
     if (!nextLayers.some((layer) => layer.id === 'routes')) {
       nextLayers.push({ id: 'routes', name: 'Маршруты', visible: true });
+    }
+    if (!nextLayers.some((layer) => layer.id === 'market_links')) {
+      nextLayers.push({ id: 'market_links', name: 'Связи рынка', visible: false });
     }
     return nextLayers;
   }, []);
@@ -937,6 +941,7 @@ function App() {
     color?: string;
     logoDataUrl?: string;
     capitalProvinceId?: string;
+    allowInfrastructureAccessWithoutTreaties?: boolean;
   }) => {
     if (!payload.actorCountryId) return;
     if (payload.actorCountryId !== payload.leaderCountryId) return;
@@ -983,6 +988,9 @@ function App() {
             countries.find((country) => country.id === payload.leaderCountryId)?.color ??
             '#22c55e',
           logoDataUrl: payload.logoDataUrl,
+          allowInfrastructureAccessWithoutTreaties: Boolean(
+            payload.allowInfrastructureAccessWithoutTreaties,
+          ),
           memberCountryIds: members,
           warehouseByResourceId: {},
           priceByResourceId: Object.fromEntries(
@@ -1027,6 +1035,7 @@ function App() {
       color?: string;
       logoDataUrl?: string;
       capitalProvinceId?: string;
+      allowInfrastructureAccessWithoutTreaties?: boolean;
     },
   ) => {
     setMarkets((prev) => {
@@ -1056,6 +1065,10 @@ function App() {
                 typeof patch.logoDataUrl === 'undefined'
                   ? market.logoDataUrl
                   : patch.logoDataUrl,
+              allowInfrastructureAccessWithoutTreaties:
+                typeof patch.allowInfrastructureAccessWithoutTreaties === 'boolean'
+                  ? patch.allowInfrastructureAccessWithoutTreaties
+                  : Boolean(market.allowInfrastructureAccessWithoutTreaties),
               memberCountryIds,
               capitalProvinceId: nextCapitalProvinceId,
               capitalLostSinceTurn: undefined,
@@ -2872,6 +2885,9 @@ function App() {
               )?.color ??
               '#22c55e',
             logoDataUrl: market.logoDataUrl,
+            allowInfrastructureAccessWithoutTreaties: Boolean(
+              market.allowInfrastructureAccessWithoutTreaties,
+            ),
             memberCountryIds: members,
             warehouseByResourceId: Object.fromEntries(
               Object.entries(market.warehouseByResourceId ?? {}).filter(
@@ -3499,6 +3515,132 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         .filter((entry) => Boolean(provinces[entry.provinceId])),
     [markets, provinces],
   );
+  const marketBorderConnections = useMemo<
+    {
+      id: string;
+      marketId: string;
+      marketName: string;
+      marketColor: string;
+      marketLogoDataUrl?: string;
+      fromProvinceId: string;
+      toProvinceId: string;
+      fromCountryName: string;
+      toCountryName: string;
+      routeTypeNames: string[];
+    }[]
+  >(() => {
+    const sharedMarkets = markets.filter(
+      (market) =>
+        market.allowInfrastructureAccessWithoutTreaties &&
+        (market.memberCountryIds?.length ?? 0) > 1,
+    );
+    if (sharedMarkets.length === 0) return [];
+
+    const parseProvinceNodeId = (nodeId: string) =>
+      nodeId.startsWith('province:') ? nodeId.slice('province:'.length) : undefined;
+    const routeById = new Map(logistics.routes.map((route) => [route.id, route]));
+    const routeTypeById = new Map(
+      logistics.routeTypes.map((routeType) => [routeType.id, routeType]),
+    );
+    const countryNameById = new Map(countries.map((country) => [country.id, country.name]));
+    const marketsByCountryId = new Map<string, string[]>();
+    const marketById = new Map(sharedMarkets.map((market) => [market.id, market]));
+    sharedMarkets.forEach((market) => {
+      market.memberCountryIds.forEach((countryId) => {
+        const current = marketsByCountryId.get(countryId) ?? [];
+        current.push(market.id);
+        marketsByCountryId.set(countryId, current);
+      });
+    });
+
+    const routeTypesByMarketAndProvince = new Map<string, Map<string, Set<string>>>();
+    const addRouteType = (marketId: string, provinceId: string, routeTypeId: string) => {
+      if (!routeTypesByMarketAndProvince.has(marketId)) {
+        routeTypesByMarketAndProvince.set(marketId, new Map());
+      }
+      const byProvince = routeTypesByMarketAndProvince.get(marketId);
+      if (!byProvince) return;
+      if (!byProvince.has(provinceId)) {
+        byProvince.set(provinceId, new Set());
+      }
+      byProvince.get(provinceId)?.add(routeTypeId);
+    };
+
+    logistics.edges.forEach((edge) => {
+      if (!edge.routeId || edge.active === false) return;
+      const route = routeById.get(edge.routeId);
+      if (!route?.ownerCountryId || !route.routeTypeId) return;
+      const fromProvinceId = parseProvinceNodeId(edge.fromNodeId);
+      const toProvinceId = parseProvinceNodeId(edge.toNodeId);
+      if (!fromProvinceId || !toProvinceId) return;
+      const ownerMarkets = marketsByCountryId.get(route.ownerCountryId) ?? [];
+      ownerMarkets.forEach((marketId) => {
+        addRouteType(marketId, fromProvinceId, route.routeTypeId);
+        addRouteType(marketId, toProvinceId, route.routeTypeId);
+      });
+    });
+
+    const results: {
+      id: string;
+      marketId: string;
+      marketName: string;
+      marketColor: string;
+      marketLogoDataUrl?: string;
+      fromProvinceId: string;
+      toProvinceId: string;
+      fromCountryName: string;
+      toCountryName: string;
+      routeTypeNames: string[];
+    }[] = [];
+    const seen = new Set<string>();
+
+    sharedMarkets.forEach((market) => {
+      const memberSet = new Set(market.memberCountryIds);
+      const byProvince = routeTypesByMarketAndProvince.get(market.id);
+      if (!byProvince) return;
+
+      Object.values(provinces).forEach((province) => {
+        if (!province.ownerCountryId || !memberSet.has(province.ownerCountryId)) return;
+        const provinceTypes = byProvince.get(province.id);
+        if (!provinceTypes || provinceTypes.size === 0) return;
+        (province.adjacentProvinceIds ?? []).forEach((neighborId) => {
+          const neighbor = provinces[neighborId];
+          if (!neighbor?.ownerCountryId || !memberSet.has(neighbor.ownerCountryId)) return;
+          if (neighbor.ownerCountryId === province.ownerCountryId) return;
+          const neighborTypes = byProvince.get(neighborId);
+          if (!neighborTypes || neighborTypes.size === 0) return;
+
+          const commonTypeIds = Array.from(provinceTypes).filter((routeTypeId) =>
+            neighborTypes.has(routeTypeId),
+          );
+          if (commonTypeIds.length === 0) return;
+
+          const a = province.id < neighborId ? province.id : neighborId;
+          const b = province.id < neighborId ? neighborId : province.id;
+          const key = `${market.id}:${a}:${b}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+
+          results.push({
+            id: key,
+            marketId: market.id,
+            marketName: market.name,
+            marketColor: market.color,
+            marketLogoDataUrl: market.logoDataUrl,
+            fromProvinceId: a,
+            toProvinceId: b,
+            fromCountryName: countryNameById.get(provinces[a]?.ownerCountryId ?? '') ?? provinces[a]?.ownerCountryId ?? '-',
+            toCountryName: countryNameById.get(provinces[b]?.ownerCountryId ?? '') ?? provinces[b]?.ownerCountryId ?? '-',
+            routeTypeNames: commonTypeIds.map(
+              (routeTypeId) => routeTypeById.get(routeTypeId)?.name ?? routeTypeId,
+            ),
+          });
+        });
+      });
+    });
+
+    return results;
+  }, [markets, logistics.edges, logistics.routes, logistics.routeTypes, provinces, countries]);
   const logisticsDraftRouteType = logisticsRouteDraft
     ? logistics.routeTypes.find((item) => item.id === logisticsRouteDraft.routeTypeId)
     : undefined;
@@ -3584,6 +3726,12 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     const routeTypeById = new Map(
       logistics.routeTypes.map((routeType) => [routeType.id, routeType]),
     );
+    const allowedRouteOwnerIds = new Set<string>([activeCountryId]);
+    if (activeCountryMarket?.allowInfrastructureAccessWithoutTreaties) {
+      activeCountryMarket.memberCountryIds.forEach((countryId) =>
+        allowedRouteOwnerIds.add(countryId),
+      );
+    }
     const routeAllowsCategory = (routeId: string, categoryId: string) => {
       const route = routeById.get(routeId);
       if (!route) return false;
@@ -3594,24 +3742,63 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     };
     return base.map((entry) => {
       const graph = new Map<string, Set<string>>();
+      const routeTypeIdsByProvince = new Map<string, Set<string>>();
       const addLink = (from: string, to: string) => {
         if (!graph.has(from)) {
           graph.set(from, new Set<string>());
         }
         graph.get(from)?.add(to);
       };
+      const addRouteTypeForProvince = (provinceId: string, routeTypeId?: string) => {
+        if (!routeTypeId) return;
+        if (!routeTypeIdsByProvince.has(provinceId)) {
+          routeTypeIdsByProvince.set(provinceId, new Set<string>());
+        }
+        routeTypeIdsByProvince.get(provinceId)?.add(routeTypeId);
+      };
 
       logistics.edges.forEach((edge) => {
         if (!edge.routeId) return;
         if (edge.active === false) return;
+        const route = routeById.get(edge.routeId);
+        const routeOwnerId = route?.ownerCountryId;
+        if (!routeOwnerId || !allowedRouteOwnerIds.has(routeOwnerId)) return;
         if (!routeAllowsCategory(edge.routeId, entry.categoryId)) return;
         const fromProvinceId = parseProvinceNodeId(edge.fromNodeId);
         const toProvinceId = parseProvinceNodeId(edge.toNodeId);
         if (!fromProvinceId || !toProvinceId) return;
         if (!provinces[fromProvinceId] || !provinces[toProvinceId]) return;
+        addRouteTypeForProvince(fromProvinceId, route.routeTypeId);
+        addRouteTypeForProvince(toProvinceId, route.routeTypeId);
         addLink(fromProvinceId, toProvinceId);
         addLink(toProvinceId, fromProvinceId);
       });
+
+      if (activeCountryMarket?.allowInfrastructureAccessWithoutTreaties) {
+        const memberCountryIds = new Set(activeCountryMarket.memberCountryIds);
+        Object.values(provinces).forEach((province) => {
+          if (!province.ownerCountryId || !memberCountryIds.has(province.ownerCountryId)) {
+            return;
+          }
+          const provinceRouteTypes = routeTypeIdsByProvince.get(province.id);
+          if (!provinceRouteTypes || provinceRouteTypes.size === 0) return;
+          (province.adjacentProvinceIds ?? []).forEach((neighborId) => {
+            const neighbor = provinces[neighborId];
+            if (!neighbor?.ownerCountryId || !memberCountryIds.has(neighbor.ownerCountryId)) {
+              return;
+            }
+            if (neighbor.ownerCountryId === province.ownerCountryId) return;
+            const neighborRouteTypes = routeTypeIdsByProvince.get(neighborId);
+            if (!neighborRouteTypes || neighborRouteTypes.size === 0) return;
+            const hasCompatibleRouteType = Array.from(provinceRouteTypes).some((routeTypeId) =>
+              neighborRouteTypes.has(routeTypeId),
+            );
+            if (!hasCompatibleRouteType) return;
+            addLink(province.id, neighborId);
+            addLink(neighborId, province.id);
+          });
+        });
+      }
 
       const visited = new Set<string>();
       const queue: string[] = [capitalId];
@@ -4137,13 +4324,14 @@ const layerPaint: MapLayerPaint = useMemo(() => {
 
   const toggleLayer = (id: string) => {
     setMapLayers((prev) => {
+      const isOverlayLayer = id === 'routes' || id === 'market_links';
       const next =
-        id === 'routes'
+        isOverlayLayer
           ? prev.map((layer) =>
-              layer.id === 'routes' ? { ...layer, visible: !layer.visible } : layer,
+              layer.id === id ? { ...layer, visible: !layer.visible } : layer,
             )
           : prev.map((layer) =>
-              layer.id === 'routes'
+              layer.id === 'routes' || layer.id === 'market_links'
                 ? layer
                 : {
                     ...layer,
@@ -5990,6 +6178,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           logisticsRouteRemovableNodeIndexes={logisticsRouteRemovableNodeIndexes}
           onRouteNodeControlClick={handleRouteEditNodeControlClick}
           marketCapitals={marketCapitals}
+          marketBorderConnections={marketBorderConnections}
           selectedResourceId={selectedResourceId}
           onSelectResource={setSelectedResourceId}
           selectedId={selectedProvinceId}

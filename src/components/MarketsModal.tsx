@@ -36,6 +36,7 @@ type MarketsModalProps = {
     color?: string;
     logoDataUrl?: string;
     capitalProvinceId?: string;
+    allowInfrastructureAccessWithoutTreaties?: boolean;
   }) => void;
   onUpdateMarket: (
     marketId: string,
@@ -47,6 +48,7 @@ type MarketsModalProps = {
       color?: string;
       logoDataUrl?: string;
       capitalProvinceId?: string;
+      allowInfrastructureAccessWithoutTreaties?: boolean;
     },
   ) => void;
   onDeleteMarket: (marketId: string, actorCountryId?: string) => void;
@@ -225,6 +227,8 @@ export default function MarketsModal({
   const [capitalProvinceIdDraft, setCapitalProvinceIdDraft] = useState('');
   const [marketColorDraft, setMarketColorDraft] = useState('#22c55e');
   const [marketLogoDraft, setMarketLogoDraft] = useState<string | undefined>(undefined);
+  const [allowInfrastructureAccessWithoutTreatiesDraft, setAllowInfrastructureAccessWithoutTreatiesDraft] =
+    useState(false);
 
   const activeCountry = countries.find((country) => country.id === activeCountryId);
   const memberMarket = activeCountryId
@@ -256,6 +260,9 @@ export default function MarketsModal({
       setCapitalProvinceIdDraft(ownMarket.capitalProvinceId ?? '');
       setMarketColorDraft(ownMarket.color ?? '#22c55e');
       setMarketLogoDraft(ownMarket.logoDataUrl);
+      setAllowInfrastructureAccessWithoutTreatiesDraft(
+        Boolean(ownMarket.allowInfrastructureAccessWithoutTreaties),
+      );
       return;
     }
     if (!newMarketName && activeCountry) {
@@ -263,6 +270,7 @@ export default function MarketsModal({
     }
     setCapitalProvinceIdDraft((prev) => prev || ownCountryProvinceIds[0] || '');
     setMarketColorDraft((prev) => prev || activeCountry?.color || '#22c55e');
+    setAllowInfrastructureAccessWithoutTreatiesDraft(false);
   }, [open, ownMarket, activeCountry, newMarketName, ownCountryProvinceIds]);
 
   const assignedMarketByCountry = useMemo(() => {
@@ -687,6 +695,24 @@ export default function MarketsModal({
                         PNG/JPG/WebP. Лучше использовать квадратное изображение.
                       </div>
                     </div>
+                    <label className="flex items-center gap-2 text-white/75 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={allowInfrastructureAccessWithoutTreatiesDraft}
+                        onChange={(event) =>
+                          setAllowInfrastructureAccessWithoutTreatiesDraft(
+                            event.target.checked,
+                          )
+                        }
+                        className="h-4 w-4 rounded border-white/20 bg-black/40 accent-emerald-500"
+                      />
+                      Общая инфраструктура рынка без договоров
+                    </label>
+                    <div className="text-[11px] text-white/50 leading-relaxed">
+                      Если включено, маршруты всех стран-участников рынка считаются общей
+                      инфраструктурой для доступа к столице рынка по категориям. Сами маршруты
+                      остаются независимыми и не объединяются в один маршрут.
+                    </div>
                     {ownCountryProvinceIds.length === 0 && (
                       <div className="text-rose-200/90 text-xs">
                         У страны нет провинций для столицы рынка.
@@ -702,6 +728,8 @@ export default function MarketsModal({
                           color: marketColorDraft,
                           logoDataUrl: marketLogoDraft,
                           capitalProvinceId: capitalProvinceIdDraft || undefined,
+                          allowInfrastructureAccessWithoutTreaties:
+                            allowInfrastructureAccessWithoutTreatiesDraft,
                         })
                       }
                       disabled={!canCreateMarket}
@@ -720,6 +748,20 @@ export default function MarketsModal({
                     <div className="text-white/85 text-sm font-semibold">Участие в рынке</div>
                     <div className="text-white/70 text-sm">
                       Страна состоит в рынке: <span className="text-amber-200">{memberMarket.name}</span>
+                    </div>
+                    <div className="text-white/65 text-xs">
+                      Общая инфраструктура без договоров:{' '}
+                      <span
+                        className={
+                          memberMarket.allowInfrastructureAccessWithoutTreaties
+                            ? 'text-emerald-200'
+                            : 'text-white/75'
+                        }
+                      >
+                        {memberMarket.allowInfrastructureAccessWithoutTreaties
+                          ? 'включена'
+                          : 'выключена'}
+                      </span>
                     </div>
                     <div className="text-white/55 text-xs">
                       Пока страна состоит в рынке, создать свой рынок нельзя.
@@ -830,6 +872,25 @@ export default function MarketsModal({
                           PNG/JPG/WebP. Лучше использовать квадратное изображение.
                         </div>
                       </div>
+                      <label className="flex items-center gap-2 text-white/75 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={allowInfrastructureAccessWithoutTreatiesDraft}
+                          onChange={(event) =>
+                            setAllowInfrastructureAccessWithoutTreatiesDraft(
+                              event.target.checked,
+                            )
+                          }
+                          disabled={!canEditOwnMarket}
+                          className="h-4 w-4 rounded border-white/20 bg-black/40 accent-emerald-500 disabled:opacity-50"
+                        />
+                        Общая инфраструктура рынка без договоров
+                      </label>
+                      <div className="text-[11px] text-white/50 leading-relaxed">
+                        Если включено, маршруты всех стран-участников рынка считаются общей
+                        инфраструктурой для доступа к столице рынка по категориям. Сами маршруты
+                        остаются независимыми и не объединяются в один маршрут.
+                      </div>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() =>
@@ -839,6 +900,8 @@ export default function MarketsModal({
                               color: marketColorDraft,
                               logoDataUrl: marketLogoDraft,
                               capitalProvinceId: capitalProvinceIdDraft || undefined,
+                              allowInfrastructureAccessWithoutTreaties:
+                                allowInfrastructureAccessWithoutTreatiesDraft,
                             })
                           }
                           disabled={!canEditOwnMarket || !capitalProvinceIdDraft}
@@ -868,6 +931,20 @@ export default function MarketsModal({
 
                     <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                       <div className="text-white/85 text-sm font-semibold mb-2">Участники рынка</div>
+                      <div className="mb-2 text-[11px] text-white/60">
+                        Общая инфраструктура без договоров:{' '}
+                        <span
+                          className={
+                            ownMarket.allowInfrastructureAccessWithoutTreaties
+                              ? 'text-emerald-200'
+                              : 'text-white/75'
+                          }
+                        >
+                          {ownMarket.allowInfrastructureAccessWithoutTreaties
+                            ? 'включена'
+                            : 'выключена'}
+                        </span>
+                      </div>
                       <div className="space-y-2">
                         {ownMarket.memberCountryIds.map((memberId) => {
                           const country = countries.find((item) => item.id === memberId);

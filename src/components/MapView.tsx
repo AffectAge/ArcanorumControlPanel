@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Flag,
   Palette,
@@ -11,6 +12,7 @@ import {
   Globe2,
   Map as MapIcon,
   Route,
+  Link2,
 } from 'lucide-react';
 import svgPanZoom from 'svg-pan-zoom';
 import mapUrl from '../assets/world-states-provinces.svg';
@@ -55,6 +57,18 @@ type MapViewProps = {
     color: string;
     logoDataUrl?: string;
   }[];
+  marketBorderConnections?: {
+    id: string;
+    marketId: string;
+    marketName: string;
+    marketColor: string;
+    marketLogoDataUrl?: string;
+    fromProvinceId: string;
+    toProvinceId: string;
+    fromCountryName: string;
+    toCountryName: string;
+    routeTypeNames: string[];
+  }[];
   selectedResourceId?: string;
   onSelectResource: (id?: string) => void;
   selectedId?: string;
@@ -82,6 +96,7 @@ const layerTone: Record<string, string> = {
   pollution: 'from-slate-300/25 via-amber-400/10 to-transparent',
   colonization: 'from-emerald-400/20 via-emerald-500/10 to-transparent',
   routes: 'from-cyan-300/25 via-sky-400/10 to-transparent',
+  market_links: 'from-emerald-300/20 via-cyan-300/10 to-transparent',
 };
 
 const layerIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -99,6 +114,7 @@ const layerIconMap: Record<string, React.ComponentType<{ className?: string }>> 
   pollution: Mountain,
   colonization: MapPinned,
   routes: Route,
+  market_links: Link2,
 };
 
 const stripeIdFromColor = (color: string) =>
@@ -242,6 +258,7 @@ export default function MapView({
   logisticsRouteRemovableNodeIndexes = [],
   onRouteNodeControlClick,
   marketCapitals = [],
+  marketBorderConnections = [],
   selectedResourceId,
   onSelectResource,
   selectedId,
@@ -254,6 +271,12 @@ export default function MapView({
   onContextMenu,
 }: MapViewProps) {
   const [svgMarkup, setSvgMarkup] = useState<string>('');
+  const [marketLinkTooltip, setMarketLinkTooltip] = useState<{
+    x: number;
+    y: number;
+    label: string;
+    description: string;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const panZoomRef = useRef<ReturnType<typeof svgPanZoom> | null>(null);
   const onProvincesDetectedRef = useRef(onProvincesDetected);
@@ -517,6 +540,7 @@ export default function MapView({
     const handleMouseLeave = () => {
       lastHoveredProvinceId = undefined;
       onHoverProvince(undefined);
+      setMarketLinkTooltip(null);
     };
 
     svg.addEventListener('click', handleClick);
@@ -537,6 +561,7 @@ export default function MapView({
     if (!svg) return;
 
     const overlayId = 'logistics-overlay';
+    const marketLinksOverlayId = 'market-links-overlay';
     const viewport =
       (svg.querySelector('.svg-pan-zoom_viewport') as SVGElement | null) ?? svg;
 
@@ -557,6 +582,20 @@ export default function MapView({
       overlay.removeChild(overlay.firstChild);
     }
     overlay.setAttribute('pointer-events', 'none');
+
+    let marketLinksOverlay = viewport.querySelector(
+      `#${marketLinksOverlayId}`,
+    ) as SVGGElement | null;
+    if (!marketLinksOverlay) {
+      marketLinksOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      marketLinksOverlay.setAttribute('id', marketLinksOverlayId);
+      marketLinksOverlay.setAttribute('pointer-events', 'all');
+      viewport.appendChild(marketLinksOverlay);
+    }
+    while (marketLinksOverlay.firstChild) {
+      marketLinksOverlay.removeChild(marketLinksOverlay.firstChild);
+    }
+    marketLinksOverlay.setAttribute('pointer-events', 'all');
 
     const provinceCenters = new Map<string, { x: number; y: number }>();
     Array.from(svg.querySelectorAll('path')).forEach((path) => {
@@ -967,6 +1006,100 @@ export default function MapView({
         overlay?.appendChild(label);
       });
     }
+
+    const marketLinksLayerVisible = activeLayerIds.includes('market_links');
+    if (marketLinksLayerVisible) {
+      marketBorderConnections.forEach((connection) => {
+        const from = provinceCenters.get(connection.fromProvinceId);
+        const to = provinceCenters.get(connection.toProvinceId);
+        if (!from || !to) return;
+
+        const container = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        container.setAttribute('cursor', 'help');
+        container.setAttribute('pointer-events', 'all');
+
+        const width = 1.2;
+
+        const casing = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        casing.setAttribute('x1', `${from.x}`);
+        casing.setAttribute('y1', `${from.y}`);
+        casing.setAttribute('x2', `${to.x}`);
+        casing.setAttribute('y2', `${to.y}`);
+        casing.setAttribute('stroke', 'rgba(8, 15, 30, 0.96)');
+        casing.setAttribute('stroke-width', `${width + 1.1}`);
+        casing.setAttribute('stroke-linecap', 'round');
+        casing.setAttribute('opacity', '0.95');
+        casing.setAttribute('pointer-events', 'none');
+        container.appendChild(casing);
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', `${from.x}`);
+        line.setAttribute('y1', `${from.y}`);
+        line.setAttribute('x2', `${to.x}`);
+        line.setAttribute('y2', `${to.y}`);
+        line.setAttribute('stroke', connection.marketColor);
+        line.setAttribute('stroke-width', `${width}`);
+        line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('opacity', '0.92');
+        line.setAttribute('pointer-events', 'none');
+        container.appendChild(line);
+
+        const centerLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        centerLine.setAttribute('x1', `${from.x}`);
+        centerLine.setAttribute('y1', `${from.y}`);
+        centerLine.setAttribute('x2', `${to.x}`);
+        centerLine.setAttribute('y2', `${to.y}`);
+        centerLine.setAttribute('stroke', 'rgba(255,255,255,0.78)');
+        centerLine.setAttribute('stroke-width', `${Math.max(0.45, width * 0.34)}`);
+        centerLine.setAttribute('stroke-linecap', 'round');
+        centerLine.setAttribute('opacity', '0.76');
+        centerLine.setAttribute('pointer-events', 'none');
+        container.appendChild(centerLine);
+
+        const drawNode = (x: number, y: number) => {
+          const nodeOuter = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          nodeOuter.setAttribute('cx', `${x}`);
+          nodeOuter.setAttribute('cy', `${y}`);
+          nodeOuter.setAttribute('r', `${Math.max(1.4, width * 0.45)}`);
+          nodeOuter.setAttribute('fill', 'rgba(8, 15, 30, 0.96)');
+          nodeOuter.setAttribute('pointer-events', 'none');
+          container.appendChild(nodeOuter);
+
+          const nodeInner = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          nodeInner.setAttribute('cx', `${x}`);
+          nodeInner.setAttribute('cy', `${y}`);
+          nodeInner.setAttribute('r', `${Math.max(0.8, width * 0.22)}`);
+          nodeInner.setAttribute('fill', connection.marketColor);
+          nodeInner.setAttribute('pointer-events', 'none');
+          container.appendChild(nodeInner);
+        };
+        drawNode(from.x, from.y);
+        drawNode(to.x, to.y);
+
+        const routeTypesText =
+          connection.routeTypeNames.length > 0
+            ? connection.routeTypeNames.join(', ')
+            : 'нет данных';
+        const label = `Рыночная связь: ${connection.marketName}`;
+        const description =
+          `${connection.fromCountryName} ↔ ${connection.toCountryName}\n` +
+          `Типы маршрутов: ${routeTypesText}`;
+
+        container.addEventListener('mousemove', (event) => {
+          setMarketLinkTooltip({
+            x: event.clientX,
+            y: event.clientY,
+            label,
+            description,
+          });
+        });
+        container.addEventListener('mouseleave', () => {
+          setMarketLinkTooltip((current) => (current?.label === label ? null : current));
+        });
+
+        marketLinksOverlay?.appendChild(container);
+      });
+    }
   }, [
     svgMarkup,
     logisticsNodes,
@@ -982,7 +1115,14 @@ export default function MapView({
     logisticsRouteTypes,
     activeLayerIds,
     marketCapitals,
+    marketBorderConnections,
   ]);
+
+  useEffect(() => {
+    if (!activeLayerIds.includes('market_links')) {
+      setMarketLinkTooltip(null);
+    }
+  }, [activeLayerIds]);
 
   const resourcesLayerVisible = layers.some(
     (layer) => layer.id === 'resources' && layer.visible,
@@ -1009,6 +1149,27 @@ export default function MapView({
             ))}
         </div>
       </div>
+      {marketLinkTooltip
+        ? createPortal(
+            <div
+              className="fixed w-max max-w-72 px-2.5 py-1.5 rounded-lg border border-white/10 bg-[#0b111b] text-white shadow-2xl pointer-events-none whitespace-pre-line"
+              style={{
+                top: Math.max(8, Math.min(window.innerHeight - 8, marketLinkTooltip.y + 12)),
+                left: Math.max(8, Math.min(window.innerWidth - 8, marketLinkTooltip.x + 12)),
+                transform: 'translate(0, 0)',
+                zIndex: 2147483647,
+              }}
+            >
+              <div className="text-[11px] font-semibold leading-tight">
+                {marketLinkTooltip.label}
+              </div>
+              <div className="text-[10px] text-white/70 leading-tight mt-1">
+                {marketLinkTooltip.description}
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       
 

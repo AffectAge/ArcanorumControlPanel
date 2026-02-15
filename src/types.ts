@@ -151,6 +151,7 @@ export type Market = {
   creatorCountryId: string;
   color: string;
   logoDataUrl?: string;
+  allowInfrastructureAccessWithoutTreaties?: boolean;
   memberCountryIds: string[];
   warehouseByResourceId?: Record<string, number>;
   priceByResourceId?: Record<string, number>;
