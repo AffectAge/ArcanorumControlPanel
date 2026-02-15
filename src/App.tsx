@@ -3524,6 +3524,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       marketLogoDataUrl?: string;
       fromProvinceId: string;
       toProvinceId: string;
+      fromCountryId: string;
+      toCountryId: string;
       fromCountryName: string;
       toCountryName: string;
       routeTypeNames: string[];
@@ -3588,6 +3590,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       marketLogoDataUrl?: string;
       fromProvinceId: string;
       toProvinceId: string;
+      fromCountryId: string;
+      toCountryId: string;
       fromCountryName: string;
       toCountryName: string;
       routeTypeNames: string[];
@@ -3617,6 +3621,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
 
           const a = province.id < neighborId ? province.id : neighborId;
           const b = province.id < neighborId ? neighborId : province.id;
+          const countryA = provinces[a]?.ownerCountryId;
+          const countryB = provinces[b]?.ownerCountryId;
+          if (!countryA || !countryB || countryA === countryB) return;
           const key = `${market.id}:${a}:${b}`;
           if (seen.has(key)) return;
           seen.add(key);
@@ -3629,8 +3636,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             marketLogoDataUrl: market.logoDataUrl,
             fromProvinceId: a,
             toProvinceId: b,
-            fromCountryName: countryNameById.get(provinces[a]?.ownerCountryId ?? '') ?? provinces[a]?.ownerCountryId ?? '-',
-            toCountryName: countryNameById.get(provinces[b]?.ownerCountryId ?? '') ?? provinces[b]?.ownerCountryId ?? '-',
+            fromCountryId: countryA,
+            toCountryId: countryB,
+            fromCountryName: countryNameById.get(countryA) ?? countryA,
+            toCountryName: countryNameById.get(countryB) ?? countryB,
             routeTypeNames: commonTypeIds.map(
               (routeTypeId) => routeTypeById.get(routeTypeId)?.name ?? routeTypeId,
             ),
@@ -4804,6 +4813,42 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         guestCountryId: targetCountryId,
         agreementCategory: 'market_invite',
         marketLeaderCountryId: activeCountryId,
+        allowState: true,
+        allowCompanies: false,
+      },
+    });
+  };
+
+  const requestJoinMarketByTreaty = (marketId: string) => {
+    if (!activeCountryId || !marketId) return;
+    const targetMarket = markets.find((market) => market.id === marketId);
+    if (!targetMarket) return;
+    if (targetMarket.memberCountryIds.includes(activeCountryId)) return;
+    const leaderCountryId = targetMarket.leaderCountryId;
+    if (!leaderCountryId || leaderCountryId === activeCountryId) return;
+    const alreadyInMarket = markets.some((market) =>
+      market.memberCountryIds.includes(activeCountryId),
+    );
+    if (alreadyInMarket) return;
+    const existingRequest = diplomacyProposals.some((proposal) => {
+      const category = proposal.agreement.agreementCategory ?? 'construction';
+      if (category !== 'market_invite' && category !== 'market') return false;
+      return (
+        proposal.fromCountryId === activeCountryId &&
+        proposal.toCountryId === leaderCountryId &&
+        proposal.agreement.marketLeaderCountryId === leaderCountryId
+      );
+    });
+    if (existingRequest) return;
+    addDiplomacyProposal({
+      fromCountryId: activeCountryId,
+      toCountryId: leaderCountryId,
+      agreement: {
+        title: `Запрос на вступление в рынок ${targetMarket.name}`,
+        hostCountryId: leaderCountryId,
+        guestCountryId: activeCountryId,
+        agreementCategory: 'market_invite',
+        marketLeaderCountryId: leaderCountryId,
         allowState: true,
         allowCompanies: false,
       },
@@ -6374,7 +6419,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       {pendingDiplomacyProposals.length > 0 && (
         <button
           onClick={() => setDiplomacyInboxOpen(true)}
-          className="absolute left-1/2 -translate-x-1/2 top-[88px] h-9 px-4 rounded-xl border border-emerald-400/40 bg-emerald-500/15 text-emerald-200 text-sm flex items-center gap-2 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400/20 hover:border-emerald-300/60 transition-colors z-40"
+          className="absolute left-1/2 -translate-x-1/2 top-[88px] h-9 px-4 rounded-xl border border-emerald-300/70 bg-emerald-600 text-white text-sm flex items-center gap-2 shadow-lg shadow-emerald-900/40 hover:bg-emerald-500 hover:border-emerald-200 transition-colors z-40"
         >
           <Handshake className="w-4 h-4" />
           Предложения ({pendingDiplomacyProposals.length})
@@ -6981,6 +7026,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onLeaveMarket={leaveMarket}
         onTradeWithWarehouse={tradeWithMarketWarehouse}
         onInviteByTreaty={inviteCountryToMarketByTreaty}
+        onRequestJoinMarket={requestJoinMarketByTreaty}
       />
 
       <HotseatPanel

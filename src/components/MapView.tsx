@@ -65,6 +65,8 @@ type MapViewProps = {
     marketLogoDataUrl?: string;
     fromProvinceId: string;
     toProvinceId: string;
+    fromCountryId: string;
+    toCountryId: string;
     fromCountryName: string;
     toCountryName: string;
     routeTypeNames: string[];
@@ -1010,6 +1012,13 @@ export default function MapView({
     const marketLinksLayerVisible = activeLayerIds.includes('market_links');
     if (marketLinksLayerVisible) {
       marketBorderConnections.forEach((connection) => {
+        if (
+          !connection.fromCountryId ||
+          !connection.toCountryId ||
+          connection.fromCountryId === connection.toCountryId
+        ) {
+          return;
+        }
         const from = provinceCenters.get(connection.fromProvinceId);
         const to = provinceCenters.get(connection.toProvinceId);
         if (!from || !to) return;

@@ -61,6 +61,7 @@ type MarketsModalProps = {
     action: 'buy' | 'sell';
   }) => void;
   onInviteByTreaty: (targetCountryId: string) => void;
+  onRequestJoinMarket: (marketId: string) => void;
 };
 
 type MarketsTab = 'market' | 'goods';
@@ -220,6 +221,7 @@ export default function MarketsModal({
   onLeaveMarket,
   onTradeWithWarehouse: _onTradeWithWarehouse,
   onInviteByTreaty,
+  onRequestJoinMarket,
 }: MarketsModalProps) {
   const [tab, setTab] = useState<MarketsTab>('market');
   const [newMarketName, setNewMarketName] = useState('');
@@ -296,6 +298,20 @@ export default function MarketsModal({
     });
     return result;
   }, [proposals, activeCountryId]);
+  const pendingJoinRequestMarketLeaderIds = useMemo(() => {
+    if (!activeCountryId) return new Set<string>();
+    const result = new Set<string>();
+    proposals.forEach((proposal) => {
+      const category = proposal.agreement.agreementCategory ?? 'construction';
+      if (category !== 'market_invite' && category !== 'market') return;
+      const leaderId = proposal.agreement.marketLeaderCountryId;
+      if (!leaderId) return;
+      if (proposal.fromCountryId !== activeCountryId) return;
+      if (proposal.toCountryId !== leaderId) return;
+      result.add(leaderId);
+    });
+    return result;
+  }, [proposals, activeCountryId]);
 
   const inviteCandidates = useMemo(() => {
     if (!activeCountryId || !ownMarket) return [];
@@ -307,6 +323,13 @@ export default function MarketsModal({
       return !assignedMarketId;
     });
   }, [countries, activeCountryId, ownMarket, assignedMarketByCountry]);
+  const joinableMarkets = useMemo(() => {
+    if (!activeCountryId || memberMarket) return [] as Market[];
+    return markets.filter((market) => {
+      if (market.memberCountryIds.includes(activeCountryId)) return false;
+      return Boolean(market.leaderCountryId);
+    });
+  }, [markets, activeCountryId, memberMarket]);
 
   const canCreateMarket = Boolean(
     activeCountryId &&
@@ -742,6 +765,54 @@ export default function MarketsModal({
                       <Plus className="w-4 h-4" />
                       Создать рынок
                     </button>
+                    <div className="pt-2 border-t border-white/10 space-y-2">
+                      <div className="text-white/85 text-sm font-semibold">
+                        Попроситься в существующий рынок
+                      </div>
+                      <div className="text-white/55 text-xs">
+                        Запрос отправится лидеру рынка как дипломатическое предложение.
+                      </div>
+                      <div className="space-y-2">
+                        {joinableMarkets.length > 0 ? (
+                          joinableMarkets.map((market) => {
+                            const leader = countries.find(
+                              (country) => country.id === market.leaderCountryId,
+                            );
+                            const pending = pendingJoinRequestMarketLeaderIds.has(
+                              market.leaderCountryId,
+                            );
+                            return (
+                              <div
+                                key={`join-market:${market.id}`}
+                                className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between gap-3"
+                              >
+                                <div className="flex flex-col">
+                                  <span className="text-white/85 text-sm">{market.name}</span>
+                                  <span className="text-white/55 text-[11px]">
+                                    Лидер: {leader?.name ?? market.leaderCountryId} ·
+                                    участников: {market.memberCountryIds.length}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => onRequestJoinMarket(market.id)}
+                                  disabled={pending}
+                                  className={`h-7 px-2 rounded-md border text-xs inline-flex items-center gap-1 ${
+                                    pending
+                                      ? 'border-white/10 bg-black/30 text-white/35 cursor-not-allowed'
+                                      : 'border-emerald-400/35 bg-emerald-600 text-white'
+                                  }`}
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                  {pending ? 'Запрос отправлен' : 'Попроситься'}
+                                </button>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="text-white/50 text-sm">Нет рынков для запроса вступления.</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : !ownMarket ? (
                   <div className="rounded-xl border border-amber-400/30 bg-amber-500/5 p-4 space-y-3">
