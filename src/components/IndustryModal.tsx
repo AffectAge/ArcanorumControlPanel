@@ -1,4 +1,4 @@
-import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon, Plus, Coins } from 'lucide-react';
+import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon, Plus, Coins, ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { expandDiplomacyAgreements } from '../diplomacyUtils';
 import Tooltip from './Tooltip';
@@ -952,6 +952,15 @@ export default function IndustryModal({
     countryId: string;
     companyId: string;
   } | null>(null);
+  const [expandedEconomyByCardKey, setExpandedEconomyByCardKey] = useState<
+    Record<string, boolean>
+  >({});
+  const toggleEconomySection = (cardKey: string) => {
+    setExpandedEconomyByCardKey((prev) => ({
+      ...prev,
+      [cardKey]: !prev[cardKey],
+    }));
+  };
   const resourceNameById = useMemo(
     () => new Map(resources.map((resource) => [resource.id, resource.name])),
     [resources],
@@ -1597,6 +1606,9 @@ export default function IndustryModal({
                                   <div className="text-white/40 text-xs">
                                     Стоимость: {Math.max(1, building?.cost ?? 1)}
                                   </div>
+                                  <div className="text-white/40 text-xs">
+                                    Стоимость сноса: {demolishCost}
+                                  </div>
                                   {card.kind === 'construction' && (
                                     <div className="mt-2">
                                       <div className="h-2 rounded-full bg-white/10 overflow-hidden">
@@ -1716,47 +1728,65 @@ export default function IndustryModal({
                               </div>
                               {card.kind === 'built' && (
                                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-white/60 text-[11px] uppercase tracking-wide">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleEconomySection(card.key)}
+                                    className="w-full flex items-center justify-between gap-2 text-left"
+                                  >
+                                    <span className="text-white/60 text-[11px] uppercase tracking-wide shrink-0">
                                       Экономика
                                     </span>
-                                    <div className="flex items-center gap-1.5 text-[10px]">
-                                      <div className="relative group flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2 py-1">
-                                        <span className="text-white/75 tabular-nums">
-                                          Продуктивность: {productivityPercent}%
-                                        </span>
-                                        <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                          <div
-                                            className="h-full rounded-full transition-all"
-                                            style={{
-                                              width: `${productivityPercent}%`,
-                                              backgroundColor: getProductivityBarColor(
-                                                productivityPercent,
-                                              ),
-                                            }}
-                                          />
-                                        </div>
-                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                          Эффективность здания за ход.
-                                        </span>
+                                    <span className="ml-auto flex items-center justify-end gap-1.5 text-[10px]">
+                                      <span className="relative group flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2 py-1">
+                                      <span className="text-white/75 tabular-nums">
+                                        Продуктивность: {productivityPercent}%
+                                      </span>
+                                      <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                        <div
+                                          className="h-full rounded-full transition-all"
+                                          style={{
+                                            width: `${productivityPercent}%`,
+                                            backgroundColor: getProductivityBarColor(
+                                              productivityPercent,
+                                            ),
+                                          }}
+                                        />
                                       </div>
+                                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Эффективность здания за ход.
+                                      </span>
+                                      </span>
                                       <span className="relative group rounded-lg border border-white/15 bg-black/35 px-2 py-0.5 text-white-200 tabular-nums inline-flex items-center gap-1.5">
-                                        <Coins className="w-3.5 h-3.5" />
-                                        {(builtEntry?.ducats ?? 0).toFixed(1)}
-                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                          Текущий запас дукатов здания.
-                                        </span>
+                                      <Coins className="w-3.5 h-3.5" />
+                                      {(builtEntry?.ducats ?? 0).toFixed(1)}
+                                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Текущий запас дукатов здания.
+                                      </span>
                                       </span>
                                       <span
                                         className={`relative group rounded-lg border px-2 py-0.5 tabular-nums ${ducatsDeltaBadgeClass}`}
                                       >
-                                        {ducatsDeltaLabel}
-                                        <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                          Изменение дукатов за ход: продажи минус закупки.
-                                        </span>
+                                      {ducatsDeltaLabel}
+                                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                        Изменение дукатов за ход: продажи минус закупки.
                                       </span>
-                                    </div>
-                                  </div>
+                                      </span>
+                                      <ChevronDown
+                                        className={
+                                          expandedEconomyByCardKey[card.key]
+                                            ? 'w-4 h-4 text-white/60 transition-transform duration-300 rotate-180 shrink-0'
+                                            : 'w-4 h-4 text-white/60 transition-transform duration-300 shrink-0'
+                                        }
+                                      />
+                                    </span>
+                                  </button>
+                                  <div
+                                    className={
+                                      expandedEconomyByCardKey[card.key]
+                                        ? 'overflow-hidden transition-all duration-300 max-h-[2000px] opacity-100'
+                                        : 'overflow-hidden transition-all duration-300 max-h-0 opacity-0'
+                                    }
+                                  >
                                   <div className="space-y-2">
                                     <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                       <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
@@ -1998,6 +2028,7 @@ export default function IndustryModal({
                                       ) : (
                                         <div className="text-white/45 text-[11px]">не настроено</div>
                                       )}
+                                    </div>
                                     </div>
                                   </div>
                                 </div>
@@ -2296,6 +2327,9 @@ export default function IndustryModal({
                                   <div className="text-white/40 text-xs">
                                     Стоимость: {Math.max(1, building?.cost ?? 1)}
                                   </div>
+                                  <div className="text-white/40 text-xs">
+                                    Стоимость сноса: {demolishCost}
+                                  </div>
                                   {card.kind === 'construction' && (
                                     <div className="mt-2">
                                       <div className="h-2 rounded-full bg-white/10 overflow-hidden">
@@ -2420,47 +2454,65 @@ export default function IndustryModal({
                         </div>
                         {card.kind === 'built' && (
                           <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-white/60 text-[11px] uppercase tracking-wide">
+                            <button
+                              type="button"
+                              onClick={() => toggleEconomySection(card.key)}
+                              className="w-full flex items-center justify-between gap-2 text-left"
+                            >
+                              <span className="text-white/60 text-[11px] uppercase tracking-wide shrink-0">
                                 Экономика
                               </span>
-                              <div className="flex items-center gap-1.5 text-[10px]">
-                                <div className="relative group flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2 py-1">
-                                  <span className="text-white/75 tabular-nums">
-                                    Продуктивность: {productivityPercent}%
-                                  </span>
-                                  <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full transition-all"
-                                      style={{
-                                        width: `${productivityPercent}%`,
-                                        backgroundColor: getProductivityBarColor(
-                                          productivityPercent,
-                                        ),
-                                      }}
-                                    />
-                                  </div>
-                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Эффективность здания за ход.
-                                  </span>
+                              <span className="ml-auto flex items-center justify-end gap-1.5 text-[10px]">
+                                <span className="relative group flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2 py-1">
+                                <span className="text-white/75 tabular-nums">
+                                  Продуктивность: {productivityPercent}%
+                                </span>
+                                <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-all"
+                                    style={{
+                                      width: `${productivityPercent}%`,
+                                      backgroundColor: getProductivityBarColor(
+                                        productivityPercent,
+                                      ),
+                                    }}
+                                  />
                                 </div>
+                                <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Эффективность здания за ход.
+                                </span>
+                                </span>
                                 <span className="relative group rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums inline-flex items-center gap-1.5">
-                                  <Coins className="w-3.5 h-3.5" />
-                                  {(builtEntry?.ducats ?? 0).toFixed(1)}
-                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Текущий запас дукатов здания.
-                                  </span>
+                                <Coins className="w-3.5 h-3.5" />
+                                {(builtEntry?.ducats ?? 0).toFixed(1)}
+                                <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Текущий запас дукатов здания.
+                                </span>
                                 </span>
                                 <span
                                   className={`relative group rounded-full border px-2 py-0.5 tabular-nums ${ducatsDeltaBadgeClass}`}
                                 >
-                                  {ducatsDeltaLabel}
-                                  <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                    Изменение дукатов за ход: продажи минус закупки.
-                                  </span>
+                                {ducatsDeltaLabel}
+                                <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                  Изменение дукатов за ход: продажи минус закупки.
                                 </span>
-                              </div>
-                            </div>
+                                </span>
+                                <ChevronDown
+                                  className={
+                                    expandedEconomyByCardKey[card.key]
+                                      ? 'w-4 h-4 text-white/60 transition-transform duration-300 rotate-180 shrink-0'
+                                      : 'w-4 h-4 text-white/60 transition-transform duration-300 shrink-0'
+                                  }
+                                />
+                              </span>
+                            </button>
+                            <div
+                              className={
+                                expandedEconomyByCardKey[card.key]
+                                  ? 'overflow-hidden transition-all duration-300 max-h-[2000px] opacity-100'
+                                  : 'overflow-hidden transition-all duration-300 max-h-0 opacity-0'
+                              }
+                            >
                             <div className="space-y-2">
                               <div className="rounded-lg border border-white/10 bg-black/25 p-2.5 space-y-1">
                                 <div className="relative group w-fit text-white/50 text-[10px] uppercase tracking-wide">
@@ -2741,6 +2793,7 @@ export default function IndustryModal({
                                 ) : (
                                   <div className="text-white/45 text-[11px]">не настроено</div>
                                 )}
+                              </div>
                               </div>
                             </div>
                           </div>
