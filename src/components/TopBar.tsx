@@ -1,6 +1,5 @@
 ﻿import {
   Menu,
-  RotateCcw,
   SkipForward,
   Globe2,
   Hammer,
@@ -12,6 +11,7 @@
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { Country } from '../types';
+import Tooltip from './Tooltip';
 
 type TopBarProps = {
   turn: number;
@@ -59,30 +59,10 @@ export default function TopBar({
   onOpenSettings,
 }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [hoverTip, setHoverTip] = useState<{
-    text: string;
-    x: number;
-    y: number;
-    visible: boolean;
-  }>({ text: '', x: 0, y: 0, visible: false });
   const activeCountry = useMemo(
     () => countries.find((country) => country.id === activeCountryId),
     [countries, activeCountryId],
   );
-
-  const showTooltip = (text: string, event: React.MouseEvent) => {
-    setHoverTip({ text, x: event.clientX, y: event.clientY, visible: true });
-  };
-
-  const moveTooltip = (event: React.MouseEvent) => {
-    setHoverTip((prev) =>
-      prev.visible ? { ...prev, x: event.clientX, y: event.clientY } : prev,
-    );
-  };
-
-  const hideTooltip = () => {
-    setHoverTip((prev) => ({ ...prev, visible: false }));
-  };
 
   const formatPoints = (value: number) => {
     const abs = Math.abs(value);
@@ -101,48 +81,56 @@ export default function TopBar({
 
   const renderStat = ({
     tooltip,
+    tooltipDescription,
     icon: Icon,
     iconColorClass,
     valueClass,
     value,
     gain,
+    rightText,
+    rightTextStyle,
     extraText,
     extraStyle,
   }: {
     tooltip: string;
+    tooltipDescription?: string;
     icon: React.ComponentType<{ className?: string }>;
     iconColorClass: string;
     valueClass: string;
     value: number;
     gain: number;
+    rightText?: string;
+    rightTextStyle?: React.CSSProperties;
     extraText?: string;
     extraStyle?: React.CSSProperties;
   }) => (
-    <div
-      className="h-10 px-2 rounded-xl border border-white/10 bg-black/30 flex items-center gap-2"
-      onMouseEnter={(event) => showTooltip(tooltip, event)}
-      onMouseMove={moveTooltip}
-      onMouseLeave={hideTooltip}
-    >
-      <div className="w-6 h-6 rounded-lg border border-white/10 bg-black/20 flex items-center justify-center shrink-0">
-        <Icon className={`w-4 h-4 ${iconColorClass}`} />
-      </div>
-      <div className="leading-tight">
-        <div className={`${valueClass} font-bold text-sm tabular-nums`}>
-          {formatPoints(value)}
-          {gain > 0 && (
-            <span className="text-emerald-400 text-[11px] font-semibold ml-1">
-              +{formatPoints(gain)}
-            </span>
+    <Tooltip label={tooltip} description={tooltipDescription}>
+      <div className="h-10 px-2 rounded-xl border border-white/10 bg-black/30 flex items-center gap-2">
+        <div className="w-6 h-6 rounded-lg border border-white/10 bg-black/20 flex items-center justify-center shrink-0">
+          <Icon className={`w-4 h-4 ${iconColorClass}`} />
+        </div>
+        <div className="leading-tight">
+          <div className={`${valueClass} font-bold text-sm tabular-nums`}>
+            {formatPoints(value)}
+            {gain > 0 && (
+              <span className="text-emerald-400 text-[11px] font-semibold ml-1">
+                +{formatPoints(gain)}
+              </span>
+            )}
+            {rightText && (
+              <span className="text-[10px] text-white/55 ml-1" style={rightTextStyle}>
+                {rightText}
+              </span>
+            )}
+          </div>
+          {extraText && (
+            <div className="text-[10px] text-white/55" style={extraStyle}>
+              {extraText}
+            </div>
           )}
         </div>
-        {extraText && (
-          <div className="text-[10px] text-white/55" style={extraStyle}>
-            {extraText}
-          </div>
-        )}
       </div>
-    </div>
+    </Tooltip>
   );
 
   return (
@@ -220,32 +208,29 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 ">
-          <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-            <RotateCcw className="w-4 h-4 text-white/80" />
-          </div>
-          <span className="text-white font-bold text-sm">Ход {turn}</span>
-        </div>
-
-        <div className="flex items-center gap-2 px-3 py-2 ">
+        <div className="h-10 px-2 rounded-xl border border-white/10 bg-black/30 flex items-center gap-2">
           <div
-            className="w-6 h-6 rounded-lg border border-white/10 flex items-center justify-center overflow-hidden"
-            style={{ backgroundColor: activeCountry?.color ?? '#1a1f2b' }}
+            className="w-7 h-7 rounded-lg border border-white/10 flex items-center justify-center overflow-hidden"
+            style={{
+              backgroundColor: activeCountry?.flagDataUrl
+                ? 'transparent'
+                : activeCountry?.color ?? '#1a1f2b',
+            }}
           >
             {activeCountry?.flagDataUrl && (
               <img
                 src={activeCountry.flagDataUrl}
                 alt={activeCountry.name}
-                className="w-5 h-5 object-contain"
+                className="block w-full h-full object-contain p-[1px]"
               />
             )}
           </div>
           {activeCountry?.coatDataUrl && (
-            <div className="w-6 h-6 rounded-lg border border-white/10 overflow-hidden bg-black/30">
+            <div className="w-7 h-7 rounded-lg border border-white/10 overflow-hidden bg-black/30">
               <img
                 src={activeCountry.coatDataUrl}
                 alt={`${activeCountry.name} coat`}
-                className="w-5 h-5 object-contain"
+                className="block w-full h-full object-contain p-[1px]"
               />
             </div>
           )}
@@ -258,15 +243,17 @@ export default function TopBar({
       <div className="flex items-center gap-3">
         {renderStat({
           tooltip: 'Очки колонизации',
+          tooltipDescription:
+            'Очки для начала и поддержки колонизации. Каждая активная колония потребляет очки каждый ход.',
           icon: Globe2,
           iconColorClass: 'text-emerald-300',
           valueClass: 'text-emerald-100',
           value: activeCountry?.colonizationPoints ?? 0,
           gain: colonizationGainPerTurn,
-          extraText: `${colonizationActiveCount}/${
+          rightText: `${colonizationActiveCount}/${
             colonizationActiveLimit > 0 ? colonizationActiveLimit : '∞'
           }`,
-          extraStyle:
+          rightTextStyle:
             colonizationActiveLimit > 0 &&
             colonizationActiveCount >= colonizationActiveLimit
               ? { color: '#f87171' }
@@ -275,6 +262,8 @@ export default function TopBar({
 
         {renderStat({
           tooltip: 'Очки строительства',
+          tooltipDescription:
+            'Очки для строительства и сноса зданий, а также для развития инфраструктуры.',
           icon: Hammer,
           iconColorClass: 'text-amber-300',
           valueClass: 'text-amber-100',
@@ -284,6 +273,8 @@ export default function TopBar({
 
         {renderStat({
           tooltip: 'Очки науки',
+          tooltipDescription:
+            'Ресурс научного развития. Используется в механиках исследований и технологического прогресса.',
           icon: Atom,
           iconColorClass: 'text-sky-300',
           valueClass: 'text-sky-100',
@@ -293,6 +284,8 @@ export default function TopBar({
 
         {renderStat({
           tooltip: 'Очки культуры',
+          tooltipDescription:
+            'Ресурс культурного развития. Влияет на культурные механики и связанный прогресс.',
           icon: Feather,
           iconColorClass: 'text-rose-300',
           valueClass: 'text-rose-100',
@@ -302,6 +295,8 @@ export default function TopBar({
 
         {renderStat({
           tooltip: 'Очки религии',
+          tooltipDescription:
+            'Ресурс религиозного влияния. Применяется в религиозных механиках государства.',
           icon: Cross,
           iconColorClass: 'text-violet-300',
           valueClass: 'text-violet-100',
@@ -311,6 +306,8 @@ export default function TopBar({
 
         {renderStat({
           tooltip: 'Золото',
+          tooltipDescription:
+            'Базовая валюта государства. Накопление и расход зависят от экономики и настроек хода.',
           icon: Coins,
           iconColorClass: 'text-yellow-300',
           valueClass: 'text-yellow-100',
@@ -320,6 +317,8 @@ export default function TopBar({
 
         {renderStat({
           tooltip: 'Дукаты',
+          tooltipDescription:
+            'Торговая валюта рынков. Используется для закупок, продаж и расчётов между участниками рынка.',
           icon: Gem,
           iconColorClass: 'text-cyan-300',
           valueClass: 'text-cyan-100',
@@ -355,20 +354,13 @@ export default function TopBar({
         <button
           onClick={onEndTurn}
           disabled={countries.length === 0}
-          className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center hover:bg-emerald-400/30 hover:border-emerald-400/50 transition-all duration-200 group shadow-lg shadow-emerald-500/20 hover:scale-110"
+          className="h-11 px-3 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center gap-2 hover:bg-emerald-400/30 hover:border-emerald-400/50 transition-all duration-200 group shadow-lg shadow-emerald-500/20 hover:scale-105 disabled:opacity-60 disabled:hover:scale-100"
         >
           <SkipForward className="w-5 h-5 text-emerald-400 group-hover:text-emerald-300 transition-colors" />
+          <span className="text-emerald-100 font-bold text-sm tabular-nums">{turn}</span>
         </button>
       </div>
 
-      {hoverTip.visible && (
-        <div
-          className="fixed z-[60] pointer-events-none px-2 py-1 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 text-white text-xs font-medium whitespace-nowrap -translate-y-1/2"
-          style={{ left: hoverTip.x + 12, top: hoverTip.y }}
-        >
-          {hoverTip.text}
-        </div>
-      )}
     </div>
   );
 }
