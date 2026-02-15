@@ -234,7 +234,10 @@ export default function TopBar({
               />
             </div>
           )}
-          <span className="text-white font-semibold text-sm">
+          <span
+            className="font-semibold text-sm"
+            style={{ color: activeCountry?.color ?? '#ffffff' }}
+          >
             {activeCountry ? activeCountry.name : 'Страна не выбрана'}
           </span>
         </div>
