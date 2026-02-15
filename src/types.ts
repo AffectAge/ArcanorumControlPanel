@@ -83,6 +83,7 @@ export type LogisticsRouteType = {
   id: string;
   name: string;
   color: string;
+  iconDataUrl?: string;
   lineWidth: number;
   dashPattern?: string;
   constructionCostPerSegment?: number;
@@ -181,6 +182,7 @@ export type ResourceCategory = {
   id: string;
   name: string;
   color?: string;
+  iconDataUrl?: string;
 };
 
 export type GameSettings = {

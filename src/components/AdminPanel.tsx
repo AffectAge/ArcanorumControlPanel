@@ -98,7 +98,7 @@ type AdminPanelProps = {
     maxMarketPrice?: number,
     infrastructureCostPerUnit?: number,
   ) => void;
-  onAddResourceCategory: (name: string, color?: string) => void;
+  onAddResourceCategory: (name: string, color?: string, iconDataUrl?: string) => void;
   onAddBuilding: (
     name: string,
     cost: number,
@@ -120,6 +120,7 @@ type AdminPanelProps = {
   onAddRouteType: (
     name: string,
     color: string,
+    iconDataUrl: string | undefined,
     lineWidth: number,
     dashPattern?: string,
     constructionCostPerSegment?: number,
@@ -139,6 +140,7 @@ type AdminPanelProps = {
         LogisticsRouteType,
         | 'name'
         | 'color'
+        | 'iconDataUrl'
         | 'lineWidth'
         | 'dashPattern'
         | 'constructionCostPerSegment'
@@ -185,6 +187,7 @@ type AdminPanelProps = {
   onUpdateCultureColor: (id: string, color: string) => void;
   onUpdateResourceColor: (id: string, color: string) => void;
   onUpdateResourceCategoryColor: (id: string, color: string) => void;
+  onUpdateResourceCategoryIcon: (id: string, iconDataUrl?: string) => void;
   onUpdateResourcePricing: (
     resourceId: string,
     patch: {
@@ -294,6 +297,7 @@ export default function AdminPanel({
   onUpdateCultureColor,
   onUpdateResourceColor,
   onUpdateResourceCategoryColor,
+  onUpdateResourceCategoryIcon,
   onUpdateResourcePricing,
   onUpdateResourceCategory,
   onDeleteClimate,
@@ -327,6 +331,9 @@ export default function AdminPanel({
   const [resourceName, setResourceName] = useState('');
   const [resourceCategoryName, setResourceCategoryName] = useState('');
   const [resourceCategoryColor, setResourceCategoryColor] = useState('#38bdf8');
+  const [resourceCategoryIcon, setResourceCategoryIcon] = useState<string | undefined>(
+    undefined,
+  );
   const [resourceCategoryId, setResourceCategoryId] = useState('');
   const [buildingName, setBuildingName] = useState('');
   const [buildingCost, setBuildingCost] = useState(100);
@@ -411,6 +418,7 @@ export default function AdminPanel({
     useState<number | ''>(1);
   const [routeTypeName, setRouteTypeName] = useState('');
   const [routeTypeColor, setRouteTypeColor] = useState('#38bdf8');
+  const [routeTypeIcon, setRouteTypeIcon] = useState<string | undefined>(undefined);
   const [routeTypeWidth, setRouteTypeWidth] = useState<number | ''>(1.2);
   const [routeTypeDash, setRouteTypeDash] = useState('');
   const [routeTypeCostPerSegment, setRouteTypeCostPerSegment] = useState<
@@ -432,6 +440,7 @@ export default function AdminPanel({
     useState(true);
   const [routeTypeTransportCapacityByCategory, setRouteTypeTransportCapacityByCategory] =
     useState<Record<string, number>>({});
+  const [routeTypesModalOpen, setRouteTypesModalOpen] = useState(false);
 
   const provinceIds = useMemo(() => Object.keys(provinces).sort(), [provinces]);
   const activeProvince = selectedProvince ? provinces[selectedProvince] : undefined;
@@ -579,8 +588,9 @@ export default function AdminPanel({
   const handleAddResourceCategory = () => {
     const name = resourceCategoryName.trim();
     if (!name) return;
-    onAddResourceCategory(name, resourceCategoryColor);
+    onAddResourceCategory(name, resourceCategoryColor, resourceCategoryIcon);
     setResourceCategoryName('');
+    setResourceCategoryIcon(undefined);
   };
 
   const handleAddRouteType = () => {
@@ -589,6 +599,7 @@ export default function AdminPanel({
     onAddRouteType(
       name,
       routeTypeColor,
+      routeTypeIcon,
       routeTypeWidth === '' ? 1.2 : Math.max(0.4, Number(routeTypeWidth) || 1.2),
       routeTypeDash.trim() || undefined,
       routeTypeCostPerSegment === ''
@@ -607,6 +618,7 @@ export default function AdminPanel({
       routeTypeTransportCapacityByCategory,
     );
     setRouteTypeName('');
+    setRouteTypeIcon(undefined);
     setRouteTypeDash('');
     setRouteTypeWidth(1.2);
     setRouteTypeCostPerSegment(0);
@@ -2466,6 +2478,34 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Логотип
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        handleIconUpload(event.target.files?.[0], setResourceCategoryIcon)
+                      }
+                      className="hidden"
+                      id="resource-category-icon"
+                    />
+                    <label
+                      htmlFor="resource-category-icon"
+                      className="h-10 px-3 rounded-lg border border-white/10 bg-black/40 text-white/70 text-xs flex items-center gap-2 cursor-pointer hover:border-emerald-400/40"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Выбрать
+                    </label>
+                    {resourceCategoryIcon && (
+                      <img
+                        src={resourceCategoryIcon}
+                        alt=""
+                        className="w-8 h-8 rounded-lg object-cover border border-white/10"
+                      />
+                    )}
+                  </div>
+                </label>
                 <div className="ml-auto flex items-end gap-2">
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
                     Цвет
@@ -2493,10 +2533,18 @@ export default function AdminPanel({
                     className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
                   >
                     <div className="flex items-center gap-3">
-                      <span
-                        className="w-4 h-4 rounded-full border border-white/10"
-                        style={{ backgroundColor: category.color ?? '#38bdf8' }}
-                      />
+                      {category.iconDataUrl ? (
+                        <img
+                          src={category.iconDataUrl}
+                          alt={category.name}
+                          className="w-6 h-6 rounded-md object-cover border border-white/10"
+                        />
+                      ) : (
+                        <span
+                          className="w-4 h-4 rounded-full border border-white/10"
+                          style={{ backgroundColor: category.color ?? '#38bdf8' }}
+                        />
+                      )}
                       <span className="text-white/80 text-sm">{category.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -2508,6 +2556,37 @@ export default function AdminPanel({
                         }
                         className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                       />
+                      <div className="flex items-center gap-2 flex-row-reverse">
+                        {category.iconDataUrl && (
+                          <button
+                            onClick={() =>
+                              onUpdateResourceCategoryIcon(category.id, undefined)
+                            }
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40 relative group"
+                          >
+                            <Trash2 className="w-4 h-4 text-white/60" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Удалить логотип
+                            </span>
+                          </button>
+                        )}
+                        <label className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 text-white/70 flex items-center justify-center cursor-pointer hover:border-emerald-400/40 relative group">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              handleIconUpload(event.target.files?.[0], (value) =>
+                                onUpdateResourceCategoryIcon(category.id, value),
+                              )
+                            }
+                          />
+                          <ImageIcon className="w-4 h-4" />
+                          <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            Изменить логотип
+                          </span>
+                        </label>
+                      </div>
                       <button
                         onClick={() => onDeleteResourceCategory(category.id)}
                         className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
@@ -3365,9 +3444,184 @@ export default function AdminPanel({
               <div>
                 <h2 className="text-white text-xl font-semibold">Типы маршрутов</h2>
                 <p className="text-white/60 text-sm">
-                  Создавайте собственные типы линий логистики для прокладки на карте.
+                  Список маршрутов. Настройка параметров открывается отдельной кнопкой.
                 </p>
               </div>
+              <div className="text-white/55 text-sm">
+                Всего типов маршрутов: {routeTypes.length}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-3 items-end">
+                <label className="md:col-span-2 flex flex-col gap-2 text-white/70 text-sm">
+                  Название
+                  <input
+                    value={routeTypeName}
+                    onChange={(event) => setRouteTypeName(event.target.value)}
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <div className="flex flex-col gap-2 text-white/70 text-sm">
+                  Иконка
+                  <label className="w-10 h-10 rounded-lg border border-white/10 bg-black/30 inline-flex items-center justify-center cursor-pointer hover:border-emerald-400/50 transition-colors overflow-hidden">
+                    {routeTypeIcon ? (
+                      <img src={routeTypeIcon} alt="route-type-icon" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-4 h-4 text-white/70" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) =>
+                        handleIconUpload(event.target.files?.[0], setRouteTypeIcon)
+                      }
+                    />
+                  </label>
+                </div>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цвет
+                  <input
+                    type="color"
+                    value={routeTypeColor}
+                    onChange={(event) => setRouteTypeColor(event.target.value)}
+                    className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Толщина
+                  <input
+                    type="number"
+                    step={0.1}
+                    min={0.4}
+                    value={routeTypeWidth}
+                    onChange={(event) =>
+                      setRouteTypeWidth(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0.4, Number(event.target.value) || 0.4),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  Цена/участок
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={routeTypeCostPerSegment}
+                    onChange={(event) =>
+                      setRouteTypeCostPerSegment(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Math.floor(Number(event.target.value) || 0)),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <button
+                  onClick={handleAddRouteType}
+                  className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 inline-flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Добавить тип
+                </button>
+              </div>
+              <div className="space-y-2">
+                {routeTypes.length > 0 ? (
+                  routeTypes.map((item) => (
+                    <div
+                      key={`route-type-card-${item.id}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-6 h-6 rounded-md border border-white/10 bg-black/30 shrink-0 overflow-hidden flex items-center justify-center">
+                          {item.iconDataUrl ? (
+                            <img
+                              src={item.iconDataUrl}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span
+                              className="w-4 h-4 rounded-full border border-white/10"
+                              style={{ backgroundColor: item.color }}
+                            />
+                          )}
+                        </div>
+                        <span className="text-white/85 text-sm truncate">{item.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-emerald-400/40 cursor-pointer relative group">
+                          <ImageIcon className="w-4 h-4 text-white/60" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(event) =>
+                              handleIconUpload(event.target.files?.[0], (value) =>
+                                onUpdateRouteType(item.id, { iconDataUrl: value }),
+                              )
+                            }
+                          />
+                          <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            Загрузить логотип
+                          </span>
+                        </label>
+                        {item.iconDataUrl && (
+                          <button
+                            onClick={() => onUpdateRouteType(item.id, { iconDataUrl: undefined })}
+                            className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-amber-400/50 relative group"
+                          >
+                            <Trash2 className="w-4 h-4 text-white/60" />
+                            <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                              Удалить логотип
+                            </span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setRouteTypesModalOpen(true)}
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-emerald-400/40 relative group"
+                        >
+                          <Sliders className="w-4 h-4 text-white/60" />
+                          <span className="pointer-events-none absolute -top-9 right-0 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            Параметры
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => onDeleteRouteType(item.id)}
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
+                        >
+                          <Trash2 className="w-4 h-4 text-white/60" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-white/50 text-sm">Нет типов маршрутов</div>
+                )}
+              </div>
+            </div>
+          )}
+          {routeTypesModalOpen && (
+            <div className="fixed inset-0 z-[90] bg-black/70 backdrop-blur-sm animate-fadeIn">
+              <div className="absolute inset-8 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl flex flex-col overflow-hidden">
+                <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-white text-lg font-semibold">Типы маршрутов</h3>
+                    <p className="text-white/60 text-xs mt-1">
+                      Создавайте собственные типы линий логистики для прокладки на карте.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setRouteTypesModalOpen(false)}
+                    className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:border-emerald-400/50 hover:bg-emerald-400/10 transition-all"
+                  >
+                    <X className="w-4 h-4 text-white/70" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
@@ -3640,6 +3894,31 @@ export default function AdminPanel({
                         }
                         className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
                       />
+                      <label className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center cursor-pointer overflow-hidden hover:border-emerald-400/40">
+                        {item.iconDataUrl ? (
+                          <img src={item.iconDataUrl} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <ImageIcon className="w-4 h-4 text-white/60" />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) =>
+                            handleIconUpload(event.target.files?.[0], (value) =>
+                              onUpdateRouteType(item.id, { iconDataUrl: value }),
+                            )
+                          }
+                        />
+                      </label>
+                      {item.iconDataUrl && (
+                        <button
+                          onClick={() => onUpdateRouteType(item.id, { iconDataUrl: undefined })}
+                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-amber-400/40"
+                        >
+                          <Trash2 className="w-4 h-4 text-white/60" />
+                        </button>
+                      )}
                       <input
                         value={item.name}
                         onChange={(event) =>
@@ -3927,6 +4206,8 @@ export default function AdminPanel({
                     </label>
                   </div>
                 ))}
+              </div>
+                </div>
               </div>
             </div>
           )}

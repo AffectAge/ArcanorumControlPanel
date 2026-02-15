@@ -220,6 +220,25 @@ export default function LogisticsModal({
                     ))}
                   </select>
                 </label>
+                {selectedRouteType && (
+                  <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/25 px-2 py-1">
+                    <div className="w-6 h-6 rounded-md border border-white/10 bg-black/30 overflow-hidden flex items-center justify-center">
+                      {selectedRouteType.iconDataUrl ? (
+                        <img
+                          src={selectedRouteType.iconDataUrl}
+                          alt={selectedRouteType.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span
+                          className="w-4 h-4 rounded-full border border-white/10"
+                          style={{ backgroundColor: selectedRouteType.color }}
+                        />
+                      )}
+                    </div>
+                    <span className="text-xs text-white/80">{selectedRouteType.name}</span>
+                  </div>
+                )}
 
                 <div className="rounded-lg border border-cyan-400/30 bg-cyan-500/5 p-3 space-y-2">
                   <div className="text-xs text-cyan-100/80">
@@ -292,8 +311,24 @@ export default function LogisticsModal({
                         className="rounded-xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-3 shadow-lg shadow-black/20"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="text-white text-sm font-semibold leading-tight break-words">
-                            {route.name}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-6 h-6 rounded-md border border-white/10 bg-black/30 overflow-hidden shrink-0 flex items-center justify-center">
+                              {type?.iconDataUrl ? (
+                                <img
+                                  src={type.iconDataUrl}
+                                  alt={type.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span
+                                  className="w-4 h-4 rounded-full border border-white/10"
+                                  style={{ backgroundColor: type?.color ?? '#94a3b8' }}
+                                />
+                              )}
+                            </div>
+                            <div className="text-white text-sm font-semibold leading-tight break-words min-w-0">
+                              {route.name}
+                            </div>
                           </div>
                           <span
                             className="shrink-0 px-2 py-0.5 rounded-md text-[10px] font-medium border"

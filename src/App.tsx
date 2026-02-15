@@ -771,6 +771,7 @@ function App() {
   const addLogisticsRouteType = (payload: {
     name: string;
     color: string;
+    iconDataUrl?: string;
     lineWidth: number;
     dashPattern?: string;
     constructionCostPerSegment?: number;
@@ -791,6 +792,7 @@ function App() {
           id: createId(),
           name: payload.name,
           color: payload.color,
+          iconDataUrl: payload.iconDataUrl,
           lineWidth: Math.max(0.4, payload.lineWidth),
           dashPattern: payload.dashPattern?.trim() || undefined,
           constructionCostPerSegment: Math.max(
@@ -826,6 +828,7 @@ function App() {
         LogisticsRouteType,
         | 'name'
         | 'color'
+        | 'iconDataUrl'
         | 'lineWidth'
         | 'dashPattern'
         | 'constructionCostPerSegment'
@@ -845,8 +848,10 @@ function App() {
       routeTypes: prev.routeTypes.map((item) =>
         item.id === id
           ? {
-              ...item,
-              ...patch,
+                ...item,
+                ...patch,
+              iconDataUrl:
+                patch.iconDataUrl == null ? item.iconDataUrl : patch.iconDataUrl,
               lineWidth:
                 patch.lineWidth == null ? item.lineWidth : Math.max(0.4, patch.lineWidth),
               dashPattern:
@@ -3501,6 +3506,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     return logistics.routes
       .filter((route) => route.provinceIds.includes(selectedProvinceId))
       .map((route) => {
+        const routeType = logistics.routeTypes.find(
+          (type) => type.id === route.routeTypeId,
+        );
         const required = Math.max(0, route.constructionRequiredPoints ?? 0);
         const progress = Math.max(
           0,
@@ -3508,12 +3516,13 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         );
         return {
           routeName: route.name,
+          routeTypeIconDataUrl: routeType?.iconDataUrl,
           progressPoints: progress,
           requiredPoints: required,
         };
       })
       .filter((entry) => entry.requiredPoints > 0 && entry.progressPoints < entry.requiredPoints);
-  }, [selectedProvinceId, logistics.routes]);
+  }, [selectedProvinceId, logistics.routes, logistics.routeTypes]);
   const activeCountryMarket = useMemo(() => {
     if (!activeCountryId) return undefined;
     return markets.find((market) => market.memberCountryIds.includes(activeCountryId));
@@ -3523,6 +3532,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       categoryId: string;
       categoryName: string;
       categoryColor?: string;
+      categoryIconDataUrl?: string;
       status: 'available' | 'unavailable';
       points: number;
       consumedLastTurn: number;
@@ -3538,6 +3548,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       categoryId: category.id,
       categoryName: category.name,
       categoryColor: category.color,
+      categoryIconDataUrl: category.iconDataUrl,
       status: 'unavailable' as const,
       points: 0,
       consumedLastTurn: 0,
@@ -3560,7 +3571,6 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       if (routeType.allowAllMarketCategories ?? true) return true;
       return (routeType.marketAccessCategoryIds ?? []).includes(categoryId);
     };
-
     return base.map((entry) => {
       const graph = new Map<string, Set<string>>();
       const addLink = (from: string, to: string) => {
@@ -5171,10 +5181,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     );
   };
 
-  const addResourceCategory = (name: string, color?: string) => {
+  const addResourceCategory = (name: string, color?: string, iconDataUrl?: string) => {
     setResourceCategories((prev) => [
       ...prev,
-      { id: createId(), name, color: color || '#38bdf8' },
+      { id: createId(), name, color: color || '#38bdf8', iconDataUrl },
     ]);
   };
 
@@ -5292,6 +5302,12 @@ const layerPaint: MapLayerPaint = useMemo(() => {
   const updateResourceCategoryColor = (id: string, color: string) => {
     setResourceCategories((prev) =>
       prev.map((item) => (item.id === id ? { ...item, color } : item)),
+    );
+  };
+
+  const updateResourceCategoryIcon = (id: string, iconDataUrl?: string) => {
+    setResourceCategories((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, iconDataUrl } : item)),
     );
   };
 
@@ -6492,6 +6508,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onAddRouteType={(
           name,
           color,
+          iconDataUrl,
           lineWidth,
           dashPattern,
           constructionCostPerSegment,
@@ -6507,6 +6524,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           addLogisticsRouteType({
             name,
             color,
+            iconDataUrl,
             lineWidth,
             dashPattern,
             constructionCostPerSegment,
@@ -6556,6 +6574,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           updateTraitColor(setResources, id, color)
         }
         onUpdateResourceCategoryColor={updateResourceCategoryColor}
+        onUpdateResourceCategoryIcon={updateResourceCategoryIcon}
         onUpdateResourcePricing={updateResourcePricing}
         onUpdateResourceCategory={updateResourceCategory}
         onDeleteClimate={deleteClimate}

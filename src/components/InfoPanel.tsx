@@ -36,6 +36,7 @@ interface InfoPanelProps {
   colonizationAllowed?: boolean;
   routeConstructionProgress?: {
     routeName: string;
+    routeTypeIconDataUrl?: string;
     progressPoints: number;
     requiredPoints: number;
   }[];
@@ -43,6 +44,7 @@ interface InfoPanelProps {
     categoryId: string;
     categoryName: string;
     categoryColor?: string;
+    categoryIconDataUrl?: string;
     status: 'available' | 'unavailable';
     points: number;
     consumedLastTurn: number;
@@ -224,10 +226,18 @@ export default function InfoPanel({
                     className="flex items-center justify-between rounded-md border border-white/10 bg-black/25 px-2 py-1"
                   >
                     <span className="inline-flex items-center gap-2 text-white/70">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full border border-white/20"
-                        style={{ backgroundColor: entry.categoryColor ?? '#64748b' }}
-                      />
+                      {entry.categoryIconDataUrl ? (
+                        <img
+                          src={entry.categoryIconDataUrl}
+                          alt={entry.categoryName}
+                          className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                        />
+                      ) : (
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border border-white/20"
+                          style={{ backgroundColor: entry.categoryColor ?? '#64748b' }}
+                        />
+                      )}
                       {entry.categoryName}
                     </span>
                     <span className="inline-flex items-center gap-1.5">
@@ -278,7 +288,16 @@ export default function InfoPanel({
                       key={entry.routeName}
                       className="rounded-md border border-white/10 bg-black/25 px-2 py-1"
                     >
-                      <div className="text-white/75 text-xs">{entry.routeName}</div>
+                      <div className="text-white/75 text-xs flex items-center gap-2">
+                        {entry.routeTypeIconDataUrl && (
+                          <img
+                            src={entry.routeTypeIconDataUrl}
+                            alt={entry.routeName}
+                            className="w-4 h-4 rounded-sm border border-white/10 object-cover"
+                          />
+                        )}
+                        <span>{entry.routeName}</span>
+                      </div>
                       <div className="text-white/50 text-[11px]">
                         {Math.floor(entry.progressPoints)} / {entry.requiredPoints} ({percent}%)
                       </div>
