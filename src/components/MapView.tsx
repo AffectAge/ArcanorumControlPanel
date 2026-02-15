@@ -49,6 +49,7 @@ type MapViewProps = {
   selectedId?: string;
   onToggleLayer: (id: string) => void;
   onSelectProvince: (id: string) => void;
+  onClearProvinceSelection: () => void;
   onHoverProvince: (id?: string) => void;
   onProvincesDetected: (ids: string[]) => void;
   onProvinceAdjacencyDetected?: (adjacency: Record<string, string[]>) => void;
@@ -228,6 +229,7 @@ export default function MapView({
   selectedId,
   onToggleLayer,
   onSelectProvince,
+  onClearProvinceSelection,
   onHoverProvince,
   onProvincesDetected,
   onProvinceAdjacencyDetected,
@@ -459,9 +461,16 @@ export default function MapView({
       const target = event.target as Element | null;
       if (!target) return;
       const path = target.closest('path');
-      if (!path) return;
+      if (!path) {
+        onClearProvinceSelection();
+        return;
+      }
       const provinceId = path.getAttribute('data-province');
-      if (provinceId) onSelectProvince(provinceId);
+      if (provinceId) {
+        onSelectProvince(provinceId);
+        return;
+      }
+      onClearProvinceSelection();
     };
 
     const handleContextMenu = (event: Event) => {
@@ -502,7 +511,7 @@ export default function MapView({
       svg.removeEventListener('mousemove', handleMouseMove);
       svg.removeEventListener('mouseleave', handleMouseLeave);
     };
-  }, [onSelectProvince, onContextMenu, onHoverProvince, svgMarkup]);
+  }, [onSelectProvince, onClearProvinceSelection, onContextMenu, onHoverProvince, svgMarkup]);
 
   useEffect(() => {
     if (!containerRef.current) return;

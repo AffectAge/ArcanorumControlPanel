@@ -5700,6 +5700,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             }
             setSelectedProvinceId(id);
           }}
+          onClearProvinceSelection={() => setSelectedProvinceId(undefined)}
           onHoverProvince={setHoveredProvinceId}
           onContextMenu={(id, x, y) => {
             setSelectedProvinceId(id);
