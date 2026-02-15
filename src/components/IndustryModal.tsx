@@ -2125,15 +2125,28 @@ export default function IndustryModal({
                           </div>
                         );
                       })}
+                      <button
+                        key={`${provinceId}-add`}
+                        onClick={() => onOpenConstruction(provinceId)}
+                        className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col items-center justify-center gap-3 shadow-lg shadow-black/30 hover:border-emerald-400/40"
+                      >
+                        <div className="w-12 h-12 rounded-xl border border-white/10 bg-black/30 flex items-center justify-center">
+                          <Plus className="w-6 h-6 text-emerald-300" />
+                        </div>
+                        <div className="text-white/70 text-sm text-center">{provinceId}</div>
+                        <div className="text-white/40 text-xs">Строительство</div>
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {filteredCards.length > 0 && filterProvinceId && (
+            {filterProvinceId && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[70vh] overflow-y-auto pr-1 legend-scroll">
-                {filteredCards.map((card) => {
+                {filteredCards
+                  .filter((card) => card.kind !== 'empty')
+                  .map((card) => {
                   if (card.kind === 'empty') {
                     return (
                       <Tooltip key={card.key} label="Открыть строительство">
@@ -2855,6 +2868,17 @@ export default function IndustryModal({
                     </div>
                   );
                 })}
+                <button
+                  key={`${filterProvinceId}-add`}
+                  onClick={() => onOpenConstruction(filterProvinceId)}
+                  className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-4 flex flex-col items-center justify-center gap-3 shadow-lg shadow-black/30 hover:border-emerald-400/40"
+                >
+                  <div className="w-12 h-12 rounded-xl border border-white/10 bg-black/30 flex items-center justify-center">
+                    <Plus className="w-6 h-6 text-emerald-300" />
+                  </div>
+                  <div className="text-white/70 text-sm text-center">{filterProvinceId}</div>
+                  <div className="text-white/40 text-xs">Строительство</div>
+                </button>
               </div>
             )}
           </div>
