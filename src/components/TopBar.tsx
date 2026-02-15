@@ -99,6 +99,52 @@ export default function TopBar({
     return `${formatted.endsWith('.0') ? formatted.slice(0, -2) : formatted}k`;
   };
 
+  const renderStat = ({
+    tooltip,
+    icon: Icon,
+    iconColorClass,
+    valueClass,
+    value,
+    gain,
+    extraText,
+    extraStyle,
+  }: {
+    tooltip: string;
+    icon: React.ComponentType<{ className?: string }>;
+    iconColorClass: string;
+    valueClass: string;
+    value: number;
+    gain: number;
+    extraText?: string;
+    extraStyle?: React.CSSProperties;
+  }) => (
+    <div
+      className="h-10 px-2 rounded-xl border border-white/10 bg-black/30 flex items-center gap-2"
+      onMouseEnter={(event) => showTooltip(tooltip, event)}
+      onMouseMove={moveTooltip}
+      onMouseLeave={hideTooltip}
+    >
+      <div className="w-6 h-6 rounded-lg border border-white/10 bg-black/20 flex items-center justify-center shrink-0">
+        <Icon className={`w-4 h-4 ${iconColorClass}`} />
+      </div>
+      <div className="leading-tight">
+        <div className={`${valueClass} font-bold text-sm tabular-nums`}>
+          {formatPoints(value)}
+          {gain > 0 && (
+            <span className="text-emerald-400 text-[11px] font-semibold ml-1">
+              +{formatPoints(gain)}
+            </span>
+          )}
+        </div>
+        {extraText && (
+          <div className="text-[10px] text-white/55" style={extraStyle}>
+            {extraText}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="absolute left-4 right-4 top-3 h-14 flex items-center justify-between px-4 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl z-50 animate-slideDown">
       <div className="flex items-center gap-3">
@@ -210,169 +256,76 @@ export default function TopBar({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 px-3 py-2 ">
-          <div
-            className="relative group"
-            onMouseEnter={(event) => showTooltip('Очки колонизации', event)}
-            onMouseMove={moveTooltip}
-            onMouseLeave={hideTooltip}
-          >
-            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Globe2 className="w-4 h-4 text-emerald-300" />
-            </div>
-          </div>
-          <span className="text-emerald-100 font-bold text-sm">
-            {formatPoints(activeCountry?.colonizationPoints ?? 0)}
-          </span>
-          {colonizationGainPerTurn > 0 && (
-            <span className="text-emerald-400 text-xs font-semibold">
-              +{formatPoints(colonizationGainPerTurn)}
-            </span>
-          )}
-          <div
-            className="text-white/50 text-xs"
-            onMouseEnter={(event) =>
-              showTooltip('Активные колонизации / лимит', event)
-            }
-            onMouseMove={moveTooltip}
-            onMouseLeave={hideTooltip}
-            style={
-              colonizationActiveLimit > 0 &&
-              colonizationActiveCount >= colonizationActiveLimit
-                ? { color: '#f87171' }
-                : undefined
-            }
-          >
-            {colonizationActiveCount}/
-            {colonizationActiveLimit > 0 ? colonizationActiveLimit : '∞'}
-          </div>
-        </div>
+        {renderStat({
+          tooltip: 'Очки колонизации',
+          icon: Globe2,
+          iconColorClass: 'text-emerald-300',
+          valueClass: 'text-emerald-100',
+          value: activeCountry?.colonizationPoints ?? 0,
+          gain: colonizationGainPerTurn,
+          extraText: `${colonizationActiveCount}/${
+            colonizationActiveLimit > 0 ? colonizationActiveLimit : '∞'
+          }`,
+          extraStyle:
+            colonizationActiveLimit > 0 &&
+            colonizationActiveCount >= colonizationActiveLimit
+              ? { color: '#f87171' }
+              : undefined,
+        })}
 
-        <div className="flex items-center gap-2 px-3 py-2 ">
-          <div
-            className="relative group"
-            onMouseEnter={(event) => showTooltip('Очки строительства', event)}
-            onMouseMove={moveTooltip}
-            onMouseLeave={hideTooltip}
-          >
-            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Hammer className="w-4 h-4 text-amber-300" />
-            </div>
-          </div>
-          <span className="text-amber-100 font-bold text-sm">
-            {formatPoints(activeCountry?.constructionPoints ?? 0)}
-          </span>
-          {constructionGainPerTurn > 0 && (
-            <span className="text-emerald-400 text-xs font-semibold">
-              +{formatPoints(constructionGainPerTurn)}
-            </span>
-          )}
-        </div>
+        {renderStat({
+          tooltip: 'Очки строительства',
+          icon: Hammer,
+          iconColorClass: 'text-amber-300',
+          valueClass: 'text-amber-100',
+          value: activeCountry?.constructionPoints ?? 0,
+          gain: constructionGainPerTurn,
+        })}
 
-        <div className="flex items-center gap-2 px-3 py-2 ">
-          <div
-            className="relative group"
-            onMouseEnter={(event) => showTooltip('Очки науки', event)}
-            onMouseMove={moveTooltip}
-            onMouseLeave={hideTooltip}
-          >
-            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Atom className="w-4 h-4 text-sky-300" />
-            </div>
-          </div>
-          <span className="text-sky-100 font-bold text-sm">
-            {formatPoints(activeCountry?.sciencePoints ?? 0)}
-          </span>
-          {scienceGainPerTurn > 0 && (
-            <span className="text-emerald-400 text-xs font-semibold">
-              +{formatPoints(scienceGainPerTurn)}
-            </span>
-          )}
-        </div>
+        {renderStat({
+          tooltip: 'Очки науки',
+          icon: Atom,
+          iconColorClass: 'text-sky-300',
+          valueClass: 'text-sky-100',
+          value: activeCountry?.sciencePoints ?? 0,
+          gain: scienceGainPerTurn,
+        })}
 
-        <div className="flex items-center gap-2 px-3 py-2 ">
-          <div
-            className="relative group"
-            onMouseEnter={(event) => showTooltip('Очки культуры', event)}
-            onMouseMove={moveTooltip}
-            onMouseLeave={hideTooltip}
-          >
-            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Feather className="w-4 h-4 text-rose-300" />
-            </div>
-          </div>
-          <span className="text-rose-100 font-bold text-sm">
-            {formatPoints(activeCountry?.culturePoints ?? 0)}
-          </span>
-          {cultureGainPerTurn > 0 && (
-            <span className="text-emerald-400 text-xs font-semibold">
-              +{formatPoints(cultureGainPerTurn)}
-            </span>
-          )}
-        </div>
+        {renderStat({
+          tooltip: 'Очки культуры',
+          icon: Feather,
+          iconColorClass: 'text-rose-300',
+          valueClass: 'text-rose-100',
+          value: activeCountry?.culturePoints ?? 0,
+          gain: cultureGainPerTurn,
+        })}
 
-        <div className="flex items-center gap-2 px-3 py-2 ">
-          <div
-            className="relative group"
-            onMouseEnter={(event) => showTooltip('Очки религии', event)}
-            onMouseMove={moveTooltip}
-            onMouseLeave={hideTooltip}
-          >
-            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Cross className="w-4 h-4 text-violet-300" />
-            </div>
-          </div>
-          <span className="text-violet-100 font-bold text-sm">
-            {formatPoints(activeCountry?.religionPoints ?? 0)}
-          </span>
-          {religionGainPerTurn > 0 && (
-            <span className="text-emerald-400 text-xs font-semibold">
-              +{formatPoints(religionGainPerTurn)}
-            </span>
-          )}
-        </div>
+        {renderStat({
+          tooltip: 'Очки религии',
+          icon: Cross,
+          iconColorClass: 'text-violet-300',
+          valueClass: 'text-violet-100',
+          value: activeCountry?.religionPoints ?? 0,
+          gain: religionGainPerTurn,
+        })}
 
-        <div className="flex items-center gap-2 px-3 py-2 ">
-          <div
-            className="relative group"
-            onMouseEnter={(event) => showTooltip('Золото', event)}
-            onMouseMove={moveTooltip}
-            onMouseLeave={hideTooltip}
-          >
-            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Coins className="w-4 h-4 text-yellow-300" />
-            </div>
-          </div>
-          <span className="text-yellow-100 font-bold text-sm">
-            {formatPoints(activeCountry?.gold ?? 0)}
-          </span>
-          {goldGainPerTurn > 0 && (
-            <span className="text-emerald-400 text-xs font-semibold">
-              +{formatPoints(goldGainPerTurn)}
-            </span>
-          )}
-        </div>
+        {renderStat({
+          tooltip: 'Золото',
+          icon: Coins,
+          iconColorClass: 'text-yellow-300',
+          valueClass: 'text-yellow-100',
+          value: activeCountry?.gold ?? 0,
+          gain: goldGainPerTurn,
+        })}
 
-        <div className="flex items-center gap-2 px-3 py-2 ">
-          <div
-            className="relative group"
-            onMouseEnter={(event) => showTooltip('Дукаты', event)}
-            onMouseMove={moveTooltip}
-            onMouseLeave={hideTooltip}
-          >
-            <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
-              <Gem className="w-4 h-4 text-cyan-300" />
-            </div>
-          </div>
-          <span className="text-cyan-100 font-bold text-sm">
-            {formatPoints(activeCountry?.ducats ?? 0)}
-          </span>
-          {ducatsGainPerTurn > 0 && (
-            <span className="text-emerald-400 text-xs font-semibold">
-              +{formatPoints(ducatsGainPerTurn)}
-            </span>
-          )}
-        </div>
+        {renderStat({
+          tooltip: 'Дукаты',
+          icon: Gem,
+          iconColorClass: 'text-cyan-300',
+          valueClass: 'text-cyan-100',
+          value: activeCountry?.ducats ?? 0,
+          gain: ducatsGainPerTurn,
+        })}
 
         <div className="flex items-center gap-2 px-3 py-2 ">
           <span className="text-white/60 text-sm">Ходит:</span>
