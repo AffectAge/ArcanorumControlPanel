@@ -196,12 +196,12 @@ export default function EventLogPanel({
     : 'absolute top-24 right-4 bottom-24 z-40 w-[26rem]';
   const panelClass = collapsed
     ? 'rounded-2xl border border-white/10 bg-black/45 backdrop-blur-xl shadow-2xl'
-    : 'h-full rounded-2xl border border-white/10 bg-black/45 backdrop-blur-xl shadow-2xl flex flex-col';
+    : 'h-full rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl flex flex-col';
 
   return (
     <div className={wrapperClass}>
       <div className={panelClass}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+        <div className="flex items-center justify-between px-4 py-3 rounded-lg border-b border-white/10 bg-[#0b111b] shadow-2xl">
           <div className="flex items-center gap-2 text-white/85 text-sm font-semibold">
             Журнал событий
           </div>

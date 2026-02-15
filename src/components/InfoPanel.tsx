@@ -72,8 +72,8 @@ export default function InfoPanel({
   marketAccessByCategory,
 }: InfoPanelProps) {
   return (
-    <div className="fixed left-4 bottom-4 z-40 w-72 rounded-xl bg-black/45 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden animate-fadeIn">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+    <div className="fixed left-4 bottom-4 z-40 w-72 rounded-xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden animate-fadeIn">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-[#0b111b] shadow-2xl">
         <h3 className="text-white font-semibold text-sm">Провинция {province}</h3>
         <button
           onClick={onClose}
@@ -84,7 +84,7 @@ export default function InfoPanel({
       </div>
 
       <div className="p-3 space-y-2">
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-black/30 border border-white/10">
+        <div className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-[#0b111b] shadow-2xl">
           <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
             {ownerFlagDataUrl ? (
               <img

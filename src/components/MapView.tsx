@@ -800,7 +800,7 @@ export default function MapView({
 
       <div className="absolute left-1/2 -translate-x-1/2 bottom-2 -translate-y-[0.1rem] z-30">
         {resourcesLayerVisible && (
-          <div className="absolute right-full mr-4 bottom-0 w-56 rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl p-3 shadow-xl">
+          <div className="absolute right-full mr-4 bottom-0 w-56 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl p-3 shadow-xl">
             <div className="text-white/80 text-sm font-semibold mb-2">Ресурсы</div>
             {resources.length > 0 ? (
               <label className="flex flex-col gap-1 text-xs text-white/70">
@@ -858,7 +858,7 @@ export default function MapView({
             })}
             </div>
           </div>
-          <div className="absolute left-full ml-4 bottom-0 w-64 rounded-2xl border border-white/10 bg-black/100 backdrop-blur-xl p-3 shadow-xl">
+          <div className="absolute left-full ml-4 bottom-0 w-64 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl p-3">
             <div className="text-white/80 text-xs font-semibold mb-2">Легенда</div>
             <div className="mt-3 space-y-3 max-h-48 overflow-y-auto pr-1 legend-scroll">
               {layers

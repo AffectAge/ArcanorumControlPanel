@@ -174,14 +174,14 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div className="w-9 h-9 rounded-xl border transition-all duration-200 flex items-center justify-center group relative bg-black/30 border-white/10">
             <RotateCcw className="w-4 h-4 text-white/80" />
           </div>
           <span className="text-white font-bold text-sm">Ход {turn}</span>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div
             className="w-6 h-6 rounded-lg border border-white/10 flex items-center justify-center overflow-hidden"
             style={{ backgroundColor: activeCountry?.color ?? '#1a1f2b' }}
@@ -210,7 +210,7 @@ export default function TopBar({
       </div>
 
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div
             className="relative group"
             onMouseEnter={(event) => showTooltip('Очки колонизации', event)}
@@ -248,7 +248,7 @@ export default function TopBar({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div
             className="relative group"
             onMouseEnter={(event) => showTooltip('Очки строительства', event)}
@@ -269,7 +269,7 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div
             className="relative group"
             onMouseEnter={(event) => showTooltip('Очки науки', event)}
@@ -290,7 +290,7 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div
             className="relative group"
             onMouseEnter={(event) => showTooltip('Очки культуры', event)}
@@ -311,7 +311,7 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div
             className="relative group"
             onMouseEnter={(event) => showTooltip('Очки религии', event)}
@@ -332,7 +332,7 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div
             className="relative group"
             onMouseEnter={(event) => showTooltip('Золото', event)}
@@ -353,7 +353,7 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <div
             className="relative group"
             onMouseEnter={(event) => showTooltip('Дукаты', event)}
@@ -374,7 +374,7 @@ export default function TopBar({
           )}
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-black/30 border border-white/10">
+        <div className="flex items-center gap-2 px-3 py-2 ">
           <span className="text-white/60 text-sm">Ходит:</span>
           <select
             value={activeCountryId ?? ''}
