@@ -1205,7 +1205,7 @@ export default function IndustryModal({
           </div>
         </div>
 
-        <div className="p-4 space-y-3 flex-1 min-h-0">
+        <div className="p-4 flex flex-col gap-3 flex-1 min-h-0">
           <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
             <label className="flex flex-col gap-2 text-white/70 text-xs">
               Фильтр по зданию
@@ -1433,7 +1433,7 @@ export default function IndustryModal({
             </div>
           </div>
 
-          <div className="space-y-2 overflow-y-auto pr-1 legend-scroll flex-1 min-h-0">
+          <div className="space-y-2 overflow-y-auto pr-1 pb-6 legend-scroll flex-1 min-h-0">
             {rows.length === 0 && (
               <div className="text-white/50 text-sm border border-dashed border-white/10 rounded-xl p-4">
                 Нет провинций.
@@ -1452,7 +1452,7 @@ export default function IndustryModal({
             )}
 
             {filteredCards.length > 0 && !filterProvinceId && (
-              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 legend-scroll">
+              <div className="space-y-4">
                 {Array.from(
                   filteredCards.reduce((map, card) => {
                     if (card.kind === 'empty') return map;
@@ -2143,7 +2143,7 @@ export default function IndustryModal({
             )}
 
             {filterProvinceId && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[70vh] overflow-y-auto pr-1 legend-scroll">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {filteredCards
                   .filter((card) => card.kind !== 'empty')
                   .map((card) => {
