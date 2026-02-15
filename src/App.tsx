@@ -613,6 +613,8 @@ function App() {
     useState(false);
   const [colonizationModalOpen, setColonizationModalOpen] = useState(false);
   const [constructionModalOpen, setConstructionModalOpen] = useState(false);
+  const [constructionOpenedFromIndustry, setConstructionOpenedFromIndustry] =
+    useState(false);
   const [selectedResourceId, setSelectedResourceId] = useState<string | undefined>(
     undefined,
   );
@@ -6036,6 +6038,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onConstruct={() => {
           if (contextMenu?.provinceId) {
             setSelectedProvinceId(contextMenu.provinceId);
+            setConstructionOpenedFromIndustry(false);
             setConstructionModalOpen(true);
           }
         }}
@@ -6167,7 +6170,13 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           countries.find((country) => country.id === activeCountryId)
             ?.constructionPoints ?? 0
         }
-        onClose={() => setConstructionModalOpen(false)}
+        onClose={() => {
+          setConstructionModalOpen(false);
+          if (constructionOpenedFromIndustry) {
+            setIndustryOpen(true);
+            setConstructionOpenedFromIndustry(false);
+          }
+        }}
         onStart={(buildingId, owner) => {
           if (selectedProvinceId) {
             startConstruction(selectedProvinceId, buildingId, owner);
@@ -6207,6 +6216,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         demolitionCostPercent={gameSettings.demolitionCostPercent ?? 20}
         onOpenConstruction={(provinceId) => {
           setSelectedProvinceId(provinceId);
+          setConstructionOpenedFromIndustry(true);
           setConstructionModalOpen(true);
           setIndustryOpen(false);
         }}
