@@ -39,7 +39,6 @@ export default function BottomDock({
   onOpenDiplomacy,
   onOpenMarkets,
 }: BottomDockProps) {
-  const [activeItem, setActiveItem] = useState('research');
   const [openSubmenuId, setOpenSubmenuId] = useState<string | null>(null);
 
   const submenuById: Record<
@@ -66,6 +65,7 @@ export default function BottomDock({
       {dockItems.map((item, index) => {
         const submenuItems = submenuById[item.id];
         const submenuOpen = openSubmenuId === item.id;
+        const itemHovered = openSubmenuId === item.id;
 
         return (
           <div
@@ -75,13 +75,11 @@ export default function BottomDock({
           >
             <Tooltip label={item.label}>
               <button
-                onClick={() => {
-                  setActiveItem(item.id);
-                }}
+                onClick={() => {}}
                 className={`
                   w-11 h-11 rounded-xl border transition-all duration-200 flex items-center justify-center group relative
                   ${
-                    activeItem === item.id
+                    itemHovered
                       ? 'bg-emerald-500/20 border-emerald-400/50 shadow-lg shadow-emerald-500/20'
                       : 'bg-black/30 border-white/10 hover:border-emerald-400/50 hover:bg-emerald-400/10 hover:scale-110'
                   }
@@ -92,7 +90,7 @@ export default function BottomDock({
                   className={`
                     w-5 h-5 transition-colors
                     ${
-                      activeItem === item.id
+                      itemHovered
                         ? 'text-emerald-400'
                         : 'text-white/70 group-hover:text-emerald-400'
                     }
@@ -116,7 +114,6 @@ export default function BottomDock({
                     key={entry.label}
                     onClick={() => {
                       if (!entry.onClick) return;
-                      setActiveItem(item.id);
                       setOpenSubmenuId(null);
                       entry.onClick();
                     }}

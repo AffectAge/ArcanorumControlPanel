@@ -18,7 +18,7 @@ export default function LeftToolbar({
   onOpenIndustry,
   onOpenMarkets,
 }: LeftToolbarProps) {
-  const [activeTool, setActiveTool] = useState('industry');
+  const [hoveredTool, setHoveredTool] = useState<string | null>(null);
 
   return (
     <div className="absolute left-4 top-24 flex flex-col gap-3 z-40 animate-slideRight">
@@ -26,7 +26,6 @@ export default function LeftToolbar({
         <Tooltip key={tool.id} label={tool.label}>
           <button
             onClick={() => {
-              setActiveTool(tool.id);
               if (tool.id === 'industry') {
                 onOpenIndustry();
               }
@@ -34,10 +33,12 @@ export default function LeftToolbar({
                 onOpenMarkets();
               }
             }}
+            onMouseEnter={() => setHoveredTool(tool.id)}
+            onMouseLeave={() => setHoveredTool(null)}
             className={`
               w-11 h-11 rounded-xl backdrop-blur-xl border transition-all duration-200 flex items-center justify-center group relative
               ${
-                activeTool === tool.id
+                hoveredTool === tool.id
                   ? 'bg-emerald-700 border-emerald-400/70 shadow-lg shadow-emerald-500/20'
                   : 'bg-[#0b111b] border-white/15 hover:border-emerald-400/50 hover:bg-[#0f1726] hover:scale-110'
               }
@@ -48,7 +49,7 @@ export default function LeftToolbar({
               className={`
                 w-5 h-5 transition-colors
                 ${
-                  activeTool === tool.id
+                  hoveredTool === tool.id
                     ? 'text-emerald-400'
                     : 'text-white/70 group-hover:text-emerald-400'
                 }
