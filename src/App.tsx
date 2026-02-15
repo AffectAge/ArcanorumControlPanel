@@ -611,6 +611,10 @@ function App() {
     name: string;
     routeTypeId: string;
   } | null>(null);
+  const [logisticsRouteEditDraft, setLogisticsRouteEditDraft] = useState<{
+    routeId: string;
+    originalProvinceIds: string[];
+  } | null>(null);
   const [adjacencyRecomputeRequested, setAdjacencyRecomputeRequested] =
     useState(false);
   const [colonizationModalOpen, setColonizationModalOpen] = useState(false);
@@ -3497,9 +3501,21 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     0,
     Math.floor(logisticsDraftRouteType?.constructionCostPerSegment ?? 0),
   );
+  const isLogisticsEditMode = Boolean(logisticsRouteEditDraft);
+  const logisticsEditOriginalSegments = Math.max(
+    0,
+    (logisticsRouteEditDraft?.originalProvinceIds.length ?? 0) - 1,
+  );
+  const logisticsEditCurrentSegments = Math.max(0, logisticsRouteProvinceIds.length - 1);
+  const logisticsEditAddedSegments = Math.max(
+    0,
+    logisticsEditCurrentSegments - logisticsEditOriginalSegments,
+  );
   const logisticsDraftTotalCost = Math.max(
     0,
-    (logisticsRouteProvinceIds.length - 1) * logisticsDraftSegmentCost,
+    (isLogisticsEditMode
+      ? logisticsEditAddedSegments
+      : Math.max(0, logisticsRouteProvinceIds.length - 1)) * logisticsDraftSegmentCost,
   );
   const selectedProvinceRouteConstructionProgress = useMemo(() => {
     if (!selectedProvinceId) return [];
@@ -5770,14 +5786,15 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         <div className="absolute left-1/2 -translate-x-1/2 bottom-24 z-40 rounded-xl border border-cyan-400/40 bg-[#08131f]/90 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-900/30">
           <div className="px-2">
             <div className="text-cyan-100/90 text-xs">
-              Выбрано провинций: {logisticsRouteProvinceIds.length} шт.
+              {isLogisticsEditMode ? 'Редактирование маршрута' : 'Прокладка маршрута'}: {logisticsRouteProvinceIds.length} пров.
             </div>
             <div className="text-cyan-100/70 text-[11px] leading-tight">
-              Выберите провинции по пути на карте. Нельзя повторять провинции,
-              перескакивать через соседей без разрешения и строить без договоров.
+              {isLogisticsEditMode
+                ? 'Добавляйте новые провинции кликом по карте в конец маршрута. Можно удалить последний узел.'
+                : 'Выберите провинции по пути на карте. Нельзя повторять провинции, перескакивать через соседей без разрешения и строить без договоров.'}
             </div>
             <div className="text-cyan-100/75 text-[11px] leading-tight mt-1">
-              Стоимость: {logisticsDraftTotalCost} (участков: {Math.max(0, logisticsRouteProvinceIds.length - 1)} x {logisticsDraftSegmentCost})
+              Стоимость: {logisticsDraftTotalCost} (участков: {isLogisticsEditMode ? logisticsEditAddedSegments : Math.max(0, logisticsRouteProvinceIds.length - 1)} x {logisticsDraftSegmentCost})
             </div>
             {routePlannerHint && (
               <div className="text-amber-200/90 text-[11px] leading-tight mt-1">
@@ -5785,10 +5802,31 @@ const layerPaint: MapLayerPaint = useMemo(() => {
               </div>
             )}
           </div>
+          {isLogisticsEditMode && (
+            <button
+              onClick={() => {
+                setLogisticsRouteProvinceIds((prev) => {
+                  if (prev.length <= 2) {
+                    setRoutePlannerHint('Маршрут должен содержать минимум 2 провинции.');
+                    return prev;
+                  }
+                  setRoutePlannerHint(undefined);
+                  return prev.slice(0, -1);
+                });
+              }}
+              className="h-8 px-3 rounded-lg border border-amber-400/40 bg-amber-500/20 text-amber-100 text-sm"
+            >
+              Удалить последний узел
+            </button>
+          )}
           <button
             onClick={() => {
               if (!logisticsRouteDraft || logisticsRouteProvinceIds.length < 2) {
-                setRoutePlannerHint('Для строительства нужно выбрать минимум 2 провинции.');
+                setRoutePlannerHint(
+                  isLogisticsEditMode
+                    ? 'Маршрут должен содержать минимум 2 провинции.'
+                    : 'Для строительства нужно выбрать минимум 2 провинции.',
+                );
                 return;
               }
               if (!activeCountryId) {
@@ -5830,6 +5868,99 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                 setRoutePlannerHint(
                   `Превышены лимиты или нет прав логистического договора для страны ${blockedCountryName}.`,
                 );
+                return;
+              }
+              if (isLogisticsEditMode && logisticsRouteEditDraft) {
+                const targetRoute = logistics.routes.find(
+                  (item) => item.id === logisticsRouteEditDraft.routeId,
+                );
+                if (!targetRoute) {
+                  setRoutePlannerHint('Маршрут не найден.');
+                  return;
+                }
+                if (targetRoute.ownerCountryId !== activeCountryId) {
+                  setRoutePlannerHint('Редактировать можно только свои маршруты.');
+                  return;
+                }
+                const originalSegments = Math.max(
+                  0,
+                  logisticsRouteEditDraft.originalProvinceIds.length - 1,
+                );
+                const nextSegments = Math.max(0, logisticsRouteProvinceIds.length - 1);
+                const segmentDelta = nextSegments - originalSegments;
+                const prevRequired = Math.max(
+                  0,
+                  targetRoute.constructionRequiredPoints ?? 0,
+                );
+                const prevProgress = Math.max(
+                  0,
+                  targetRoute.constructionProgressPoints ?? prevRequired,
+                );
+                const nextRequired = Math.max(
+                  0,
+                  prevRequired + segmentDelta * segmentCost,
+                );
+                const nextProgress = Math.min(prevProgress, nextRequired);
+
+                setLogistics((prev) => {
+                  const updatedRoutes = prev.routes.map((route) =>
+                    route.id === targetRoute.id
+                      ? {
+                          ...route,
+                          provinceIds: logisticsRouteProvinceIds,
+                          constructionRequiredPoints: nextRequired,
+                          constructionProgressPoints: nextProgress,
+                        }
+                      : route,
+                  );
+                  const preservedEdges = prev.edges.filter(
+                    (edge) => edge.routeId !== targetRoute.id,
+                  );
+                  const rebuiltEdges: LogisticsEdge[] = [];
+                  for (let i = 0; i < logisticsRouteProvinceIds.length - 1; i += 1) {
+                    const fromProvinceId = logisticsRouteProvinceIds[i];
+                    const toProvinceId = logisticsRouteProvinceIds[i + 1];
+                    if (
+                      !fromProvinceId ||
+                      !toProvinceId ||
+                      fromProvinceId === toProvinceId
+                    ) {
+                      continue;
+                    }
+                    rebuiltEdges.push({
+                      id: createId(),
+                      routeId: targetRoute.id,
+                      fromNodeId: `province:${fromProvinceId}`,
+                      toNodeId: `province:${toProvinceId}`,
+                      routeTypeId: targetRoute.routeTypeId,
+                      active: true,
+                      bidirectional: true,
+                      ownerCountryId: targetRoute.ownerCountryId,
+                    });
+                  }
+                  return {
+                    ...prev,
+                    routes: updatedRoutes,
+                    edges: [...preservedEdges, ...rebuiltEdges],
+                  };
+                });
+                addEvent({
+                  category: 'economy',
+                  message:
+                    segmentDelta > 0
+                      ? `Маршрут "${targetRoute.name}" изменён: добавлено участков ${segmentDelta} (стоимость: ${Math.max(0, segmentDelta * segmentCost)}).`
+                      : segmentDelta < 0
+                        ? `Маршрут "${targetRoute.name}" изменён: удалено участков ${Math.abs(segmentDelta)}.`
+                        : `Маршрут "${targetRoute.name}" сохранён без изменения стоимости.`,
+                  countryId: activeCountryId,
+                  priority: 'low',
+                });
+                setLogisticsRouteProvinceIds([]);
+                setLogisticsRouteDraft(null);
+                setLogisticsRouteEditDraft(null);
+                setRoutePlannerHint(undefined);
+                setLogisticsRoutePlannerActive(false);
+                setLogisticsOpen(true);
                 return;
               }
               const startsUnderConstruction = totalCost > 0;
@@ -5882,18 +6013,20 @@ const layerPaint: MapLayerPaint = useMemo(() => {
               }
               setLogisticsRouteProvinceIds([]);
               setLogisticsRouteDraft(null);
+              setLogisticsRouteEditDraft(null);
               setRoutePlannerHint(undefined);
               setLogisticsRoutePlannerActive(false);
               setLogisticsOpen(true);
             }}
             className="h-8 px-3 rounded-lg border border-emerald-400/40 bg-emerald-500/20 text-emerald-200 text-sm"
           >
-            Построить
+            {isLogisticsEditMode ? 'Сохранить' : 'Построить'}
           </button>
           <button
             onClick={() => {
               setLogisticsRoutePlannerActive(false);
               setLogisticsRouteDraft(null);
+              setLogisticsRouteEditDraft(null);
               setLogisticsRouteProvinceIds([]);
               setRoutePlannerHint(undefined);
               setLogisticsOpen(true);
@@ -6126,6 +6259,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           setLogisticsRouteProvinceIds([]);
           setLogisticsRoutePlannerActive(false);
           setLogisticsRouteDraft(null);
+          setLogisticsRouteEditDraft(null);
           setRoutePlannerHint(undefined);
           setLogisticsOpen(true);
         }}
@@ -6146,6 +6280,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           setLogisticsOpen(false);
           setLogisticsRoutePlannerActive(false);
           setLogisticsRouteDraft(null);
+          setLogisticsRouteEditDraft(null);
           setLogisticsRouteProvinceIds([]);
           setRoutePlannerHint(undefined);
         }}
@@ -6154,7 +6289,24 @@ const layerPaint: MapLayerPaint = useMemo(() => {
             name: payload.name,
             routeTypeId: payload.routeTypeId,
           });
+          setLogisticsRouteEditDraft(null);
           setLogisticsRouteProvinceIds([]);
+          setRoutePlannerHint(undefined);
+          setLogisticsOpen(false);
+          setLogisticsRoutePlannerActive(true);
+        }}
+        onStartRouteEdit={(routeId) => {
+          const targetRoute = logistics.routes.find((item) => item.id === routeId);
+          if (!targetRoute || targetRoute.ownerCountryId !== activeCountryId) return;
+          setLogisticsRouteDraft({
+            name: targetRoute.name,
+            routeTypeId: targetRoute.routeTypeId,
+          });
+          setLogisticsRouteEditDraft({
+            routeId: targetRoute.id,
+            originalProvinceIds: [...targetRoute.provinceIds],
+          });
+          setLogisticsRouteProvinceIds([...targetRoute.provinceIds]);
           setRoutePlannerHint(undefined);
           setLogisticsOpen(false);
           setLogisticsRoutePlannerActive(true);

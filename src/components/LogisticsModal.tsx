@@ -24,6 +24,7 @@ type LogisticsModalProps = {
     name: string;
     routeTypeId: string;
   }) => void;
+  onStartRouteEdit: (routeId: string) => void;
   demolitionCostPercent: number;
   onDemolishRoute: (routeId: string) => void;
   onSetRouteLevel: (routeId: string, level: number, actorCountryId?: string) => void;
@@ -39,6 +40,7 @@ export default function LogisticsModal({
   onClose,
   onSetRouteStatus,
   onStartRouteBuild,
+  onStartRouteEdit,
   demolitionCostPercent,
   onDemolishRoute,
   onSetRouteLevel,
@@ -304,6 +306,7 @@ export default function LogisticsModal({
                     const canPayDemolition = availablePoints >= demolition.cost;
                     const routeLevel = Math.max(1, Math.floor(route.level ?? 1));
                     const canChangeLevel = activeCountryId === route.ownerCountryId;
+                    const canEditRoute = canChangeLevel;
 
                     return (
                       <div
@@ -483,6 +486,20 @@ export default function LogisticsModal({
                             );
                           })}
                         </div>
+                        {canEditRoute && (
+                          <div className="mt-2 rounded-md border border-sky-400/30 bg-sky-500/5 px-2 py-2">
+                            <div className="text-[11px] text-sky-100/80">
+                              Редактирование: добавить провинцию в конец маршрута или удалить последний узел.
+                            </div>
+                            <button
+                              onClick={() => onStartRouteEdit(route.id)}
+                              className="mt-1 h-8 px-3 rounded-lg border border-sky-400/40 bg-sky-500/20 text-sky-100 text-xs inline-flex items-center gap-2"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              Редактировать маршрут
+                            </button>
+                          </div>
+                        )}
                         {demolition.canDemolish && (
                           <div className="mt-2 rounded-md border border-rose-400/30 bg-rose-500/5 px-2 py-2">
                             <div className="text-[11px] text-rose-100/80">
