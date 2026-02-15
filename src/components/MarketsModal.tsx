@@ -898,35 +898,18 @@ export default function MarketsModal({
       .sort((a, b) => b.amount - a.amount);
   }, [memberMarket, provinces, buildings, resourceCategories]);
 
-  const worldMarketSharedInfrastructureConsumedRows = useMemo(() => {
-    if (!memberMarket)
-      return [] as Array<{
-        categoryId: string;
-        name: string;
-        amount: number;
-        iconDataUrl?: string;
-        color?: string;
-      }>;
-    return resourceCategories
-      .map((category) => ({
-        categoryId: category.id,
-        name: category.name,
-        amount: Math.max(
-          0,
-          memberMarket.lastSharedInfrastructureConsumedByCategory?.[category.id] ?? 0,
-        ),
-        iconDataUrl: category.iconDataUrl,
-        color: category.color,
-      }))
-      .sort((a, b) => b.amount - a.amount);
-  }, [memberMarket, resourceCategories]);
-
   const worldMarketSharedInfrastructureOverviewRows = useMemo(() => {
     const currentByCategory = new Map(
       worldMarketSharedInfrastructureRows.map((row) => [row.categoryId, row.amount]),
     );
     const consumedByCategory = new Map(
-      worldMarketSharedInfrastructureConsumedRows.map((row) => [row.categoryId, row.amount]),
+      resourceCategories.map((category) => [
+        category.id,
+        Math.max(
+          0,
+          memberMarket?.lastSharedInfrastructureConsumedByCategory?.[category.id] ?? 0,
+        ),
+      ]),
     );
     return resourceCategories.map((category) => ({
       categoryId: category.id,
@@ -935,12 +918,13 @@ export default function MarketsModal({
       color: category.color,
       current: Math.max(0, currentByCategory.get(category.id) ?? 0),
       consumed: Math.max(0, consumedByCategory.get(category.id) ?? 0),
+      remainingAfterLastTurn: Math.max(
+        0,
+        Math.max(0, currentByCategory.get(category.id) ?? 0) -
+          Math.max(0, consumedByCategory.get(category.id) ?? 0),
+      ),
     }));
-  }, [
-    resourceCategories,
-    worldMarketSharedInfrastructureRows,
-    worldMarketSharedInfrastructureConsumedRows,
-  ]);
+  }, [resourceCategories, worldMarketSharedInfrastructureRows, memberMarket]);
   if (!open) return null;
 
   return (
@@ -1643,50 +1627,13 @@ export default function MarketsModal({
                     Общая инфраструктура вашего рынка
                   </div>
                   <div className="text-white/55 text-xs mb-3">
-                    Этот пул используется для мировых закупок после исчерпания инфраструктуры
+                    Этот пул используется для мировых закупок вместе с инфраструктурой
                     провинции.
                   </div>
                   {memberMarket ? (
                     <div className="space-y-3">
-                      <div className="rounded-lg border border-white/10 bg-black/25 overflow-hidden">
-                        <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 border-b border-white/10 text-[11px] text-white/50 uppercase tracking-wide">
-                          <span>Категория</span>
-                          <span className="text-right">Пул сейчас</span>
-                          <span className="text-right">Расход за прошлый ход</span>
-                        </div>
-                        <div className="divide-y divide-white/10">
-                          {worldMarketSharedInfrastructureOverviewRows.map((row) => (
-                            <div
-                              key={`world-market-shared-infra-overview:${row.categoryId}`}
-                              className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-sm"
-                            >
-                              <span className="inline-flex items-center gap-2 text-white/80 min-w-0">
-                                {row.iconDataUrl ? (
-                                  <img
-                                    src={row.iconDataUrl}
-                                    alt={row.name}
-                                    className="w-4 h-4 rounded-sm border border-white/20 object-cover"
-                                  />
-                                ) : (
-                                  <span
-                                    className="w-2.5 h-2.5 rounded-full"
-                                    style={{ backgroundColor: row.color ?? '#94a3b8' }}
-                                  />
-                                )}
-                                <span className="truncate">{row.name}</span>
-                              </span>
-                              <span className="text-right text-emerald-200 tabular-nums">
-                                {formatInfrastructureAmount(row.current)}
-                              </span>
-                              <span className="text-right text-amber-200 tabular-nums">
-                                {formatInfrastructureAmount(row.consumed)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                       <div className="text-[11px] text-white/60">
-                        Итого расход за прошлый ход:{' '}
+                        Суммарно потреблено общей инфраструктуры за прошлый ход (все страны рынка):{' '}
                         <span className="text-amber-200 tabular-nums">
                           {formatInfrastructureAmount(
                             worldMarketSharedInfrastructureOverviewRows.reduce(
@@ -1695,6 +1642,53 @@ export default function MarketsModal({
                             ),
                           )}
                         </span>
+                      </div>
+                      <div className="text-[11px] text-white/45">
+                        В строках: база на ход, расход за прошлый ход, остаток после прошлого хода.
+                      </div>
+                      <div className="space-y-1">
+                        {worldMarketSharedInfrastructureOverviewRows.map((row) => {
+                          const hasAccess = row.current > 0;
+                          return (
+                            <div
+                              key={`world-market-shared-infra-overview:${row.categoryId}`}
+                              className="flex items-center justify-between rounded-md border border-white/10 bg-black/25 px-2 py-1"
+                            >
+                              <span className="inline-flex items-center gap-2 text-white/70">
+                                {row.iconDataUrl ? (
+                                  <img
+                                    src={row.iconDataUrl}
+                                    alt={row.name}
+                                    className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                                  />
+                                ) : (
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full border border-white/20"
+                                    style={{ backgroundColor: row.color ?? '#64748b' }}
+                                  />
+                                )}
+                                {row.name}
+                              </span>
+                              <span className="inline-flex items-center gap-3">
+                                <span
+                                  className={
+                                    hasAccess
+                                      ? 'text-emerald-200 tabular-nums'
+                                      : 'text-rose-200 tabular-nums'
+                                  }
+                                >
+                                  База {formatInfrastructureAmount(row.current)}
+                                </span>
+                                <span className="text-amber-200 tabular-nums">
+                                  -{formatInfrastructureAmount(row.consumed)}
+                                </span>
+                                <span className="text-sky-200 tabular-nums">
+                                  = {formatInfrastructureAmount(row.remainingAfterLastTurn)}
+                                </span>
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : (
