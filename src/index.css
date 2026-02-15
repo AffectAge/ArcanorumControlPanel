@@ -118,8 +118,7 @@ body {
 }
 
 .map-path-selected {
-  fill: rgba(34, 211, 238, 0.45) !important;
-  stroke: rgba(34, 211, 238, 0.95) !important;
+  stroke: rgba(0, 0, 0, 0.95) !important;
   stroke-width: 0.35px !important;
 }
 
