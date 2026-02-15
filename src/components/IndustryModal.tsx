@@ -1,4 +1,4 @@
-import { X, Hammer, Factory, MapPin, Building, Trash2, Hammer as HammerIcon, Plus, Coins, ChevronDown } from 'lucide-react';
+import { X, Factory, MapPin, Building, Trash2, Plus, Coins, ChevronDown } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { expandDiplomacyAgreements } from '../diplomacyUtils';
 import Tooltip from './Tooltip';
@@ -1187,24 +1187,6 @@ export default function IndustryModal({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative group">
-              <button
-                onClick={() => {
-                  if (filterProvinceId) onOpenConstruction(filterProvinceId);
-                }}
-                disabled={!filterProvinceId}
-                className={`w-9 h-9 rounded-lg border flex items-center justify-center transition-all ${
-                  filterProvinceId
-                    ? 'bg-black/40 border-white/10 text-white/60 hover:border-emerald-400/50 hover:text-emerald-300'
-                    : 'bg-black/30 border-white/5 text-white/30 cursor-not-allowed'
-                }`}
-              >
-                <HammerIcon className="w-4 h-4" />
-              </button>
-              <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/90 backdrop-blur-xl rounded-lg border border-white/10 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                Строительство
-              </div>
-            </div>
             <button
               onClick={onClose}
               className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:border-emerald-400/50 hover:bg-emerald-400/10 transition-all"
