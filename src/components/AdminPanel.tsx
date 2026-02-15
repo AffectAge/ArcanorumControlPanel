@@ -175,6 +175,7 @@ type AdminPanelProps = {
       | 'consumptionByResourceId'
       | 'extractionByResourceId'
       | 'productionByResourceId'
+      | 'marketInfrastructureByCategory'
     >,
   ) => void;
   onUpdateIndustryColor: (id: string, color: string) => void;
@@ -354,6 +355,10 @@ export default function AdminPanel({
     useState<BuildingEconomyMap>({});
   const [editEconomyProductionByResourceId, setEditEconomyProductionByResourceId] =
     useState<BuildingEconomyMap>({});
+  const [
+    editEconomyMarketInfrastructureByCategory,
+    setEditEconomyMarketInfrastructureByCategory,
+  ] = useState<BuildingEconomyMap>({});
   const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
   const [editReqMaxPerProvince, setEditReqMaxPerProvince] = useState<number | ''>(0);
   const [editReqMaxPerCountry, setEditReqMaxPerCountry] = useState<number | ''>(0);
@@ -670,6 +675,9 @@ export default function AdminPanel({
     setEditEconomyProductionByResourceId(
       normalizeBuildingEconomyMap(building.productionByResourceId),
     );
+    setEditEconomyMarketInfrastructureByCategory(
+      normalizeBuildingEconomyMap(building.marketInfrastructureByCategory),
+    );
   };
 
   const closeEditEconomy = () => {
@@ -691,6 +699,9 @@ export default function AdminPanel({
       ),
       productionByResourceId: sanitizeOptionalEconomyMap(
         editEconomyProductionByResourceId,
+      ),
+      marketInfrastructureByCategory: sanitizeOptionalEconomyMap(
+        editEconomyMarketInfrastructureByCategory,
       ),
     });
     closeEditEconomy();
@@ -4369,7 +4380,7 @@ export default function AdminPanel({
                 </label>
 
                 {resources.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
                       <div className="text-white/70 text-xs">Потребление за ход</div>
                       <div className="grid grid-cols-1 gap-2">
@@ -4456,6 +4467,40 @@ export default function AdminPanel({
                                   );
                                   if (amount > 0) next[resource.id] = amount;
                                   else delete next[resource.id];
+                                  return next;
+                                })
+                              }
+                              className="w-20 h-7 rounded bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/50"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                      <div className="text-white/70 text-xs">Общая инфраструктура рынка</div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {resourceCategories.map((category) => (
+                          <label
+                            key={`edit-market-infra-${category.id}`}
+                            className="flex items-center justify-between gap-2 text-[11px] text-white/70"
+                          >
+                            <span>{category.name}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={
+                                editEconomyMarketInfrastructureByCategory[category.id] ?? 0
+                              }
+                              onChange={(event) =>
+                                setEditEconomyMarketInfrastructureByCategory((prev) => {
+                                  const next = { ...prev };
+                                  const amount = Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  );
+                                  if (amount > 0) next[category.id] = amount;
+                                  else delete next[category.id];
                                   return next;
                                 })
                               }

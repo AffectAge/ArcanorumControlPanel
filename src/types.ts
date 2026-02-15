@@ -35,6 +35,7 @@ export type GameState = {
   diplomacyProposals?: DiplomacyProposal[];
   logistics?: LogisticsState;
   markets?: Market[];
+  worldMarket?: WorldMarket;
   settings?: GameSettings;
   eventLog?: EventLogState;
 };
@@ -144,6 +145,26 @@ export type LogisticsState = {
   routes: LogisticsRoute[];
 };
 
+export type MarketResourceTradePolicy = {
+  allowExportToMarketMembers?: boolean;
+  allowImportFromMarketMembers?: boolean;
+  maxExportAmountPerTurnToMarketMembers?: number;
+  maxImportAmountPerTurnFromMarketMembers?: number;
+  countryOverridesByCountryId?: Record<string, MarketResourceTradePolicyOverride>;
+};
+
+export type MarketResourceTradePolicyOverride = {
+  allowExportToMarketMembers?: boolean;
+  allowImportFromMarketMembers?: boolean;
+  maxExportAmountPerTurnToMarketMembers?: number;
+  maxImportAmountPerTurnFromMarketMembers?: number;
+};
+
+export type MarketTradePolicyByCountryId = Record<
+  string,
+  Record<string, MarketResourceTradePolicy>
+>;
+
 export type Market = {
   id: string;
   name: string;
@@ -152,6 +173,7 @@ export type Market = {
   color: string;
   logoDataUrl?: string;
   allowInfrastructureAccessWithoutTreaties?: boolean;
+  resourceTradePolicyByCountryId?: MarketTradePolicyByCountryId;
   memberCountryIds: string[];
   warehouseByResourceId?: Record<string, number>;
   priceByResourceId?: Record<string, number>;
@@ -160,9 +182,23 @@ export type Market = {
   offerHistoryByResourceId?: Record<string, number[]>;
   productionFactHistoryByResourceId?: Record<string, number[]>;
   productionMaxHistoryByResourceId?: Record<string, number[]>;
+  lastSharedInfrastructureConsumedByCategory?: Record<string, number>;
   capitalProvinceId?: string;
   capitalLostSinceTurn?: number;
   createdTurn?: number;
+};
+
+export type WorldMarket = {
+  id: 'world_market';
+  name: string;
+  memberMarketIds?: string[];
+  warehouseByResourceId?: Record<string, number>;
+  priceByResourceId?: Record<string, number>;
+  priceHistoryByResourceId?: Record<string, number[]>;
+  demandHistoryByResourceId?: Record<string, number[]>;
+  offerHistoryByResourceId?: Record<string, number[]>;
+  productionFactHistoryByResourceId?: Record<string, number[]>;
+  productionMaxHistoryByResourceId?: Record<string, number[]>;
 };
 
 export type ProvinceRecord = Record<string, ProvinceData>;
@@ -222,6 +258,7 @@ export type BuildingDefinition = {
   consumptionByResourceId?: Record<string, number>;
   extractionByResourceId?: Record<string, number>;
   productionByResourceId?: Record<string, number>;
+  marketInfrastructureByCategory?: Record<string, number>;
   requirements?: {
     resources?: TraitCriteria;
     buildings?: Record<

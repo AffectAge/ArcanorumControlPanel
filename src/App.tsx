@@ -53,6 +53,7 @@ import type {
   LogisticsEdge,
   LogisticsRouteType,
   Market,
+  WorldMarket,
   ResourceCategory,
   EventLogEntry,
   EventCategory,
@@ -93,6 +94,12 @@ const normalizeResourceMap = (
     ),
   );
   return Object.keys(next).length > 0 ? next : undefined;
+};
+
+const normalizeTradeAmountLimit = (value: unknown): number | undefined => {
+  if (!Number.isFinite(value)) return undefined;
+  const safe = Math.max(0, Math.floor(Number(value)));
+  return safe > 0 ? safe : undefined;
 };
 
 const normalizeResourcePrice = (value: unknown, fallback = DEFAULT_RESOURCE_BASE_PRICE) => {
@@ -188,6 +195,9 @@ const normalizeBuildingDefinitions = (
     consumptionByResourceId: normalizeResourceMap(building.consumptionByResourceId),
     extractionByResourceId: normalizeResourceMap(building.extractionByResourceId),
     productionByResourceId: normalizeResourceMap(building.productionByResourceId),
+    marketInfrastructureByCategory: normalizeResourceMap(
+      building.marketInfrastructureByCategory,
+    ),
   }));
 
 const normalizeResources = (list: Trait[]): Trait[] =>
@@ -480,6 +490,40 @@ const cloneBuildings = (list: BuildingDefinition[]) =>
 const cloneIndustries = (list: Industry[]) => list.map((item) => ({ ...item }));
 const cloneCompanies = (list: Company[]) => list.map((item) => ({ ...item }));
 
+const createDefaultWorldMarket = (
+  resources: Trait[],
+  basePriceFallback = DEFAULT_RESOURCE_BASE_PRICE,
+): WorldMarket => ({
+  id: 'world_market',
+  name: 'Мировой рынок',
+  memberMarketIds: [],
+  warehouseByResourceId: {},
+  priceByResourceId: Object.fromEntries(
+    resources.map((resource) => [
+      resource.id,
+      normalizeResourcePrice(resource.basePrice, basePriceFallback),
+    ]),
+  ),
+  priceHistoryByResourceId: Object.fromEntries(
+    resources.map((resource) => {
+      const initialPrice = normalizeResourcePrice(resource.basePrice, basePriceFallback);
+      return [resource.id, [initialPrice]];
+    }),
+  ),
+  demandHistoryByResourceId: Object.fromEntries(
+    resources.map((resource) => [resource.id, [0]]),
+  ),
+  offerHistoryByResourceId: Object.fromEntries(
+    resources.map((resource) => [resource.id, [0]]),
+  ),
+  productionFactHistoryByResourceId: Object.fromEntries(
+    resources.map((resource) => [resource.id, [0]]),
+  ),
+  productionMaxHistoryByResourceId: Object.fromEntries(
+    resources.map((resource) => [resource.id, [0]]),
+  ),
+});
+
 const initialMapLayers: MapLayer[] = [
   { id: 'political', name: 'Политическая', visible: true },
   { id: 'cultural', name: 'Культурная', visible: false },
@@ -574,6 +618,9 @@ function App() {
     createDefaultLogisticsState(),
   );
   const [markets, setMarkets] = useState<Market[]>([]);
+  const [worldMarket, setWorldMarket] = useState<WorldMarket>(() =>
+    createDefaultWorldMarket(cloneResources(startingData.resources)),
+  );
   const [diplomacyInboxOpen, setDiplomacyInboxOpen] = useState(false);
   const [diplomacySentNotice, setDiplomacySentNotice] = useState<{
     open: boolean;
@@ -650,7 +697,14 @@ function App() {
     factualSupplyByMarketAndResource: Map<string, Record<string, number>>;
     marketVolumeByMarketAndResource: Map<string, Record<string, number>>;
     productionMaxByMarketAndResource: Map<string, Record<string, number>>;
+    demandByWorldResource: Record<string, number>;
+    factualSupplyByWorldResource: Record<string, number>;
+    marketVolumeByWorldResource: Record<string, number>;
+    productionMaxByWorldResource: Record<string, number>;
   } | null>(null);
+  const pendingSharedInfrastructureConsumedRef = useRef<
+    Map<string, Record<string, number>> | null
+  >(null);
 
   const ensureAdditionalMapLayers = useCallback((layers: MapLayer[]) => {
     const nextLayers = [...layers];
@@ -679,6 +733,13 @@ function App() {
       };
     });
   }, [provinces, countries, logistics.edges, turn]);
+
+  useEffect(() => {
+    setWorldMarket((prev) => ({
+      ...prev,
+      memberMarketIds: markets.map((market) => market.id),
+    }));
+  }, [markets]);
 
   const getActiveColonizationsCount = (countryId?: string) => {
     if (!countryId) return 0;
@@ -991,6 +1052,7 @@ function App() {
           allowInfrastructureAccessWithoutTreaties: Boolean(
             payload.allowInfrastructureAccessWithoutTreaties,
           ),
+          resourceTradePolicyByCountryId: {},
           memberCountryIds: members,
           warehouseByResourceId: {},
           priceByResourceId: Object.fromEntries(
@@ -1036,6 +1098,7 @@ function App() {
       logoDataUrl?: string;
       capitalProvinceId?: string;
       allowInfrastructureAccessWithoutTreaties?: boolean;
+      resourceTradePolicyByCountryId?: Market['resourceTradePolicyByCountryId'];
     },
   ) => {
     setMarkets((prev) => {
@@ -1069,6 +1132,9 @@ function App() {
                 typeof patch.allowInfrastructureAccessWithoutTreaties === 'boolean'
                   ? patch.allowInfrastructureAccessWithoutTreaties
                   : Boolean(market.allowInfrastructureAccessWithoutTreaties),
+              resourceTradePolicyByCountryId:
+                patch.resourceTradePolicyByCountryId ??
+                market.resourceTradePolicyByCountryId,
               memberCountryIds,
               capitalProvinceId: nextCapitalProvinceId,
               capitalLostSinceTurn: undefined,
@@ -1955,11 +2021,14 @@ function App() {
         string,
         Record<string, number>
       >();
+      const demandByWorldResource: Record<string, number> = {};
+      const factualSupplyCurrentTurnByWorldResource: Record<string, number> = {};
+      const marketVolumeCurrentTurnByWorldResource: Record<string, number> = {};
+      const productionMaxCurrentTurnByWorldResource: Record<string, number> = {};
       Object.values(prev).forEach((province) => {
         if (!province.ownerCountryId) return;
         const market = marketByCountry.get(province.ownerCountryId);
-        if (!market) return;
-        const demand = demandByMarketAndResource.get(market.id) ?? {};
+        const demand = market ? demandByMarketAndResource.get(market.id) ?? {} : undefined;
         (province.buildingsBuilt ?? []).forEach((entry) => {
           const inactiveByProductivity =
             Number.isFinite(entry.lastProductivity) &&
@@ -1969,11 +2038,17 @@ function App() {
           Object.entries(definition?.consumptionByResourceId ?? {}).forEach(
             ([resourceId, amount]) => {
               if (!Number.isFinite(amount) || amount <= 0) return;
-              demand[resourceId] = Math.max(0, (demand[resourceId] ?? 0) + amount);
+              demandByWorldResource[resourceId] = Math.max(
+                0,
+                (demandByWorldResource[resourceId] ?? 0) + amount,
+              );
+              if (demand) {
+                demand[resourceId] = Math.max(0, (demand[resourceId] ?? 0) + amount);
+              }
             },
           );
         });
-        demandByMarketAndResource.set(market.id, demand);
+        if (market && demand) demandByMarketAndResource.set(market.id, demand);
       });
 
       const hasBuiltBuildings = Object.values(prev).some(
@@ -1981,6 +2056,7 @@ function App() {
       );
       if (!hasBuiltBuildings) {
         pendingMarketPriceMetricsRef.current = null;
+        pendingSharedInfrastructureConsumedRef.current = null;
         let changed = false;
         const nextWithoutConsumption: ProvinceRecord = { ...prev };
         Object.values(nextWithoutConsumption).forEach((province) => {
@@ -1988,6 +2064,12 @@ function App() {
           province.lastLogisticsConsumedByCategory = undefined;
           changed = true;
         });
+        setMarkets((prevMarkets) =>
+          prevMarkets.map((market) => ({
+            ...market,
+            lastSharedInfrastructureConsumedByCategory: undefined,
+          })),
+        );
         return changed ? nextWithoutConsumption : prev;
       }
 
@@ -1997,7 +2079,15 @@ function App() {
         string,
         Record<string, number>
       >();
+      const remainingSharedInfrastructureByMarketIdAndCategory = new Map<
+        string,
+        Record<string, number>
+      >();
       const consumedInfrastructureByProvinceIdAndCategory = new Map<
+        string,
+        Record<string, number>
+      >();
+      const consumedSharedInfrastructureByMarketIdAndCategory = new Map<
         string,
         Record<string, number>
       >();
@@ -2059,6 +2149,22 @@ function App() {
       });
     });
 
+    runtime.forEach((entry) => {
+      const ownerCountryId = entry.ownerCountryId;
+      if (!ownerCountryId) return;
+      const marketId = marketByCountry.get(ownerCountryId)?.id;
+      if (!marketId) return;
+      const contribution = normalizeResourceMap(
+        entry.definition?.marketInfrastructureByCategory,
+      );
+      if (!contribution) return;
+      const shared = remainingSharedInfrastructureByMarketIdAndCategory.get(marketId) ?? {};
+      Object.entries(contribution).forEach(([categoryId, amount]) => {
+        shared[categoryId] = Math.max(0, (shared[categoryId] ?? 0) + amount);
+      });
+      remainingSharedInfrastructureByMarketIdAndCategory.set(marketId, shared);
+    });
+
     runtime.forEach((buyer) => {
       const consumption = normalizeResourceMap(buyer.definition?.consumptionByResourceId);
       const extraction = normalizeResourceMap(buyer.definition?.extractionByResourceId);
@@ -2073,7 +2179,7 @@ function App() {
       const purchaseCostByResourceId: Record<string, number> = {};
       let purchaseCostDucats = 0;
 
-      if (consumptionEntries.length > 0 && buyerMarket) {
+      if (consumptionEntries.length > 0) {
         consumptionEntries.forEach(([resourceId, requiredAmount]) => {
           let shortage = Math.max(
             0,
@@ -2089,6 +2195,7 @@ function App() {
             resource?.infrastructureCostPerUnit,
           );
           let buyerInfrastructureLeft = Number.POSITIVE_INFINITY;
+          let buyerMarketSharedInfrastructureLeft = Number.POSITIVE_INFINITY;
           if (resourceCategoryId) {
             const currentInfrastructureByCategory =
               remainingBuyerInfrastructureByProvinceIdAndCategory.get(buyer.provinceId) ??
@@ -2099,9 +2206,24 @@ function App() {
               buyer.provinceId,
               currentInfrastructureByCategory,
             );
+            const buyerMarketId = buyerMarket?.id;
+            const sharedInfrastructureByCategory =
+              buyerMarketId
+                ? remainingSharedInfrastructureByMarketIdAndCategory.get(buyerMarketId) ?? {}
+                : {};
+            if (buyerMarketId) {
+              remainingSharedInfrastructureByMarketIdAndCategory.set(
+                buyerMarketId,
+                sharedInfrastructureByCategory,
+              );
+            }
             buyerInfrastructureLeft = Math.max(
               0,
               currentInfrastructureByCategory[resourceCategoryId] ?? 0,
+            );
+            buyerMarketSharedInfrastructureLeft = Math.max(
+              0,
+              sharedInfrastructureByCategory[resourceCategoryId] ?? 0,
             );
             if (buyerInfrastructureLeft <= 0) return;
           }
@@ -2109,30 +2231,78 @@ function App() {
           const prioritizedSellers = runtime
             .filter((seller) => seller !== buyer)
             .sort((a, b) => {
-              const aOwnCountry =
-                Boolean(buyer.ownerCountryId) &&
-                a.provinceOwnerCountryId === buyer.ownerCountryId;
-              const bOwnCountry =
-                Boolean(buyer.ownerCountryId) &&
-                b.provinceOwnerCountryId === buyer.ownerCountryId;
-              if (aOwnCountry === bOwnCountry) return 0;
-              return aOwnCountry ? -1 : 1;
+              const rankSeller = (seller: BuildingRuntime) => {
+                const isOwnCountry =
+                  Boolean(buyer.ownerCountryId) &&
+                  seller.provinceOwnerCountryId === buyer.ownerCountryId;
+                if (isOwnCountry) return 0;
+                const isSameMarket =
+                  Boolean(buyerMarket) &&
+                  Boolean(seller.provinceOwnerCountryId) &&
+                  buyerMarket!.memberCountryIds.includes(
+                    seller.provinceOwnerCountryId as string,
+                  );
+                if (isSameMarket) return 1;
+                return 2;
+              };
+              return rankSeller(a) - rankSeller(b);
             });
 
           for (const seller of prioritizedSellers) {
             if (seller === buyer) continue;
-            if (
-              !seller.provinceOwnerCountryId ||
-              !buyerMarket.memberCountryIds.includes(seller.provinceOwnerCountryId)
-            ) {
-              continue;
-            }
             if (shortage <= 0) break;
 
             const sellerWarehouse = seller.entry.warehouseByResourceId ?? {};
             const sellerStock = Math.max(0, sellerWarehouse[resourceId] ?? 0);
             if (sellerStock <= 0) continue;
-            const buyerMarketPrices = buyerMarket.priceByResourceId ?? {};
+            const isOwnOrSameMarketSeller =
+              Boolean(buyerMarket) &&
+              Boolean(seller.provinceOwnerCountryId) &&
+              buyerMarket!.memberCountryIds.includes(seller.provinceOwnerCountryId as string);
+            const canUseSharedInfrastructure = !isOwnOrSameMarketSeller;
+            let sellerInfrastructureLeft = Number.POSITIVE_INFINITY;
+            let sellerMarketSharedInfrastructureLeft = Number.POSITIVE_INFINITY;
+            const sellerMarket = seller.ownerCountryId
+              ? marketByCountry.get(seller.ownerCountryId)
+              : undefined;
+            if (resourceCategoryId) {
+              const sellerInfrastructureByCategory =
+                remainingBuyerInfrastructureByProvinceIdAndCategory.get(seller.provinceId) ?? {
+                  ...(next[seller.provinceId]?.logisticsPointsByCategory ?? {}),
+                };
+              remainingBuyerInfrastructureByProvinceIdAndCategory.set(
+                seller.provinceId,
+                sellerInfrastructureByCategory,
+              );
+              sellerInfrastructureLeft = Math.max(
+                0,
+                sellerInfrastructureByCategory[resourceCategoryId] ?? 0,
+              );
+              if (sellerInfrastructureLeft <= 0) continue;
+              if (canUseSharedInfrastructure) {
+                const sellerMarketId = sellerMarket?.id;
+                const sellerSharedInfrastructureByCategory =
+                  sellerMarketId
+                    ? remainingSharedInfrastructureByMarketIdAndCategory.get(
+                        sellerMarketId,
+                      ) ?? {}
+                    : {};
+                if (sellerMarketId) {
+                  remainingSharedInfrastructureByMarketIdAndCategory.set(
+                    sellerMarketId,
+                    sellerSharedInfrastructureByCategory,
+                  );
+                }
+                sellerMarketSharedInfrastructureLeft = Math.max(
+                  0,
+                  sellerSharedInfrastructureByCategory[resourceCategoryId] ?? 0,
+                );
+                if (sellerMarketSharedInfrastructureLeft <= 0) continue;
+              }
+            }
+            const buyerMarketPrices = isOwnOrSameMarketSeller
+              ? buyerMarket?.priceByResourceId ?? {}
+              : worldMarket.priceByResourceId ?? {};
             const unitPrice = normalizeResourcePrice(
               buyerMarketPrices[resourceId],
               normalizeResourcePrice(resourceById.get(resourceId)?.basePrice),
@@ -2147,7 +2317,22 @@ function App() {
               sellerStock,
               affordable,
               resourceCategoryId
-                ? Math.floor(buyerInfrastructureLeft / infrastructureCostPerUnit)
+                ? Math.floor(
+                    Math.min(
+                      canUseSharedInfrastructure
+                        ? Math.min(
+                            buyerInfrastructureLeft,
+                            buyerMarketSharedInfrastructureLeft,
+                          )
+                        : buyerInfrastructureLeft,
+                      canUseSharedInfrastructure
+                        ? Math.min(
+                            sellerInfrastructureLeft,
+                            sellerMarketSharedInfrastructureLeft,
+                          )
+                        : sellerInfrastructureLeft,
+                    ) / infrastructureCostPerUnit,
+                  )
                 : Number.POSITIVE_INFINITY,
             );
             if (amount <= 0) continue;
@@ -2204,10 +2389,20 @@ function App() {
             shortage -= amount;
             if (resourceCategoryId) {
               const consumedInfrastructure = amount * infrastructureCostPerUnit;
+              const consumeFromProvince = consumedInfrastructure;
+              const consumeFromShared = canUseSharedInfrastructure
+                ? consumedInfrastructure
+                : 0;
               buyerInfrastructureLeft = Math.max(
                 0,
-                buyerInfrastructureLeft - consumedInfrastructure,
+                buyerInfrastructureLeft - consumeFromProvince,
               );
+              if (canUseSharedInfrastructure) {
+                buyerMarketSharedInfrastructureLeft = Math.max(
+                  0,
+                  buyerMarketSharedInfrastructureLeft - consumeFromShared,
+                );
+              }
               const infrastructureByCategory =
                 remainingBuyerInfrastructureByProvinceIdAndCategory.get(
                   buyer.provinceId,
@@ -2215,17 +2410,106 @@ function App() {
               if (infrastructureByCategory) {
                 infrastructureByCategory[resourceCategoryId] = buyerInfrastructureLeft;
               }
+              if (canUseSharedInfrastructure && buyerMarket?.id) {
+                const sharedInfrastructureByCategory =
+                  remainingSharedInfrastructureByMarketIdAndCategory.get(
+                    buyerMarket.id,
+                  ) ?? {};
+                sharedInfrastructureByCategory[resourceCategoryId] =
+                  buyerMarketSharedInfrastructureLeft;
+                remainingSharedInfrastructureByMarketIdAndCategory.set(
+                  buyerMarket.id,
+                  sharedInfrastructureByCategory,
+                );
+                const consumedSharedByCategory =
+                  consumedSharedInfrastructureByMarketIdAndCategory.get(
+                    buyerMarket.id,
+                  ) ?? {};
+                consumedSharedByCategory[resourceCategoryId] = Math.max(
+                  0,
+                  (consumedSharedByCategory[resourceCategoryId] ?? 0) + consumeFromShared,
+                );
+                consumedSharedInfrastructureByMarketIdAndCategory.set(
+                  buyerMarket.id,
+                  consumedSharedByCategory,
+                );
+              }
               const consumedByCategory =
                 consumedInfrastructureByProvinceIdAndCategory.get(buyer.provinceId) ?? {};
               consumedByCategory[resourceCategoryId] = Math.max(
                 0,
-                (consumedByCategory[resourceCategoryId] ?? 0) + consumedInfrastructure,
+                (consumedByCategory[resourceCategoryId] ?? 0) + consumeFromProvince,
               );
               consumedInfrastructureByProvinceIdAndCategory.set(
                 buyer.provinceId,
                 consumedByCategory,
               );
-              if (buyerInfrastructureLeft <= 0) break;
+              const sellerConsumeFromProvince = consumedInfrastructure;
+              const sellerConsumeFromShared = canUseSharedInfrastructure
+                ? consumedInfrastructure
+                : 0;
+              sellerInfrastructureLeft = Math.max(
+                0,
+                sellerInfrastructureLeft - sellerConsumeFromProvince,
+              );
+              if (canUseSharedInfrastructure) {
+                sellerMarketSharedInfrastructureLeft = Math.max(
+                  0,
+                  sellerMarketSharedInfrastructureLeft - sellerConsumeFromShared,
+                );
+              }
+              const sellerInfrastructureByCategory =
+                remainingBuyerInfrastructureByProvinceIdAndCategory.get(
+                  seller.provinceId,
+                );
+              if (sellerInfrastructureByCategory) {
+                sellerInfrastructureByCategory[resourceCategoryId] = sellerInfrastructureLeft;
+              }
+              if (canUseSharedInfrastructure && sellerMarket?.id) {
+                const sellerSharedInfrastructureByCategory =
+                  remainingSharedInfrastructureByMarketIdAndCategory.get(
+                    sellerMarket.id,
+                  ) ?? {};
+                sellerSharedInfrastructureByCategory[resourceCategoryId] =
+                  sellerMarketSharedInfrastructureLeft;
+                remainingSharedInfrastructureByMarketIdAndCategory.set(
+                  sellerMarket.id,
+                  sellerSharedInfrastructureByCategory,
+                );
+                const sellerConsumedSharedByCategory =
+                  consumedSharedInfrastructureByMarketIdAndCategory.get(
+                    sellerMarket.id,
+                  ) ?? {};
+                sellerConsumedSharedByCategory[resourceCategoryId] = Math.max(
+                  0,
+                  (sellerConsumedSharedByCategory[resourceCategoryId] ?? 0) +
+                    sellerConsumeFromShared,
+                );
+                consumedSharedInfrastructureByMarketIdAndCategory.set(
+                  sellerMarket.id,
+                  sellerConsumedSharedByCategory,
+                );
+              }
+              const sellerConsumedByCategory =
+                consumedInfrastructureByProvinceIdAndCategory.get(seller.provinceId) ?? {};
+              sellerConsumedByCategory[resourceCategoryId] = Math.max(
+                0,
+                (sellerConsumedByCategory[resourceCategoryId] ?? 0) +
+                  sellerConsumeFromProvince,
+              );
+              consumedInfrastructureByProvinceIdAndCategory.set(
+                seller.provinceId,
+                sellerConsumedByCategory,
+              );
+              if (
+                buyerInfrastructureLeft <= 0 ||
+                sellerInfrastructureLeft <= 0 ||
+                (canUseSharedInfrastructure &&
+                  (buyerMarketSharedInfrastructureLeft <= 0 ||
+                    sellerMarketSharedInfrastructureLeft <= 0))
+              ) {
+                break;
+              }
             }
           }
         });
@@ -2268,6 +2552,10 @@ function App() {
             0,
             (productionMax[resourceId] ?? 0) + amount,
           );
+          productionMaxCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
         });
         Object.entries(production ?? {}).forEach(([resourceId, amount]) => {
           if (!Number.isFinite(amount) || amount <= 0) return;
@@ -2275,21 +2563,44 @@ function App() {
             0,
             (productionMax[resourceId] ?? 0) + amount,
           );
+          productionMaxCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
         });
         productionMaxCurrentTurnByMarketAndResource.set(buyerMarketId, productionMax);
+      } else {
+        Object.entries(extraction ?? {}).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          productionMaxCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
+        });
+        Object.entries(production ?? {}).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          productionMaxCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
+        });
       }
       const collectMarketVolume = () => {
-        if (!buyerMarketId) return;
-        const marketVolume =
-          marketVolumeCurrentTurnByMarketAndResource.get(buyerMarketId) ?? {};
         Object.entries(buyerWarehouse).forEach(([resourceId, amount]) => {
           if (!Number.isFinite(amount) || amount <= 0) return;
+          marketVolumeCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (marketVolumeCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
+          if (!buyerMarketId) return;
+          const marketVolume =
+            marketVolumeCurrentTurnByMarketAndResource.get(buyerMarketId) ?? {};
           marketVolume[resourceId] = Math.max(
             0,
             (marketVolume[resourceId] ?? 0) + amount,
           );
+          marketVolumeCurrentTurnByMarketAndResource.set(buyerMarketId, marketVolume);
         });
-        marketVolumeCurrentTurnByMarketAndResource.set(buyerMarketId, marketVolume);
       };
       buyer.entry.lastProductivity = productivity;
       buyer.entry.lastPurchaseNeedByResourceId = normalizeResourceMap(
@@ -2357,6 +2668,10 @@ function App() {
             0,
             (marketSupply[resourceId] ?? 0) + amount,
           );
+          factualSupplyCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (factualSupplyCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
         });
         Object.entries(actualProducedByResourceId).forEach(([resourceId, amount]) => {
           if (!Number.isFinite(amount) || amount <= 0) return;
@@ -2364,8 +2679,27 @@ function App() {
             0,
             (marketSupply[resourceId] ?? 0) + amount,
           );
+          factualSupplyCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (factualSupplyCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
         });
         factualSupplyCurrentTurnByMarketAndResource.set(buyerMarketId, marketSupply);
+      } else {
+        Object.entries(actualExtractedByResourceId).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          factualSupplyCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (factualSupplyCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
+        });
+        Object.entries(actualProducedByResourceId).forEach(([resourceId, amount]) => {
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          factualSupplyCurrentTurnByWorldResource[resourceId] = Math.max(
+            0,
+            (factualSupplyCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+          );
+        });
       }
       collectMarketVolume();
       buyer.entry.lastExtractedByResourceId = normalizeResourceMap(actualExtractedByResourceId);
@@ -2381,7 +2715,13 @@ function App() {
       factualSupplyByMarketAndResource: factualSupplyCurrentTurnByMarketAndResource,
       marketVolumeByMarketAndResource: marketVolumeCurrentTurnByMarketAndResource,
       productionMaxByMarketAndResource: productionMaxCurrentTurnByMarketAndResource,
+      demandByWorldResource,
+      factualSupplyByWorldResource: factualSupplyCurrentTurnByWorldResource,
+      marketVolumeByWorldResource: marketVolumeCurrentTurnByWorldResource,
+      productionMaxByWorldResource: productionMaxCurrentTurnByWorldResource,
     };
+    pendingSharedInfrastructureConsumedRef.current =
+      consumedSharedInfrastructureByMarketIdAndCategory;
       return next;
     });
   };
@@ -2641,7 +2981,20 @@ function App() {
         const metrics = pendingMarketPriceMetricsRef.current;
         if (!metrics) return prev;
         pendingMarketPriceMetricsRef.current = null;
-        Promise.resolve().then(() => applyMarketPriceTurn(metrics));
+        Promise.resolve().then(() => {
+          applyMarketPriceTurn(metrics);
+          applyWorldMarketPriceTurn(metrics);
+          const sharedConsumed = pendingSharedInfrastructureConsumedRef.current;
+          pendingSharedInfrastructureConsumedRef.current = null;
+          setMarkets((prevMarkets) =>
+            prevMarkets.map((market) => ({
+              ...market,
+              lastSharedInfrastructureConsumedByCategory: normalizeResourceMap(
+                sharedConsumed?.get(market.id),
+              ),
+            })),
+          );
+        });
         return prev;
       });
     }
@@ -2670,6 +3023,7 @@ function App() {
       diplomacyProposals,
       logistics,
       markets,
+      worldMarket,
       settings: gameSettings,
       eventLog,
     }),
@@ -2695,6 +3049,7 @@ function App() {
       diplomacyProposals,
       logistics,
       markets,
+      worldMarket,
       gameSettings,
       eventLog,
     ],
@@ -2778,6 +3133,13 @@ function App() {
             : undefined,
       })),
     );
+    const validResourceIds = new Set(normalizedLoadedResources.map((resource) => resource.id));
+    const resourceBasePriceById = new Map(
+      normalizedLoadedResources.map((resource) => [
+        resource.id,
+        normalizeResourcePrice(resource.basePrice),
+      ]),
+    );
     setResources(normalizedLoadedResources);
     setBuildings(normalizeBuildingDefinitions(save.data.buildings ?? buildings));
     setIndustries(save.data.industries ?? industries);
@@ -2791,13 +3153,6 @@ function App() {
       );
       const validProvinceIds = new Set(
         Object.keys(save.data.provinces ?? {}),
-      );
-      const validResourceIds = new Set(normalizedLoadedResources.map((resource) => resource.id));
-      const resourceBasePriceById = new Map(
-        normalizedLoadedResources.map((resource) => [
-          resource.id,
-          normalizeResourcePrice(resource.basePrice),
-        ]),
       );
       return loaded
         .map((market) => {
@@ -2888,6 +3243,79 @@ function App() {
             allowInfrastructureAccessWithoutTreaties: Boolean(
               market.allowInfrastructureAccessWithoutTreaties,
             ),
+            resourceTradePolicyByCountryId: Object.fromEntries(
+              Object.entries(market.resourceTradePolicyByCountryId ?? {})
+                .filter(([countryId]) => validCountryIds.has(countryId))
+                .map(([countryId, byResource]) => [
+                  countryId,
+                  Object.fromEntries(
+                    Object.entries(byResource ?? {})
+                      .filter(([resourceId]) => validResourceIds.has(resourceId))
+                      .map(([resourceId, policy]) => [
+                        resourceId,
+                        {
+                          allowExportToMarketMembers:
+                            policy?.allowExportToMarketMembers === false
+                              ? false
+                              : undefined,
+                          allowImportFromMarketMembers:
+                            policy?.allowImportFromMarketMembers === false
+                              ? false
+                              : undefined,
+                          maxExportAmountPerTurnToMarketMembers: normalizeTradeAmountLimit(
+                            policy?.maxExportAmountPerTurnToMarketMembers,
+                          ),
+                          maxImportAmountPerTurnFromMarketMembers: normalizeTradeAmountLimit(
+                            policy?.maxImportAmountPerTurnFromMarketMembers,
+                          ),
+                          countryOverridesByCountryId: Object.fromEntries(
+                            Object.entries(policy?.countryOverridesByCountryId ?? {})
+                              .filter(([otherCountryId]) => validCountryIds.has(otherCountryId))
+                              .map(([otherCountryId, override]) => [
+                                otherCountryId,
+                                {
+                                  allowExportToMarketMembers:
+                                    override?.allowExportToMarketMembers === false
+                                      ? false
+                                      : undefined,
+                                  allowImportFromMarketMembers:
+                                    override?.allowImportFromMarketMembers === false
+                                      ? false
+                                      : undefined,
+                                  maxExportAmountPerTurnToMarketMembers:
+                                    normalizeTradeAmountLimit(
+                                      override?.maxExportAmountPerTurnToMarketMembers,
+                                    ),
+                                  maxImportAmountPerTurnFromMarketMembers:
+                                    normalizeTradeAmountLimit(
+                                      override?.maxImportAmountPerTurnFromMarketMembers,
+                                    ),
+                                },
+                              ])
+                              .filter(([, override]) =>
+                                Boolean(
+                                  override.allowExportToMarketMembers === false ||
+                                    override.allowImportFromMarketMembers === false ||
+                                    override.maxExportAmountPerTurnToMarketMembers != null ||
+                                    override.maxImportAmountPerTurnFromMarketMembers != null,
+                                ),
+                              ),
+                          ),
+                        },
+                      ])
+                      .filter(([, policy]) =>
+                        Boolean(
+                          policy.allowExportToMarketMembers === false ||
+                            policy.allowImportFromMarketMembers === false ||
+                            policy.maxExportAmountPerTurnToMarketMembers != null ||
+                            policy.maxImportAmountPerTurnFromMarketMembers != null ||
+                            Object.keys(policy.countryOverridesByCountryId ?? {}).length > 0,
+                        ),
+                      ),
+                  ),
+                ])
+                .filter(([, byResource]) => Object.keys(byResource).length > 0),
+            ),
             memberCountryIds: members,
             warehouseByResourceId: Object.fromEntries(
               Object.entries(market.warehouseByResourceId ?? {}).filter(
@@ -2903,6 +3331,16 @@ function App() {
             offerHistoryByResourceId: normalizedOfferHistory,
             productionFactHistoryByResourceId: normalizedProductionFactHistory,
             productionMaxHistoryByResourceId: normalizedProductionMaxHistory,
+            lastSharedInfrastructureConsumedByCategory: normalizeResourceMap(
+              Object.fromEntries(
+                Object.entries(market.lastSharedInfrastructureConsumedByCategory ?? {}).filter(
+                  ([categoryId, amount]) =>
+                    validResourceCategoryIds.has(categoryId) &&
+                    Number.isFinite(amount) &&
+                    Number(amount) > 0,
+                ),
+              ),
+            ),
             capitalProvinceId:
               market.capitalProvinceId &&
               validProvinceIds.has(market.capitalProvinceId)
@@ -2915,6 +3353,99 @@ function App() {
           };
         })
         .filter(Boolean) as Market[];
+    });
+    setWorldMarket(() => {
+      const saved = save.data.worldMarket;
+      const base = createDefaultWorldMarket(
+        normalizedLoadedResources,
+        marketDefaultResourceBasePrice,
+      );
+      if (!saved) {
+        return {
+          ...base,
+          memberMarketIds: (save.data.markets ?? []).map((market) => market.id),
+        };
+      }
+      return {
+        ...base,
+        ...saved,
+        id: 'world_market',
+        name: 'Мировой рынок',
+        memberMarketIds: (save.data.markets ?? []).map((market) => market.id),
+        warehouseByResourceId: Object.fromEntries(
+          Object.entries(saved.warehouseByResourceId ?? {}).filter(
+            ([resourceId, amount]) =>
+              validResourceIds.has(resourceId) &&
+              Number.isFinite(amount) &&
+              Number(amount) > 0,
+          ),
+        ),
+        priceByResourceId: Object.fromEntries(
+          normalizedLoadedResources.map((resource) => [
+            resource.id,
+            normalizeResourcePrice(
+              saved.priceByResourceId?.[resource.id],
+              resourceBasePriceById.get(resource.id) ?? marketDefaultResourceBasePrice,
+            ),
+          ]),
+        ),
+        priceHistoryByResourceId: Object.fromEntries(
+          normalizedLoadedResources.map((resource) => {
+            const currentPrice = normalizeResourcePrice(
+              saved.priceByResourceId?.[resource.id],
+              resourceBasePriceById.get(resource.id) ?? marketDefaultResourceBasePrice,
+            );
+            return [
+              resource.id,
+              normalizeResourcePriceHistory(
+                saved.priceHistoryByResourceId?.[resource.id],
+                currentPrice,
+                marketPriceHistoryLength,
+              ),
+            ];
+          }),
+        ),
+        demandHistoryByResourceId: Object.fromEntries(
+          normalizedLoadedResources.map((resource) => [
+            resource.id,
+            normalizeResourceAmountHistory(
+              saved.demandHistoryByResourceId?.[resource.id],
+              0,
+              marketPriceHistoryLength,
+            ),
+          ]),
+        ),
+        offerHistoryByResourceId: Object.fromEntries(
+          normalizedLoadedResources.map((resource) => [
+            resource.id,
+            normalizeResourceAmountHistory(
+              saved.offerHistoryByResourceId?.[resource.id],
+              0,
+              marketPriceHistoryLength,
+            ),
+          ]),
+        ),
+        productionFactHistoryByResourceId: Object.fromEntries(
+          normalizedLoadedResources.map((resource) => [
+            resource.id,
+            normalizeResourceAmountHistory(
+              saved.productionFactHistoryByResourceId?.[resource.id],
+              0,
+              marketPriceHistoryLength,
+            ),
+          ]),
+        ),
+        productionMaxHistoryByResourceId: Object.fromEntries(
+          normalizedLoadedResources.map((resource) => [
+            resource.id,
+            normalizeResourceAmountHistory(
+              saved.productionMaxHistoryByResourceId?.[resource.id],
+              0,
+              marketPriceHistoryLength,
+            ),
+          ]),
+        ),
+      };
     });
     setLogistics(() => {
       const base = createDefaultLogisticsState();
@@ -3081,6 +3612,7 @@ function App() {
     setDiplomacyAgreements([]);
     setDiplomacyProposals([]);
     setMarkets([]);
+    setWorldMarket(createDefaultWorldMarket(cloneResources(startingData.resources)));
     setLogistics(createDefaultLogisticsState());
     setGameSettings({
       ...startingData.gameSettings,
@@ -4819,6 +5351,128 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     });
   };
 
+  function applyWorldMarketPriceTurn(metrics: {
+    demandByWorldResource: Record<string, number>;
+    factualSupplyByWorldResource: Record<string, number>;
+    marketVolumeByWorldResource: Record<string, number>;
+    productionMaxByWorldResource: Record<string, number>;
+  }) {
+    setWorldMarket((prev) => {
+      const nextPrices: Record<string, number> = {};
+      resources.forEach((resource) => {
+        const basePrice = normalizeResourcePrice(
+          resource.basePrice,
+          marketDefaultResourceBasePrice,
+        );
+        const currentPrice = normalizeResourcePrice(
+          prev.priceByResourceId?.[resource.id],
+          basePrice,
+        );
+        const resourceDemand = Math.max(0, metrics.demandByWorldResource[resource.id] ?? 0);
+        const resourceSupplyFact = Math.max(
+          0,
+          metrics.factualSupplyByWorldResource[resource.id] ?? 0,
+        );
+        const resourceMarketVolume = Math.max(
+          0,
+          metrics.marketVolumeByWorldResource[resource.id] ?? 0,
+        );
+        nextPrices[resource.id] = computeNextMarketPrice({
+          currentPrice,
+          basePrice,
+          demand: resourceDemand,
+          productionFact: resourceSupplyFact,
+          marketVolume: resourceMarketVolume,
+          minMarketPrice: resource.minMarketPrice,
+          maxMarketPrice: resource.maxMarketPrice,
+          smoothing: marketPriceSmoothing,
+          epsilon: marketPriceEpsilon,
+        });
+      });
+      const nextHistory: Record<string, number[]> = Object.fromEntries(
+        resources.map((resource) => {
+          const basePrice = normalizeResourcePrice(resource.basePrice);
+          const nextPrice = normalizeResourcePrice(nextPrices[resource.id], basePrice);
+          const prevHistory = normalizeResourcePriceHistory(
+            prev.priceHistoryByResourceId?.[resource.id],
+            nextPrice,
+            marketPriceHistoryLength,
+          );
+          return [resource.id, [...prevHistory, nextPrice].slice(-marketPriceHistoryLength)];
+        }),
+      );
+      const nextDemandHistory: Record<string, number[]> = Object.fromEntries(
+        resources.map((resource) => {
+          const resourceDemand = Math.max(0, metrics.demandByWorldResource[resource.id] ?? 0);
+          const prevHistory = normalizeResourceAmountHistory(
+            prev.demandHistoryByResourceId?.[resource.id],
+            resourceDemand,
+            marketPriceHistoryLength,
+          );
+          return [resource.id, [...prevHistory, resourceDemand].slice(-marketPriceHistoryLength)];
+        }),
+      );
+      const nextOfferHistory: Record<string, number[]> = Object.fromEntries(
+        resources.map((resource) => {
+          const resourceSupplyFact = Math.max(
+            0,
+            metrics.factualSupplyByWorldResource[resource.id] ?? 0,
+          );
+          const resourceMarketVolume = Math.max(
+            0,
+            metrics.marketVolumeByWorldResource[resource.id] ?? 0,
+          );
+          const resourceOffer = resourceSupplyFact + resourceMarketVolume;
+          const prevHistory = normalizeResourceAmountHistory(
+            prev.offerHistoryByResourceId?.[resource.id],
+            resourceOffer,
+            marketPriceHistoryLength,
+          );
+          return [resource.id, [...prevHistory, resourceOffer].slice(-marketPriceHistoryLength)];
+        }),
+      );
+      const nextProductionFactHistory: Record<string, number[]> = Object.fromEntries(
+        resources.map((resource) => {
+          const resourceSupplyFact = Math.max(
+            0,
+            metrics.factualSupplyByWorldResource[resource.id] ?? 0,
+          );
+          const prevHistory = normalizeResourceAmountHistory(
+            prev.productionFactHistoryByResourceId?.[resource.id],
+            resourceSupplyFact,
+            marketPriceHistoryLength,
+          );
+          return [resource.id, [...prevHistory, resourceSupplyFact].slice(-marketPriceHistoryLength)];
+        }),
+      );
+      const nextProductionMaxHistory: Record<string, number[]> = Object.fromEntries(
+        resources.map((resource) => {
+          const resourceProductionMax = Math.max(
+            0,
+            metrics.productionMaxByWorldResource[resource.id] ?? 0,
+          );
+          const prevHistory = normalizeResourceAmountHistory(
+            prev.productionMaxHistoryByResourceId?.[resource.id],
+            resourceProductionMax,
+            marketPriceHistoryLength,
+          );
+          return [resource.id, [...prevHistory, resourceProductionMax].slice(-marketPriceHistoryLength)];
+        }),
+      );
+      return {
+        ...prev,
+        name: 'Мировой рынок',
+        memberMarketIds: markets.map((market) => market.id),
+        priceByResourceId: nextPrices,
+        priceHistoryByResourceId: nextHistory,
+        demandHistoryByResourceId: nextDemandHistory,
+        offerHistoryByResourceId: nextOfferHistory,
+        productionFactHistoryByResourceId: nextProductionFactHistory,
+        productionMaxHistoryByResourceId: nextProductionMaxHistory,
+      };
+    });
+  }
+
   const requestJoinMarketByTreaty = (marketId: string) => {
     if (!activeCountryId || !marketId) return;
     const targetMarket = markets.find((market) => market.id === marketId);
@@ -4852,6 +5506,166 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         allowState: true,
         allowCompanies: false,
       },
+    });
+  };
+
+  const updateOwnMarketTradePolicyResource = (
+    marketId: string,
+    actorCountryId: string | undefined,
+    resourceId: string,
+    targetCountryId: string | undefined,
+    policy?: {
+      allowExportToMarketMembers?: boolean;
+      allowImportFromMarketMembers?: boolean;
+      maxExportAmountPerTurnToMarketMembers?: number;
+      maxImportAmountPerTurnFromMarketMembers?: number;
+    },
+  ) => {
+    if (!actorCountryId || !resourceId) return;
+    setMarkets((prev) =>
+      prev.map((market) => {
+        if (market.id !== marketId) return market;
+        if (!market.memberCountryIds.includes(actorCountryId)) return market;
+        const nextByCountry = {
+          ...(market.resourceTradePolicyByCountryId ?? {}),
+        };
+        const nextByResource = {
+          ...(nextByCountry[actorCountryId] ?? {}),
+        };
+        const normalizedPolicy = policy
+          ? {
+              allowExportToMarketMembers:
+                policy.allowExportToMarketMembers === false ? false : undefined,
+              allowImportFromMarketMembers:
+                policy.allowImportFromMarketMembers === false ? false : undefined,
+              maxExportAmountPerTurnToMarketMembers: normalizeTradeAmountLimit(
+                policy.maxExportAmountPerTurnToMarketMembers,
+              ),
+              maxImportAmountPerTurnFromMarketMembers: normalizeTradeAmountLimit(
+                policy.maxImportAmountPerTurnFromMarketMembers,
+              ),
+            }
+          : undefined;
+        const hasAnyRestriction = Boolean(
+          normalizedPolicy &&
+            (normalizedPolicy.allowExportToMarketMembers === false ||
+              normalizedPolicy.allowImportFromMarketMembers === false ||
+              normalizedPolicy.maxExportAmountPerTurnToMarketMembers != null ||
+              normalizedPolicy.maxImportAmountPerTurnFromMarketMembers != null),
+        );
+        const currentPolicy = {
+          ...(nextByResource[resourceId] ?? {}),
+        };
+        if (targetCountryId && targetCountryId !== actorCountryId) {
+          const nextOverrides = {
+            ...(currentPolicy.countryOverridesByCountryId ?? {}),
+          };
+          if (hasAnyRestriction && normalizedPolicy) {
+            nextOverrides[targetCountryId] = normalizedPolicy;
+          } else {
+            delete nextOverrides[targetCountryId];
+          }
+          if (Object.keys(nextOverrides).length > 0) {
+            currentPolicy.countryOverridesByCountryId = nextOverrides;
+          } else {
+            delete currentPolicy.countryOverridesByCountryId;
+          }
+          const hasBase = Boolean(
+            currentPolicy.allowExportToMarketMembers === false ||
+              currentPolicy.allowImportFromMarketMembers === false ||
+              currentPolicy.maxExportAmountPerTurnToMarketMembers != null ||
+              currentPolicy.maxImportAmountPerTurnFromMarketMembers != null,
+          );
+          const hasOverrides = Object.keys(
+            currentPolicy.countryOverridesByCountryId ?? {},
+          ).length > 0;
+          if (hasBase || hasOverrides) {
+            nextByResource[resourceId] = currentPolicy;
+          } else {
+            delete nextByResource[resourceId];
+          }
+        } else {
+          const nextBase = hasAnyRestriction && normalizedPolicy ? normalizedPolicy : {};
+          const currentOverrides = currentPolicy.countryOverridesByCountryId;
+          const mergedPolicy = {
+            ...nextBase,
+            ...(currentOverrides && Object.keys(currentOverrides).length > 0
+              ? { countryOverridesByCountryId: currentOverrides }
+              : {}),
+          };
+          const hasBase = hasAnyRestriction;
+          const hasOverrides = Object.keys(currentOverrides ?? {}).length > 0;
+          if (hasBase || hasOverrides) {
+            nextByResource[resourceId] = mergedPolicy;
+          } else {
+            delete nextByResource[resourceId];
+          }
+        }
+        if (Object.keys(nextByResource).length > 0) {
+          nextByCountry[actorCountryId] = nextByResource;
+        } else {
+          delete nextByCountry[actorCountryId];
+        }
+        return {
+          ...market,
+          resourceTradePolicyByCountryId:
+            Object.keys(nextByCountry).length > 0 ? nextByCountry : undefined,
+        };
+      }),
+    );
+    setWorldMarket((prev) => {
+      const current = normalizeResourcePrice(
+        prev.priceByResourceId?.[resourceId],
+        nextBasePrice,
+      );
+      return {
+        ...prev,
+        memberMarketIds: markets.map((market) => market.id),
+        priceByResourceId: {
+          ...(prev.priceByResourceId ?? {}),
+          [resourceId]: current,
+        },
+        priceHistoryByResourceId: {
+          ...(prev.priceHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourcePriceHistory(
+            prev.priceHistoryByResourceId?.[resourceId],
+            current,
+            marketPriceHistoryLength,
+          ),
+        },
+        demandHistoryByResourceId: {
+          ...(prev.demandHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourceAmountHistory(
+            prev.demandHistoryByResourceId?.[resourceId],
+            0,
+            marketPriceHistoryLength,
+          ),
+        },
+        offerHistoryByResourceId: {
+          ...(prev.offerHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourceAmountHistory(
+            prev.offerHistoryByResourceId?.[resourceId],
+            0,
+            marketPriceHistoryLength,
+          ),
+        },
+        productionFactHistoryByResourceId: {
+          ...(prev.productionFactHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourceAmountHistory(
+            prev.productionFactHistoryByResourceId?.[resourceId],
+            0,
+            marketPriceHistoryLength,
+          ),
+        },
+        productionMaxHistoryByResourceId: {
+          ...(prev.productionMaxHistoryByResourceId ?? {}),
+          [resourceId]: normalizeResourceAmountHistory(
+            prev.productionMaxHistoryByResourceId?.[resourceId],
+            0,
+            marketPriceHistoryLength,
+          ),
+        },
+      };
     });
   };
 
@@ -5071,6 +5885,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       | 'consumptionByResourceId'
       | 'extractionByResourceId'
       | 'productionByResourceId'
+      | 'marketInfrastructureByCategory'
     >,
   ) => {
     setBuildings((prev) =>
@@ -5087,6 +5902,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
               ),
               productionByResourceId: normalizeResourceMap(
                 patch.productionByResourceId,
+              ),
+              marketInfrastructureByCategory: normalizeResourceMap(
+                patch.marketInfrastructureByCategory,
               ),
             }
           : item,
@@ -5796,6 +6614,34 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         },
       })),
     );
+    setWorldMarket((prev) => ({
+      ...prev,
+      memberMarketIds: markets.map((market) => market.id),
+      priceByResourceId: {
+        ...(prev.priceByResourceId ?? {}),
+        [resourceId]: normalizedBasePrice,
+      },
+      priceHistoryByResourceId: {
+        ...(prev.priceHistoryByResourceId ?? {}),
+        [resourceId]: [normalizedBasePrice],
+      },
+      demandHistoryByResourceId: {
+        ...(prev.demandHistoryByResourceId ?? {}),
+        [resourceId]: [0],
+      },
+      offerHistoryByResourceId: {
+        ...(prev.offerHistoryByResourceId ?? {}),
+        [resourceId]: [0],
+      },
+      productionFactHistoryByResourceId: {
+        ...(prev.productionFactHistoryByResourceId ?? {}),
+        [resourceId]: [0],
+      },
+      productionMaxHistoryByResourceId: {
+        ...(prev.productionMaxHistoryByResourceId ?? {}),
+        [resourceId]: [0],
+      },
+    }));
   };
 
   const addResourceCategory = (name: string, color?: string, iconDataUrl?: string) => {
@@ -5914,6 +6760,36 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         };
       }),
     );
+    setWorldMarket((prev) => {
+      const nextWarehouse = { ...(prev.warehouseByResourceId ?? {}) };
+      const nextPrices = { ...(prev.priceByResourceId ?? {}) };
+      const nextHistory = { ...(prev.priceHistoryByResourceId ?? {}) };
+      const nextDemandHistory = { ...(prev.demandHistoryByResourceId ?? {}) };
+      const nextOfferHistory = { ...(prev.offerHistoryByResourceId ?? {}) };
+      const nextProductionFactHistory = {
+        ...(prev.productionFactHistoryByResourceId ?? {}),
+      };
+      const nextProductionMaxHistory = {
+        ...(prev.productionMaxHistoryByResourceId ?? {}),
+      };
+      delete nextWarehouse[id];
+      delete nextPrices[id];
+      delete nextHistory[id];
+      delete nextDemandHistory[id];
+      delete nextOfferHistory[id];
+      delete nextProductionFactHistory[id];
+      delete nextProductionMaxHistory[id];
+      return {
+        ...prev,
+        warehouseByResourceId: nextWarehouse,
+        priceByResourceId: nextPrices,
+        priceHistoryByResourceId: nextHistory,
+        demandHistoryByResourceId: nextDemandHistory,
+        offerHistoryByResourceId: nextOfferHistory,
+        productionFactHistoryByResourceId: nextProductionFactHistory,
+        productionMaxHistoryByResourceId: nextProductionMaxHistory,
+      };
+    });
   };
 
   const updateResourceCategoryColor = (id: string, color: string) => {
@@ -5951,6 +6827,17 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         ),
       })),
     }));
+    setMarkets((prev) =>
+      prev.map((market) => {
+        const consumed = { ...(market.lastSharedInfrastructureConsumedByCategory ?? {}) };
+        if (!(id in consumed)) return market;
+        delete consumed[id];
+        return {
+          ...market,
+          lastSharedInfrastructureConsumedByCategory: normalizeResourceMap(consumed),
+        };
+      }),
+    );
   };
 
   const updateReligionIcon = (id: string, iconDataUrl?: string) => {
@@ -7014,8 +7901,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         open={marketsOpen}
         countries={countries}
         markets={markets}
+        worldMarket={worldMarket}
         provinces={provinces}
         resources={resources}
+        resourceCategories={resourceCategories}
         buildings={buildings}
         proposals={diplomacyProposals}
         activeCountryId={activeCountryId}
@@ -7027,6 +7916,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onTradeWithWarehouse={tradeWithMarketWarehouse}
         onInviteByTreaty={inviteCountryToMarketByTreaty}
         onRequestJoinMarket={requestJoinMarketByTreaty}
+        onUpdateOwnTradePolicy={updateOwnMarketTradePolicyResource}
       />
 
       <HotseatPanel

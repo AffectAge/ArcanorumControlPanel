@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   BarChart3,
+  ChevronDown,
   Globe2,
   Plus,
   Save,
@@ -14,7 +15,9 @@ import type {
   DiplomacyProposal,
   Market,
   ProvinceRecord,
+  ResourceCategory,
   Trait,
+  WorldMarket,
 } from '../types';
 import Tooltip from './Tooltip';
 
@@ -22,8 +25,10 @@ type MarketsModalProps = {
   open: boolean;
   countries: Country[];
   markets: Market[];
+  worldMarket: WorldMarket;
   provinces: ProvinceRecord;
   resources: Trait[];
+  resourceCategories: ResourceCategory[];
   buildings: BuildingDefinition[];
   proposals: DiplomacyProposal[];
   activeCountryId?: string;
@@ -62,9 +67,21 @@ type MarketsModalProps = {
   }) => void;
   onInviteByTreaty: (targetCountryId: string) => void;
   onRequestJoinMarket: (marketId: string) => void;
+  onUpdateOwnTradePolicy: (
+    marketId: string,
+    actorCountryId: string | undefined,
+    resourceId: string,
+    targetCountryId: string | undefined,
+    policy?: {
+      allowExportToMarketMembers?: boolean;
+      allowImportFromMarketMembers?: boolean;
+      maxExportAmountPerTurnToMarketMembers?: number;
+      maxImportAmountPerTurnFromMarketMembers?: number;
+    },
+  ) => void;
 };
 
-type MarketsTab = 'market' | 'goods';
+type MarketsTab = 'market' | 'goods' | 'world';
 
 const PRICE_TREND_EPSILON = 0.0001;
 const GRAPH_WIDTH = 84;
@@ -81,6 +98,13 @@ const formatCompactNumber = (value: number, smallDigits = 1) => {
   if (abs >= 1_000) return `${sign}${trim((abs / 1_000).toFixed(2))}k`;
   if (Number.isInteger(value)) return `${value}`;
   return trim(value.toFixed(smallDigits));
+};
+
+const formatInfrastructureAmount = (value: number) => {
+  if (!Number.isFinite(value)) return '0';
+  const abs = Math.abs(value);
+  if (abs >= 1000) return formatCompactNumber(value, 2);
+  return formatCompactNumber(value, 2);
 };
 
 const getSparklinePath = (values: number[], width = GRAPH_WIDTH, height = GRAPH_HEIGHT) => {
@@ -209,8 +233,10 @@ export default function MarketsModal({
   open,
   countries,
   markets,
+  worldMarket,
   provinces,
   resources,
+  resourceCategories,
   buildings,
   proposals,
   activeCountryId,
@@ -222,6 +248,7 @@ export default function MarketsModal({
   onTradeWithWarehouse: _onTradeWithWarehouse,
   onInviteByTreaty,
   onRequestJoinMarket,
+  onUpdateOwnTradePolicy,
 }: MarketsModalProps) {
   const [tab, setTab] = useState<MarketsTab>('market');
   const [newMarketName, setNewMarketName] = useState('');
@@ -231,6 +258,37 @@ export default function MarketsModal({
   const [marketLogoDraft, setMarketLogoDraft] = useState<string | undefined>(undefined);
   const [allowInfrastructureAccessWithoutTreatiesDraft, setAllowInfrastructureAccessWithoutTreatiesDraft] =
     useState(false);
+  const [tradePolicyModalResourceId, setTradePolicyModalResourceId] = useState<
+    string | undefined
+  >(undefined);
+  const [tradePolicyModalTargetCountryId, setTradePolicyModalTargetCountryId] =
+    useState<string>('');
+  const [tradePolicyDraftByResourceId, setTradePolicyDraftByResourceId] = useState<
+    Record<
+      string,
+      {
+        allowExportToMarketMembers: boolean;
+        allowImportFromMarketMembers: boolean;
+        maxExportAmountPerTurnToMarketMembers: string;
+        maxImportAmountPerTurnFromMarketMembers: string;
+      }
+    >
+  >({});
+  const [tradePolicyDraftByResourceAndCountryId, setTradePolicyDraftByResourceAndCountryId] =
+    useState<
+      Record<
+        string,
+        Record<
+          string,
+          {
+            allowExportToMarketMembers: boolean;
+            allowImportFromMarketMembers: boolean;
+            maxExportAmountPerTurnToMarketMembers: string;
+            maxImportAmountPerTurnFromMarketMembers: string;
+          }
+        >
+      >
+    >({});
 
   const activeCountry = countries.find((country) => country.id === activeCountryId);
   const memberMarket = activeCountryId
@@ -274,6 +332,83 @@ export default function MarketsModal({
     setMarketColorDraft((prev) => prev || activeCountry?.color || '#22c55e');
     setAllowInfrastructureAccessWithoutTreatiesDraft(false);
   }, [open, ownMarket, activeCountry, newMarketName, ownCountryProvinceIds]);
+
+  useEffect(() => {
+    if (!open || !memberMarket || !activeCountryId) {
+      setTradePolicyDraftByResourceId({});
+      setTradePolicyDraftByResourceAndCountryId({});
+      return;
+    }
+    const byResource = memberMarket.resourceTradePolicyByCountryId?.[activeCountryId] ?? {};
+    const nextByResourceAndCountry: Record<
+      string,
+      Record<
+        string,
+        {
+          allowExportToMarketMembers: boolean;
+          allowImportFromMarketMembers: boolean;
+          maxExportAmountPerTurnToMarketMembers: string;
+          maxImportAmountPerTurnFromMarketMembers: string;
+        }
+      >
+    > = {};
+    const next: Record<
+      string,
+      {
+        allowExportToMarketMembers: boolean;
+        allowImportFromMarketMembers: boolean;
+        maxExportAmountPerTurnToMarketMembers: string;
+        maxImportAmountPerTurnFromMarketMembers: string;
+      }
+    > = {};
+    resources.forEach((resource) => {
+      const policy = byResource[resource.id];
+      next[resource.id] = {
+        allowExportToMarketMembers: policy?.allowExportToMarketMembers !== false,
+        allowImportFromMarketMembers: policy?.allowImportFromMarketMembers !== false,
+        maxExportAmountPerTurnToMarketMembers:
+          policy?.maxExportAmountPerTurnToMarketMembers != null
+            ? String(policy.maxExportAmountPerTurnToMarketMembers)
+            : '',
+        maxImportAmountPerTurnFromMarketMembers:
+          policy?.maxImportAmountPerTurnFromMarketMembers != null
+            ? String(policy.maxImportAmountPerTurnFromMarketMembers)
+            : '',
+      };
+      const overrides: Record<
+        string,
+        {
+          allowExportToMarketMembers: boolean;
+          allowImportFromMarketMembers: boolean;
+          maxExportAmountPerTurnToMarketMembers: string;
+          maxImportAmountPerTurnFromMarketMembers: string;
+        }
+      > = {};
+      Object.entries(policy?.countryOverridesByCountryId ?? {}).forEach(
+        ([countryId, override]) => {
+          overrides[countryId] = {
+            allowExportToMarketMembers:
+              override?.allowExportToMarketMembers !== false,
+            allowImportFromMarketMembers:
+              override?.allowImportFromMarketMembers !== false,
+            maxExportAmountPerTurnToMarketMembers:
+              override?.maxExportAmountPerTurnToMarketMembers != null
+                ? String(override.maxExportAmountPerTurnToMarketMembers)
+                : '',
+            maxImportAmountPerTurnFromMarketMembers:
+              override?.maxImportAmountPerTurnFromMarketMembers != null
+                ? String(override.maxImportAmountPerTurnFromMarketMembers)
+                : '',
+          };
+        },
+      );
+      if (Object.keys(overrides).length > 0) {
+        nextByResourceAndCountry[resource.id] = overrides;
+      }
+    });
+    setTradePolicyDraftByResourceId(next);
+    setTradePolicyDraftByResourceAndCountryId(nextByResourceAndCountry);
+  }, [open, memberMarket, activeCountryId, resources]);
 
   const assignedMarketByCountry = useMemo(() => {
     const map = new Map<string, string>();
@@ -348,6 +483,86 @@ export default function MarketsModal({
     reader.onload = () => setMarketLogoDraft(String(reader.result ?? ''));
     reader.readAsDataURL(file);
   };
+
+  const createEmptyTradePolicyDraft = () => ({
+    allowExportToMarketMembers: true,
+    allowImportFromMarketMembers: true,
+    maxExportAmountPerTurnToMarketMembers: '',
+    maxImportAmountPerTurnFromMarketMembers: '',
+  });
+
+  const getTradePolicyDraft = (
+    resourceId: string,
+    targetCountryId?: string,
+  ) =>
+    targetCountryId
+      ? tradePolicyDraftByResourceAndCountryId[resourceId]?.[targetCountryId] ??
+        createEmptyTradePolicyDraft()
+      : tradePolicyDraftByResourceId[resourceId] ?? createEmptyTradePolicyDraft();
+
+  const updateTradePolicyDraft = (
+    resourceId: string,
+    targetCountryId: string | undefined,
+    patch: Partial<{
+      allowExportToMarketMembers: boolean;
+      allowImportFromMarketMembers: boolean;
+      maxExportAmountPerTurnToMarketMembers: string;
+      maxImportAmountPerTurnFromMarketMembers: string;
+    }>,
+  ) => {
+    if (targetCountryId) {
+      setTradePolicyDraftByResourceAndCountryId((prev) => ({
+        ...prev,
+        [resourceId]: {
+          ...(prev[resourceId] ?? {}),
+          [targetCountryId]: {
+            ...(prev[resourceId]?.[targetCountryId] ?? createEmptyTradePolicyDraft()),
+            ...patch,
+          },
+        },
+      }));
+      return;
+    }
+    setTradePolicyDraftByResourceId((prev) => ({
+      ...prev,
+      [resourceId]: {
+        ...(prev[resourceId] ?? createEmptyTradePolicyDraft()),
+        ...patch,
+      },
+    }));
+  };
+
+  const saveTradePolicyForResource = (
+    resourceId: string,
+    targetCountryId?: string,
+  ) => {
+    if (!memberMarket || !activeCountryId) return;
+    const draft = getTradePolicyDraft(resourceId, targetCountryId);
+    if (!draft) return;
+    const parseLimit = (raw: string) => {
+      const parsed = Math.max(0, Math.floor(Number(raw)));
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+    };
+    onUpdateOwnTradePolicy(
+      memberMarket.id,
+      activeCountryId,
+      resourceId,
+      targetCountryId,
+      {
+      allowExportToMarketMembers: draft.allowExportToMarketMembers,
+      allowImportFromMarketMembers: draft.allowImportFromMarketMembers,
+      maxExportAmountPerTurnToMarketMembers: parseLimit(
+        draft.maxExportAmountPerTurnToMarketMembers,
+      ),
+      maxImportAmountPerTurnFromMarketMembers: parseLimit(
+        draft.maxImportAmountPerTurnFromMarketMembers,
+      ),
+      },
+    );
+  };
+  const tradePolicyModalResource = resources.find(
+    (resource) => resource.id === tradePolicyModalResourceId,
+  );
 
   const goodsStats = useMemo(() => {
     const memberSet = new Set(memberMarket?.memberCountryIds ?? []);
@@ -585,6 +800,123 @@ export default function MarketsModal({
 
     return { rows: normalizedRows, warehouseTotal };
   }, [memberMarket, provinces, resources, buildings]);
+
+  const worldGoodsStats = useMemo(() => {
+    return resources.map((resource) => {
+      const marketPrice = Math.max(
+        0.01,
+        Number(worldMarket.priceByResourceId?.[resource.id] ?? resource.basePrice ?? 1) || 1,
+      );
+      const marketPriceHistory = (
+        worldMarket.priceHistoryByResourceId?.[resource.id] ?? [marketPrice]
+      ).slice(-10);
+      const demandHistory = (
+        worldMarket.demandHistoryByResourceId?.[resource.id] ?? [0]
+      ).slice(-10);
+      const offerHistory = (
+        worldMarket.offerHistoryByResourceId?.[resource.id] ?? [0]
+      ).slice(-10);
+      const productionFactHistory = (
+        worldMarket.productionFactHistoryByResourceId?.[resource.id] ?? [0]
+      ).slice(-10);
+      const productionMaxHistory = (
+        worldMarket.productionMaxHistoryByResourceId?.[resource.id] ?? [0]
+      ).slice(-10);
+      const marketDemand = demandHistory[demandHistory.length - 1] ?? 0;
+      const marketOffer = offerHistory[offerHistory.length - 1] ?? 0;
+      const marketProductionFact =
+        productionFactHistory[productionFactHistory.length - 1] ?? 0;
+      const marketProductionMax =
+        productionMaxHistory[productionMaxHistory.length - 1] ?? 0;
+      const previousPrice =
+        marketPriceHistory.length > 1
+          ? marketPriceHistory[marketPriceHistory.length - 2]
+          : marketPriceHistory[marketPriceHistory.length - 1];
+      const delta = marketPrice - previousPrice;
+      const priceTrend =
+        delta > PRICE_TREND_EPSILON ? 'up' : delta < -PRICE_TREND_EPSILON ? 'down' : 'flat';
+      return {
+        resourceId: resource.id,
+        resourceName: resource.name,
+        resourceColor: resource.color,
+        resourceIconDataUrl: resource.iconDataUrl,
+        marketPrice,
+        marketPriceHistory,
+        marketDemand,
+        marketDemandHistory: demandHistory,
+        marketOffer,
+        marketOfferHistory: offerHistory,
+        marketProductionFact,
+        marketProductionFactHistory: productionFactHistory,
+        marketProductionMax,
+        marketProductionMaxHistory: productionMaxHistory,
+        priceTrend,
+      };
+    });
+  }, [resources, worldMarket]);
+
+  const worldMarketSharedInfrastructureRows = useMemo(() => {
+    if (!memberMarket)
+      return [] as Array<{
+        categoryId: string;
+        name: string;
+        amount: number;
+        iconDataUrl?: string;
+        color?: string;
+      }>;
+    const memberSet = new Set(memberMarket.memberCountryIds);
+    const definitionById = new Map(buildings.map((building) => [building.id, building]));
+    const amountByCategoryId = new Map<string, number>();
+
+    Object.values(provinces).forEach((province) => {
+      if (!province.ownerCountryId || !memberSet.has(province.ownerCountryId)) return;
+      (province.buildingsBuilt ?? []).forEach((entry) => {
+        const definition = definitionById.get(entry.buildingId);
+        Object.entries(definition?.marketInfrastructureByCategory ?? {}).forEach(
+          ([categoryId, amount]) => {
+            if (!Number.isFinite(amount) || amount <= 0) return;
+            amountByCategoryId.set(
+              categoryId,
+              Math.max(0, (amountByCategoryId.get(categoryId) ?? 0) + amount),
+            );
+          },
+        );
+      });
+    });
+
+    return resourceCategories
+      .map((category) => ({
+        categoryId: category.id,
+        name: category.name,
+        amount: Math.max(0, amountByCategoryId.get(category.id) ?? 0),
+        iconDataUrl: category.iconDataUrl,
+        color: category.color,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [memberMarket, provinces, buildings, resourceCategories]);
+
+  const worldMarketSharedInfrastructureConsumedRows = useMemo(() => {
+    if (!memberMarket)
+      return [] as Array<{
+        categoryId: string;
+        name: string;
+        amount: number;
+        iconDataUrl?: string;
+        color?: string;
+      }>;
+    return resourceCategories
+      .map((category) => ({
+        categoryId: category.id,
+        name: category.name,
+        amount: Math.max(
+          0,
+          memberMarket.lastSharedInfrastructureConsumedByCategory?.[category.id] ?? 0,
+        ),
+        iconDataUrl: category.iconDataUrl,
+        color: category.color,
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [memberMarket, resourceCategories]);
   if (!open) return null;
 
   return (
@@ -631,6 +963,16 @@ export default function MarketsModal({
               }`}
             >
               Товары и торговля
+            </button>
+            <button
+              onClick={() => setTab('world')}
+              className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                tab === 'world'
+                  ? 'bg-indigo-500/15 border-indigo-400/40 text-white'
+                  : 'bg-white/5 border-white/10 text-white/70 hover:border-indigo-400/30'
+              }`}
+            >
+              Мировой рынок
             </button>
           </div>
 
@@ -1108,7 +1450,7 @@ export default function MarketsModal({
                   </>
                 )}
               </div>
-            ) : (
+            ) : tab === 'goods' ? (
               <div className="w-full space-y-4">
                 {!memberMarket ? (
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white/60 text-sm">
@@ -1261,9 +1603,396 @@ export default function MarketsModal({
                   </>
                 )}
               </div>
+            ) : (
+              <div className="w-full space-y-4">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-white/85 text-sm font-semibold mb-1">Мировой рынок</div>
+                  <div className="text-white/60 text-xs">
+                    Включает все рынки автоматически. Выход невозможен, лидера нет.
+                  </div>
+                  <div className="text-white/55 text-xs mt-2">
+                    Порядок закупки: страна → рынок → мировой рынок.
+                  </div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-white/85 text-sm font-semibold mb-2">
+                    Общая инфраструктура вашего рынка
+                  </div>
+                  <div className="text-white/55 text-xs mb-3">
+                    Этот пул используется для мировых закупок после исчерпания инфраструктуры
+                    провинции.
+                  </div>
+                  {memberMarket ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {worldMarketSharedInfrastructureRows.map((row) => (
+                          <div
+                            key={`world-market-shared-infra:${row.categoryId}`}
+                            className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between"
+                          >
+                            <span className="inline-flex items-center gap-2 text-white/80 text-sm">
+                              {row.iconDataUrl ? (
+                                <img
+                                  src={row.iconDataUrl}
+                                  alt={row.name}
+                                  className="w-4 h-4 rounded-sm border border-white/20 object-cover"
+                                />
+                              ) : (
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: row.color ?? '#94a3b8' }}
+                                />
+                              )}
+                              {row.name}
+                            </span>
+                            <span className="text-emerald-200 text-sm tabular-nums">
+                              {formatInfrastructureAmount(row.amount)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="pt-1">
+                        <div className="text-white/70 text-xs mb-2">
+                          Потребление общей инфраструктуры за прошлый ход
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {worldMarketSharedInfrastructureConsumedRows.map((row) => (
+                            <div
+                              key={`world-market-shared-infra-consumed:${row.categoryId}`}
+                              className="rounded-lg border border-amber-400/20 bg-amber-500/5 px-3 py-2 flex items-center justify-between"
+                            >
+                              <span className="inline-flex items-center gap-2 text-white/80 text-sm">
+                                {row.iconDataUrl ? (
+                                  <img
+                                    src={row.iconDataUrl}
+                                    alt={row.name}
+                                    className="w-4 h-4 rounded-sm border border-white/20 object-cover"
+                                  />
+                                ) : (
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full"
+                                    style={{ backgroundColor: row.color ?? '#94a3b8' }}
+                                  />
+                                )}
+                                {row.name}
+                              </span>
+                              <span className="text-amber-200 text-sm tabular-nums">
+                                  {formatInfrastructureAmount(row.amount)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2 text-[11px] text-white/60">
+                          Итого за прошлый ход:{' '}
+                          <span className="text-amber-200 tabular-nums">
+                            {formatInfrastructureAmount(
+                              worldMarketSharedInfrastructureConsumedRows.reduce(
+                                (sum, row) => sum + row.amount,
+                                0,
+                              ),
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-white/50 text-sm">
+                      Страна не состоит в рынке.
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-white/85 text-sm font-semibold mb-2">Мировая биржа</div>
+                  <div className="space-y-2">
+                    {worldGoodsStats.map((row) => (
+                      <div
+                        key={`world-exchange:${row.resourceId}`}
+                        className="w-full rounded-xl border border-white/10 bg-black/30 p-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="inline-flex items-center gap-2 text-white/90">
+                            {row.resourceIconDataUrl ? (
+                              <img
+                                src={row.resourceIconDataUrl}
+                                alt={row.resourceName}
+                                className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                              />
+                            ) : (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full"
+                                style={{ backgroundColor: row.resourceColor }}
+                              />
+                            )}
+                            <span className="text-sm">{row.resourceName}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <MiniGraphCard
+                              title="Цена за ед."
+                              value={formatCompactNumber(row.marketPrice, 1)}
+                              valueClassName="text-yellow-200"
+                              borderClassName="border-yellow-400/35"
+                              bgClassName="bg-yellow-500/10"
+                              values={row.marketPriceHistory}
+                              stroke={
+                                row.priceTrend === 'up'
+                                  ? '#34d399'
+                                  : row.priceTrend === 'down'
+                                    ? '#fb7185'
+                                    : '#fde047'
+                              }
+                              ariaLabel="График мировой цены за 10 ходов"
+                              tooltip="Цена одной единицы ресурса на мировом рынке."
+                            />
+                            <MiniGraphCard
+                              title="Спрос"
+                              value={formatCompactNumber(row.marketDemand, 0)}
+                              valueClassName="text-rose-200"
+                              borderClassName="border-rose-400/35"
+                              bgClassName="bg-rose-500/10"
+                              values={row.marketDemandHistory}
+                              stroke="#fb7185"
+                              ariaLabel="График мирового спроса за 10 ходов"
+                              tooltip="Суммарный спрос по всем странам."
+                            />
+                            <MiniGraphCard
+                              title="Предложение"
+                              value={formatCompactNumber(row.marketOffer, 0)}
+                              valueClassName="text-teal-200"
+                              borderClassName="border-teal-400/35"
+                              bgClassName="bg-teal-500/10"
+                              values={row.marketOfferHistory}
+                              stroke="#2dd4bf"
+                              ariaLabel="График мирового предложения за 10 ходов"
+                              tooltip="Суммарное предложение: факт производства + складские остатки."
+                            />
+                            <MiniGraphCard
+                              title="Произв. факт"
+                              value={formatCompactNumber(row.marketProductionFact, 0)}
+                              valueClassName="text-emerald-200"
+                              borderClassName="border-emerald-400/35"
+                              bgClassName="bg-emerald-500/10"
+                              values={row.marketProductionFactHistory}
+                              stroke="#34d399"
+                              ariaLabel="График мирового фактического производства за 10 ходов"
+                              tooltip="Фактическое производство по миру за ход."
+                            />
+                            <MiniGraphCard
+                              title="Произв. макс"
+                              value={formatCompactNumber(row.marketProductionMax, 0)}
+                              valueClassName="text-cyan-200"
+                              borderClassName="border-cyan-400/35"
+                              bgClassName="bg-cyan-500/10"
+                              values={row.marketProductionMaxHistory}
+                              stroke="#22d3ee"
+                              ariaLabel="График мирового максимального производства за 10 ходов"
+                              tooltip="Теоретический максимум производства по миру."
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>
+        {memberMarket && activeCountryId && tradePolicyModalResource && (
+          <div className="fixed inset-0 z-[95] bg-black/70 backdrop-blur-sm flex items-center justify-center">
+            <div className="w-[520px] max-w-[calc(100vw-2rem)] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                <div className="text-white text-sm font-semibold">
+                  Настройки торговли: {tradePolicyModalResource.name}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTradePolicyModalResourceId(undefined);
+                    setTradePolicyModalTargetCountryId('');
+                  }}
+                  className="h-8 w-8 rounded-md border border-white/10 bg-black/30 text-white/70 inline-flex items-center justify-center hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-4 space-y-3">
+                <label className="flex flex-col gap-1 text-white/70 text-sm">
+                  Страна-партнер
+                  <div className="relative">
+                    <select
+                      value={tradePolicyModalTargetCountryId}
+                      onChange={(event) =>
+                        setTradePolicyModalTargetCountryId(event.target.value)
+                      }
+                      className="h-9 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none"
+                    >
+                      <option value="" className="bg-[#0b111b] text-white">
+                        Общие настройки для товара
+                      </option>
+                      {memberMarket.memberCountryIds
+                        .filter((countryId) => countryId !== activeCountryId)
+                        .map((countryId) => (
+                          <option
+                            key={`trade-policy-country:${countryId}`}
+                            value={countryId}
+                            className="bg-[#0b111b] text-white"
+                          >
+                            {countries.find((country) => country.id === countryId)?.name ??
+                              countryId}
+                          </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                  </div>
+                </label>
+                {tradePolicyModalTargetCountryId && (
+                  <div className="text-[11px] text-white/55">
+                    Для выбранной страны действуют индивидуальные правила. Если их не задать,
+                    применяются общие настройки товара.
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Продажа другим странам рынка
+                    <div className="relative">
+                      <select
+                        value={
+                          (
+                            getTradePolicyDraft(
+                              tradePolicyModalResource.id,
+                              tradePolicyModalTargetCountryId || undefined,
+                            ).allowExportToMarketMembers ?? true
+                          )
+                            ? 'allow'
+                            : 'deny'
+                        }
+                        onChange={(event) =>
+                          updateTradePolicyDraft(
+                            tradePolicyModalResource.id,
+                            tradePolicyModalTargetCountryId || undefined,
+                            { allowExportToMarketMembers: event.target.value === 'allow' },
+                          )
+                        }
+                        className="h-9 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none"
+                      >
+                        <option value="allow" className="bg-[#0b111b] text-white">
+                          Разрешить продажу
+                        </option>
+                        <option value="deny" className="bg-[#0b111b] text-white">
+                          Запретить продажу
+                        </option>
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </label>
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Закупка у других стран рынка
+                    <div className="relative">
+                      <select
+                        value={
+                          (
+                            getTradePolicyDraft(
+                              tradePolicyModalResource.id,
+                              tradePolicyModalTargetCountryId || undefined,
+                            ).allowImportFromMarketMembers ?? true
+                          )
+                            ? 'allow'
+                            : 'deny'
+                        }
+                        onChange={(event) =>
+                          updateTradePolicyDraft(
+                            tradePolicyModalResource.id,
+                            tradePolicyModalTargetCountryId || undefined,
+                            { allowImportFromMarketMembers: event.target.value === 'allow' },
+                          )
+                        }
+                        className="h-9 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none"
+                      >
+                        <option value="allow" className="bg-[#0b111b] text-white">
+                          Разрешить закупку
+                        </option>
+                        <option value="deny" className="bg-[#0b111b] text-white">
+                          Запретить закупку
+                        </option>
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </label>
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Лимит продажи за ход (ед.)
+                    <input
+                      type="number"
+                      min={0}
+                      value={
+                        getTradePolicyDraft(
+                          tradePolicyModalResource.id,
+                          tradePolicyModalTargetCountryId || undefined,
+                        ).maxExportAmountPerTurnToMarketMembers ?? ''
+                      }
+                      onChange={(event) =>
+                        updateTradePolicyDraft(
+                          tradePolicyModalResource.id,
+                          tradePolicyModalTargetCountryId || undefined,
+                          { maxExportAmountPerTurnToMarketMembers: event.target.value },
+                        )
+                      }
+                      placeholder="Без лимита"
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Лимит покупки за ход (ед.)
+                    <input
+                      type="number"
+                      min={0}
+                      value={
+                        getTradePolicyDraft(
+                          tradePolicyModalResource.id,
+                          tradePolicyModalTargetCountryId || undefined,
+                        ).maxImportAmountPerTurnFromMarketMembers ?? ''
+                      }
+                      onChange={(event) =>
+                        updateTradePolicyDraft(
+                          tradePolicyModalResource.id,
+                          tradePolicyModalTargetCountryId || undefined,
+                          { maxImportAmountPerTurnFromMarketMembers: event.target.value },
+                        )
+                      }
+                      placeholder="Без лимита"
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                    />
+                  </label>
+                </div>
+              </div>
+              <div className="px-4 py-3 border-t border-white/10 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTradePolicyModalResourceId(undefined);
+                    setTradePolicyModalTargetCountryId('');
+                  }}
+                  className="h-8 px-3 rounded-lg border border-white/15 bg-black/30 text-white/75 text-sm"
+                >
+                  Закрыть
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveTradePolicyForResource(
+                      tradePolicyModalResource.id,
+                      tradePolicyModalTargetCountryId || undefined,
+                    );
+                    setTradePolicyModalResourceId(undefined);
+                    setTradePolicyModalTargetCountryId('');
+                  }}
+                  className="h-8 px-3 rounded-lg border border-emerald-400/35 bg-emerald-500/15 text-emerald-200 text-sm"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
