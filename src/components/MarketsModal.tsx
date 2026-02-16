@@ -98,6 +98,7 @@ type MarketsTab = 'market' | 'goods' | 'world';
 const PRICE_TREND_EPSILON = 0.0001;
 const GRAPH_WIDTH = 84;
 const GRAPH_HEIGHT = 24;
+const ALL_RESOURCES_WORLD_TRADE_POLICY_KEY = '__all_resources__';
 
 const formatCompactNumber = (value: number, smallDigits = 1) => {
   if (!Number.isFinite(value)) return '0';
@@ -514,9 +515,13 @@ export default function MarketsModal({
         }
       >
     > = {};
-    resources.forEach((resource) => {
-      const policy = memberMarket.worldTradePolicyByResourceId?.[resource.id];
-      nextBase[resource.id] = {
+    const resourcePolicyIds = [
+      ALL_RESOURCES_WORLD_TRADE_POLICY_KEY,
+      ...resources.map((resource) => resource.id),
+    ];
+    resourcePolicyIds.forEach((resourceId) => {
+      const policy = memberMarket.worldTradePolicyByResourceId?.[resourceId];
+      nextBase[resourceId] = {
         allowExportToWorld: policy?.allowExportToWorld !== false,
         allowImportFromWorld: policy?.allowImportFromWorld !== false,
         maxExportAmountPerTurnToWorld:
@@ -554,7 +559,7 @@ export default function MarketsModal({
         },
       );
       if (Object.keys(countryOverrides).length > 0) {
-        nextByCountry[resource.id] = countryOverrides;
+        nextByCountry[resourceId] = countryOverrides;
       }
       const marketOverrides: Record<
         string,
@@ -582,7 +587,7 @@ export default function MarketsModal({
         },
       );
       if (Object.keys(marketOverrides).length > 0) {
-        nextByMarket[resource.id] = marketOverrides;
+        nextByMarket[resourceId] = marketOverrides;
       }
     });
     setWorldTradePolicyDraftByResourceId(nextBase);
@@ -890,11 +895,16 @@ export default function MarketsModal({
   const tradePolicyModalResource = resources.find(
     (resource) => resource.id === tradePolicyModalResourceId,
   );
+  const selectedWorldTradePolicyResourceId = worldTradePolicyModalResourceId;
   const worldTradePolicyModalResource = resources.find(
-    (resource) => resource.id === worldTradePolicyModalResourceId,
+    (resource) => resource.id === selectedWorldTradePolicyResourceId,
   );
+  const selectedWorldTradePolicyResourceName =
+    selectedWorldTradePolicyResourceId === ALL_RESOURCES_WORLD_TRADE_POLICY_KEY
+      ? 'Все ресурсы'
+      : worldTradePolicyModalResource?.name ?? 'Ресурс';
   const worldTradePolicyActiveDetails = useMemo(() => {
-    if (!memberMarket || !worldTradePolicyModalResource) {
+    if (!memberMarket || !selectedWorldTradePolicyResourceId) {
       return {
         base: {
           allowExportToWorld: true,
@@ -920,7 +930,8 @@ export default function MarketsModal({
         }>,
       };
     }
-    const policy = memberMarket.worldTradePolicyByResourceId?.[worldTradePolicyModalResource.id];
+    const policy =
+      memberMarket.worldTradePolicyByResourceId?.[selectedWorldTradePolicyResourceId];
     const base = {
       allowExportToWorld: policy?.allowExportToWorld !== false,
       allowImportFromWorld: policy?.allowImportFromWorld !== false,
@@ -980,7 +991,7 @@ export default function MarketsModal({
       )
       .sort((a, b) => a.name.localeCompare(b.name));
     return { base, marketOverrides, countryOverrides };
-  }, [memberMarket, worldTradePolicyModalResource, markets, countries]);
+  }, [memberMarket, selectedWorldTradePolicyResourceId, markets, countries]);
 
   const goodsStats = useMemo(() => {
     const memberSet = new Set(memberMarket?.memberCountryIds ?? []);
@@ -2223,12 +2234,12 @@ export default function MarketsModal({
             )}
           </div>
         </div>
-        {memberMarket && activeCountryId && worldTradePolicyModalResource && (
+        {memberMarket && activeCountryId && selectedWorldTradePolicyResourceId && (
           <div className="fixed inset-0 z-[94] bg-black/75 backdrop-blur-sm">
             <div className="absolute inset-3 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden flex flex-col">
               <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
                 <div className="text-white text-base font-semibold">
-                  Ограничения мирового рынка: {worldTradePolicyModalResource.name}
+                  Ограничения мирового рынка: {selectedWorldTradePolicyResourceName}
                 </div>
                 <button
                   type="button"
@@ -2249,6 +2260,43 @@ export default function MarketsModal({
                     Режим просмотра: менять настройки может только создатель рынка.
                   </div>
                 )}
+                <label className="flex flex-col gap-1 text-white/70 text-sm">
+                  <Tooltip
+                    label="Ресурс"
+                    description='Режим "Все ресурсы" задает общее правило по умолчанию. Если у конкретного ресурса есть собственная настройка, она имеет более высокий приоритет.'
+                    side="bottom"
+                  >
+                    <span className="inline-flex">Ресурс</span>
+                  </Tooltip>
+                  <div className="relative">
+                    <select
+                      value={selectedWorldTradePolicyResourceId}
+                      onChange={(event) => {
+                        setWorldTradePolicyModalResourceId(event.target.value);
+                        setWorldTradePolicyTargetMode('all');
+                        setWorldTradePolicyTargetId('');
+                      }}
+                      className="h-10 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none"
+                    >
+                          <option
+                            value={ALL_RESOURCES_WORLD_TRADE_POLICY_KEY}
+                            className="bg-[#0b111b] text-white"
+                          >
+                            Все ресурсы
+                          </option>
+                          {resources.map((resource) => (
+                        <option
+                          key={`world-policy-resource-select:${resource.id}`}
+                          value={resource.id}
+                          className="bg-[#0b111b] text-white"
+                        >
+                          {resource.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                  </div>
+                </label>
                 <label className="flex flex-col gap-1 text-white/70 text-sm">
                   Тип ограничения
                   <div className="relative">
@@ -2376,7 +2424,7 @@ export default function MarketsModal({
                       <select
                         value={
                           getWorldTradePolicyDraft(
-                            worldTradePolicyModalResource.id,
+                            selectedWorldTradePolicyResourceId,
                             worldTradePolicyTargetMode,
                             worldTradePolicyTargetId || undefined,
                           ).allowExportToWorld
@@ -2385,7 +2433,7 @@ export default function MarketsModal({
                         }
                         onChange={(event) =>
                           updateWorldTradePolicyDraft(
-                            worldTradePolicyModalResource.id,
+                            selectedWorldTradePolicyResourceId,
                             worldTradePolicyTargetMode,
                             worldTradePolicyTargetId || undefined,
                             { allowExportToWorld: event.target.value === 'allow' },
@@ -2415,7 +2463,7 @@ export default function MarketsModal({
                       <select
                         value={
                           getWorldTradePolicyDraft(
-                            worldTradePolicyModalResource.id,
+                            selectedWorldTradePolicyResourceId,
                             worldTradePolicyTargetMode,
                             worldTradePolicyTargetId || undefined,
                           ).allowImportFromWorld
@@ -2424,7 +2472,7 @@ export default function MarketsModal({
                         }
                         onChange={(event) =>
                           updateWorldTradePolicyDraft(
-                            worldTradePolicyModalResource.id,
+                            selectedWorldTradePolicyResourceId,
                             worldTradePolicyTargetMode,
                             worldTradePolicyTargetId || undefined,
                             { allowImportFromWorld: event.target.value === 'allow' },
@@ -2461,14 +2509,14 @@ export default function MarketsModal({
                       min={0}
                       value={
                         getWorldTradePolicyDraft(
-                          worldTradePolicyModalResource.id,
+                            selectedWorldTradePolicyResourceId,
                           worldTradePolicyTargetMode,
                           worldTradePolicyTargetId || undefined,
                         ).maxExportAmountPerTurnToWorld ?? ''
                       }
                       onChange={(event) =>
                         updateWorldTradePolicyDraft(
-                          worldTradePolicyModalResource.id,
+                            selectedWorldTradePolicyResourceId,
                           worldTradePolicyTargetMode,
                           worldTradePolicyTargetId || undefined,
                           { maxExportAmountPerTurnToWorld: event.target.value },
@@ -2497,14 +2545,14 @@ export default function MarketsModal({
                       min={0}
                       value={
                         getWorldTradePolicyDraft(
-                          worldTradePolicyModalResource.id,
+                            selectedWorldTradePolicyResourceId,
                           worldTradePolicyTargetMode,
                           worldTradePolicyTargetId || undefined,
                         ).maxImportAmountPerTurnFromWorld ?? ''
                       }
                       onChange={(event) =>
                         updateWorldTradePolicyDraft(
-                          worldTradePolicyModalResource.id,
+                            selectedWorldTradePolicyResourceId,
                           worldTradePolicyTargetMode,
                           worldTradePolicyTargetId || undefined,
                           { maxImportAmountPerTurnFromWorld: event.target.value },
@@ -2762,7 +2810,7 @@ export default function MarketsModal({
                   type="button"
                   onClick={() => {
                     saveWorldTradePolicyForResource(
-                      worldTradePolicyModalResource.id,
+                      selectedWorldTradePolicyResourceId,
                       worldTradePolicyTargetMode,
                       worldTradePolicyTargetId || undefined,
                     );
