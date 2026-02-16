@@ -102,43 +102,91 @@ const normalizeTradeAmountLimit = (value: unknown): number | undefined => {
   return safe > 0 ? safe : undefined;
 };
 
-const isWorldTradeAllowedForResource = (params: {
+const resolveWorldTradePolicyForResource = (params: {
   market?: Market;
   resourceId: string;
-  direction: 'import' | 'export';
   counterpartyCountryId?: string;
   counterpartyMarketId?: string;
 }) => {
-  const {
-    market,
-    resourceId,
-    direction,
-    counterpartyCountryId,
-    counterpartyMarketId,
-  } = params;
-  if (!market) return true;
+  const { market, resourceId, counterpartyCountryId, counterpartyMarketId } = params;
+  if (!market) {
+    return {
+      allowExportToWorld: true,
+      allowImportFromWorld: true,
+      maxExportAmountPerTurnToWorld: undefined,
+      maxImportAmountPerTurnFromWorld: undefined,
+      scopeKey: 'none',
+    };
+  }
   const policy = market.worldTradePolicyByResourceId?.[resourceId];
-  if (!policy) return true;
-  const key = direction === 'import' ? 'allowImportFromWorld' : 'allowExportToWorld';
-  const readFlag = (value: { allowImportFromWorld?: boolean; allowExportToWorld?: boolean }) =>
-    value[key] !== false;
-  let allowed = readFlag(policy);
+  if (!policy) {
+    return {
+      allowExportToWorld: true,
+      allowImportFromWorld: true,
+      maxExportAmountPerTurnToWorld: undefined,
+      maxImportAmountPerTurnFromWorld: undefined,
+      scopeKey: 'none',
+    };
+  }
+  let scopeKey = 'all';
+  let resolved = {
+    allowExportToWorld: policy.allowExportToWorld !== false,
+    allowImportFromWorld: policy.allowImportFromWorld !== false,
+    maxExportAmountPerTurnToWorld: normalizeTradeAmountLimit(
+      policy.maxExportAmountPerTurnToWorld,
+    ),
+    maxImportAmountPerTurnFromWorld: normalizeTradeAmountLimit(
+      policy.maxImportAmountPerTurnFromWorld,
+    ),
+  };
   const marketOverride =
     counterpartyMarketId != null
       ? policy.marketOverridesByMarketId?.[counterpartyMarketId]
       : undefined;
   if (marketOverride) {
-    allowed = readFlag(marketOverride);
+    scopeKey = `market:${counterpartyMarketId}`;
+    resolved = {
+      ...resolved,
+      allowExportToWorld: marketOverride.allowExportToWorld !== false,
+      allowImportFromWorld: marketOverride.allowImportFromWorld !== false,
+      maxExportAmountPerTurnToWorld: normalizeTradeAmountLimit(
+        marketOverride.maxExportAmountPerTurnToWorld,
+      ),
+      maxImportAmountPerTurnFromWorld: normalizeTradeAmountLimit(
+        marketOverride.maxImportAmountPerTurnFromWorld,
+      ),
+    };
   }
   const countryOverride =
     counterpartyCountryId != null
       ? policy.countryOverridesByCountryId?.[counterpartyCountryId]
       : undefined;
   if (countryOverride) {
-    allowed = readFlag(countryOverride);
+    scopeKey = `country:${counterpartyCountryId}`;
+    resolved = {
+      ...resolved,
+      allowExportToWorld: countryOverride.allowExportToWorld !== false,
+      allowImportFromWorld: countryOverride.allowImportFromWorld !== false,
+      maxExportAmountPerTurnToWorld: normalizeTradeAmountLimit(
+        countryOverride.maxExportAmountPerTurnToWorld,
+      ),
+      maxImportAmountPerTurnFromWorld: normalizeTradeAmountLimit(
+        countryOverride.maxImportAmountPerTurnFromWorld,
+      ),
+    };
   }
-  return allowed;
+  return {
+    ...resolved,
+    scopeKey,
+  };
 };
+
+const getWorldTradeUsageKey = (
+  marketId: string,
+  resourceId: string,
+  direction: 'import' | 'export',
+  scopeKey: string,
+) => `${marketId}::${resourceId}::${direction}::${scopeKey}`;
 
 const normalizeResourcePrice = (value: unknown, fallback = DEFAULT_RESOURCE_BASE_PRICE) => {
   if (!Number.isFinite(value)) return fallback;
@@ -2130,6 +2178,7 @@ function App() {
         string,
         Record<string, number>
       >();
+      const worldTradeUsedAmountByScope = new Map<string, number>();
 
       Object.entries(prev).forEach(([provinceId, province]) => {
       const nextBuilt = (province.buildingsBuilt ?? []).map((entry) => {
@@ -2320,23 +2369,57 @@ function App() {
             const sellerMarket = seller.ownerCountryId
               ? marketByCountry.get(seller.ownerCountryId)
               : undefined;
+            let buyerWorldTradeImportLimitLeft = Number.POSITIVE_INFINITY;
+            let sellerWorldTradeExportLimitLeft = Number.POSITIVE_INFINITY;
             if (canUseSharedInfrastructure) {
-              const buyerAllowsImport = isWorldTradeAllowedForResource({
+              const buyerWorldPolicy = resolveWorldTradePolicyForResource({
                 market: buyerMarket,
                 resourceId,
-                direction: 'import',
                 counterpartyCountryId: seller.ownerCountryId,
                 counterpartyMarketId: sellerMarket?.id,
               });
-              if (!buyerAllowsImport) continue;
-              const sellerAllowsExport = isWorldTradeAllowedForResource({
+              if (!buyerWorldPolicy.allowImportFromWorld) continue;
+              if (
+                buyerMarket?.id &&
+                buyerWorldPolicy.maxImportAmountPerTurnFromWorld != null
+              ) {
+                const key = getWorldTradeUsageKey(
+                  buyerMarket.id,
+                  resourceId,
+                  'import',
+                  buyerWorldPolicy.scopeKey,
+                );
+                const used = Math.max(0, worldTradeUsedAmountByScope.get(key) ?? 0);
+                buyerWorldTradeImportLimitLeft = Math.max(
+                  0,
+                  buyerWorldPolicy.maxImportAmountPerTurnFromWorld - used,
+                );
+                if (buyerWorldTradeImportLimitLeft <= 0) continue;
+              }
+              const sellerWorldPolicy = resolveWorldTradePolicyForResource({
                 market: sellerMarket,
                 resourceId,
-                direction: 'export',
                 counterpartyCountryId: buyer.ownerCountryId,
                 counterpartyMarketId: buyerMarket?.id,
               });
-              if (!sellerAllowsExport) continue;
+              if (!sellerWorldPolicy.allowExportToWorld) continue;
+              if (
+                sellerMarket?.id &&
+                sellerWorldPolicy.maxExportAmountPerTurnToWorld != null
+              ) {
+                const key = getWorldTradeUsageKey(
+                  sellerMarket.id,
+                  resourceId,
+                  'export',
+                  sellerWorldPolicy.scopeKey,
+                );
+                const used = Math.max(0, worldTradeUsedAmountByScope.get(key) ?? 0);
+                sellerWorldTradeExportLimitLeft = Math.max(
+                  0,
+                  sellerWorldPolicy.maxExportAmountPerTurnToWorld - used,
+                );
+                if (sellerWorldTradeExportLimitLeft <= 0) continue;
+              }
             }
             if (resourceCategoryId) {
               const sellerInfrastructureByCategory =
@@ -2383,6 +2466,9 @@ function App() {
               shortage,
               sellerStock,
               affordable,
+              canUseSharedInfrastructure
+                ? Math.min(buyerWorldTradeImportLimitLeft, sellerWorldTradeExportLimitLeft)
+                : Number.POSITIVE_INFINITY,
               resourceCategoryId
                 ? Math.floor(
                     Math.min(
@@ -2453,6 +2539,44 @@ function App() {
               (sellerRevenueByResourceId[resourceId] ?? 0) + amount * unitPrice,
             );
             seller.entry.lastSalesRevenueByResourceId = sellerRevenueByResourceId;
+            if (canUseSharedInfrastructure) {
+              const buyerWorldPolicy = resolveWorldTradePolicyForResource({
+                market: buyerMarket,
+                resourceId,
+                counterpartyCountryId: seller.ownerCountryId,
+                counterpartyMarketId: sellerMarket?.id,
+              });
+              if (buyerMarket?.id) {
+                const buyerKey = getWorldTradeUsageKey(
+                  buyerMarket.id,
+                  resourceId,
+                  'import',
+                  buyerWorldPolicy.scopeKey,
+                );
+                worldTradeUsedAmountByScope.set(
+                  buyerKey,
+                  Math.max(0, (worldTradeUsedAmountByScope.get(buyerKey) ?? 0) + amount),
+                );
+              }
+              const sellerWorldPolicy = resolveWorldTradePolicyForResource({
+                market: sellerMarket,
+                resourceId,
+                counterpartyCountryId: buyer.ownerCountryId,
+                counterpartyMarketId: buyerMarket?.id,
+              });
+              if (sellerMarket?.id) {
+                const sellerKey = getWorldTradeUsageKey(
+                  sellerMarket.id,
+                  resourceId,
+                  'export',
+                  sellerWorldPolicy.scopeKey,
+                );
+                worldTradeUsedAmountByScope.set(
+                  sellerKey,
+                  Math.max(0, (worldTradeUsedAmountByScope.get(sellerKey) ?? 0) + amount),
+                );
+              }
+            }
             shortage -= amount;
             if (resourceCategoryId) {
               const consumedInfrastructure = amount * infrastructureCostPerUnit;
@@ -3393,6 +3517,12 @@ function App() {
                       policy?.allowExportToWorld === false ? false : undefined,
                     allowImportFromWorld:
                       policy?.allowImportFromWorld === false ? false : undefined,
+                    maxExportAmountPerTurnToWorld: normalizeTradeAmountLimit(
+                      policy?.maxExportAmountPerTurnToWorld,
+                    ),
+                    maxImportAmountPerTurnFromWorld: normalizeTradeAmountLimit(
+                      policy?.maxImportAmountPerTurnFromWorld,
+                    ),
                     countryOverridesByCountryId: Object.fromEntries(
                       Object.entries(policy?.countryOverridesByCountryId ?? {})
                         .filter(([countryId]) => validCountryIds.has(countryId))
@@ -3403,12 +3533,20 @@ function App() {
                               override?.allowExportToWorld === false ? false : undefined,
                             allowImportFromWorld:
                               override?.allowImportFromWorld === false ? false : undefined,
+                            maxExportAmountPerTurnToWorld: normalizeTradeAmountLimit(
+                              override?.maxExportAmountPerTurnToWorld,
+                            ),
+                            maxImportAmountPerTurnFromWorld: normalizeTradeAmountLimit(
+                              override?.maxImportAmountPerTurnFromWorld,
+                            ),
                           },
                         ])
                         .filter(([, override]) =>
                           Boolean(
                             override.allowExportToWorld === false ||
-                              override.allowImportFromWorld === false,
+                              override.allowImportFromWorld === false ||
+                              override.maxExportAmountPerTurnToWorld != null ||
+                              override.maxImportAmountPerTurnFromWorld != null,
                           ),
                         ),
                     ),
@@ -3426,12 +3564,20 @@ function App() {
                               override?.allowExportToWorld === false ? false : undefined,
                             allowImportFromWorld:
                               override?.allowImportFromWorld === false ? false : undefined,
+                            maxExportAmountPerTurnToWorld: normalizeTradeAmountLimit(
+                              override?.maxExportAmountPerTurnToWorld,
+                            ),
+                            maxImportAmountPerTurnFromWorld: normalizeTradeAmountLimit(
+                              override?.maxImportAmountPerTurnFromWorld,
+                            ),
                           },
                         ])
                         .filter(([, override]) =>
                           Boolean(
                             override.allowExportToWorld === false ||
-                              override.allowImportFromWorld === false,
+                              override.allowImportFromWorld === false ||
+                              override.maxExportAmountPerTurnToWorld != null ||
+                              override.maxImportAmountPerTurnFromWorld != null,
                           ),
                         ),
                     ),
@@ -3441,6 +3587,8 @@ function App() {
                   Boolean(
                     policy.allowExportToWorld === false ||
                       policy.allowImportFromWorld === false ||
+                      policy.maxExportAmountPerTurnToWorld != null ||
+                      policy.maxImportAmountPerTurnFromWorld != null ||
                       Object.keys(policy.countryOverridesByCountryId ?? {}).length > 0 ||
                       Object.keys(policy.marketOverridesByMarketId ?? {}).length > 0,
                   ),
@@ -5808,6 +5956,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     policy?: {
       allowExportToWorld?: boolean;
       allowImportFromWorld?: boolean;
+      maxExportAmountPerTurnToWorld?: number;
+      maxImportAmountPerTurnFromWorld?: number;
     },
   ) => {
     if (!actorCountryId || !resourceId) return;
@@ -5823,12 +5973,20 @@ const layerPaint: MapLayerPaint = useMemo(() => {
                 policy.allowExportToWorld === false ? false : undefined,
               allowImportFromWorld:
                 policy.allowImportFromWorld === false ? false : undefined,
+              maxExportAmountPerTurnToWorld: normalizeTradeAmountLimit(
+                policy.maxExportAmountPerTurnToWorld,
+              ),
+              maxImportAmountPerTurnFromWorld: normalizeTradeAmountLimit(
+                policy.maxImportAmountPerTurnFromWorld,
+              ),
             }
           : undefined;
         const hasAnyRestriction = Boolean(
           normalizedPolicy &&
             (normalizedPolicy.allowExportToWorld === false ||
-              normalizedPolicy.allowImportFromWorld === false),
+              normalizedPolicy.allowImportFromWorld === false ||
+              normalizedPolicy.maxExportAmountPerTurnToWorld != null ||
+              normalizedPolicy.maxImportAmountPerTurnFromWorld != null),
         );
         if (targetMode === 'country' && targetId) {
           const nextOverrides = {
@@ -5885,7 +6043,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
 
         const hasBaseRestriction = Boolean(
           currentPolicy.allowExportToWorld === false ||
-            currentPolicy.allowImportFromWorld === false,
+            currentPolicy.allowImportFromWorld === false ||
+            currentPolicy.maxExportAmountPerTurnToWorld != null ||
+            currentPolicy.maxImportAmountPerTurnFromWorld != null,
         );
         const hasCountryOverrides = Object.keys(
           currentPolicy.countryOverridesByCountryId ?? {},

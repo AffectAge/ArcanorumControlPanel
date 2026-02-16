@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  BarChart3,
   ChevronDown,
   Globe2,
   Plus,
@@ -88,6 +87,8 @@ type MarketsModalProps = {
     policy?: {
       allowExportToWorld?: boolean;
       allowImportFromWorld?: boolean;
+      maxExportAmountPerTurnToWorld?: number;
+      maxImportAmountPerTurnFromWorld?: number;
     },
   ) => void;
 };
@@ -317,6 +318,8 @@ export default function MarketsModal({
       {
         allowExportToWorld: boolean;
         allowImportFromWorld: boolean;
+        maxExportAmountPerTurnToWorld: string;
+        maxImportAmountPerTurnFromWorld: string;
       }
     >
   >({});
@@ -329,6 +332,8 @@ export default function MarketsModal({
           {
             allowExportToWorld: boolean;
             allowImportFromWorld: boolean;
+            maxExportAmountPerTurnToWorld: string;
+            maxImportAmountPerTurnFromWorld: string;
           }
         >
       >
@@ -342,6 +347,8 @@ export default function MarketsModal({
           {
             allowExportToWorld: boolean;
             allowImportFromWorld: boolean;
+            maxExportAmountPerTurnToWorld: string;
+            maxImportAmountPerTurnFromWorld: string;
           }
         >
       >
@@ -479,6 +486,8 @@ export default function MarketsModal({
       {
         allowExportToWorld: boolean;
         allowImportFromWorld: boolean;
+        maxExportAmountPerTurnToWorld: string;
+        maxImportAmountPerTurnFromWorld: string;
       }
     > = {};
     const nextByCountry: Record<
@@ -488,6 +497,8 @@ export default function MarketsModal({
         {
           allowExportToWorld: boolean;
           allowImportFromWorld: boolean;
+          maxExportAmountPerTurnToWorld: string;
+          maxImportAmountPerTurnFromWorld: string;
         }
       >
     > = {};
@@ -498,6 +509,8 @@ export default function MarketsModal({
         {
           allowExportToWorld: boolean;
           allowImportFromWorld: boolean;
+          maxExportAmountPerTurnToWorld: string;
+          maxImportAmountPerTurnFromWorld: string;
         }
       >
     > = {};
@@ -506,12 +519,22 @@ export default function MarketsModal({
       nextBase[resource.id] = {
         allowExportToWorld: policy?.allowExportToWorld !== false,
         allowImportFromWorld: policy?.allowImportFromWorld !== false,
+        maxExportAmountPerTurnToWorld:
+          policy?.maxExportAmountPerTurnToWorld != null
+            ? String(policy.maxExportAmountPerTurnToWorld)
+            : '',
+        maxImportAmountPerTurnFromWorld:
+          policy?.maxImportAmountPerTurnFromWorld != null
+            ? String(policy.maxImportAmountPerTurnFromWorld)
+            : '',
       };
       const countryOverrides: Record<
         string,
         {
           allowExportToWorld: boolean;
           allowImportFromWorld: boolean;
+          maxExportAmountPerTurnToWorld: string;
+          maxImportAmountPerTurnFromWorld: string;
         }
       > = {};
       Object.entries(policy?.countryOverridesByCountryId ?? {}).forEach(
@@ -519,6 +542,14 @@ export default function MarketsModal({
           countryOverrides[countryId] = {
             allowExportToWorld: override?.allowExportToWorld !== false,
             allowImportFromWorld: override?.allowImportFromWorld !== false,
+            maxExportAmountPerTurnToWorld:
+              override?.maxExportAmountPerTurnToWorld != null
+                ? String(override.maxExportAmountPerTurnToWorld)
+                : '',
+            maxImportAmountPerTurnFromWorld:
+              override?.maxImportAmountPerTurnFromWorld != null
+                ? String(override.maxImportAmountPerTurnFromWorld)
+                : '',
           };
         },
       );
@@ -530,6 +561,8 @@ export default function MarketsModal({
         {
           allowExportToWorld: boolean;
           allowImportFromWorld: boolean;
+          maxExportAmountPerTurnToWorld: string;
+          maxImportAmountPerTurnFromWorld: string;
         }
       > = {};
       Object.entries(policy?.marketOverridesByMarketId ?? {}).forEach(
@@ -537,6 +570,14 @@ export default function MarketsModal({
           marketOverrides[marketId] = {
             allowExportToWorld: override?.allowExportToWorld !== false,
             allowImportFromWorld: override?.allowImportFromWorld !== false,
+            maxExportAmountPerTurnToWorld:
+              override?.maxExportAmountPerTurnToWorld != null
+                ? String(override.maxExportAmountPerTurnToWorld)
+                : '',
+            maxImportAmountPerTurnFromWorld:
+              override?.maxImportAmountPerTurnFromWorld != null
+                ? String(override.maxImportAmountPerTurnFromWorld)
+                : '',
           };
         },
       );
@@ -615,6 +656,14 @@ export default function MarketsModal({
     const ownMemberIds = new Set(memberMarket.memberCountryIds);
     return countries.filter((country) => !ownMemberIds.has(country.id));
   }, [countries, memberMarket]);
+  const selectedWorldPolicyMarket = useMemo(
+    () => worldPolicyMarketTargets.find((market) => market.id === worldTradePolicyTargetId),
+    [worldPolicyMarketTargets, worldTradePolicyTargetId],
+  );
+  const selectedWorldPolicyCountry = useMemo(
+    () => worldPolicyCountryTargets.find((country) => country.id === worldTradePolicyTargetId),
+    [worldPolicyCountryTargets, worldTradePolicyTargetId],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -742,6 +791,8 @@ export default function MarketsModal({
   const createEmptyWorldTradePolicyDraft = () => ({
     allowExportToWorld: true,
     allowImportFromWorld: true,
+    maxExportAmountPerTurnToWorld: '',
+    maxImportAmountPerTurnFromWorld: '',
   });
 
   const getWorldTradePolicyDraft = (
@@ -771,6 +822,8 @@ export default function MarketsModal({
     patch: Partial<{
       allowExportToWorld: boolean;
       allowImportFromWorld: boolean;
+      maxExportAmountPerTurnToWorld: string;
+      maxImportAmountPerTurnFromWorld: string;
     }>,
   ) => {
     if (targetMode === 'country' && targetId) {
@@ -815,6 +868,10 @@ export default function MarketsModal({
   ) => {
     if (!memberMarket || !activeCountryId) return;
     const draft = getWorldTradePolicyDraft(resourceId, targetMode, targetId);
+    const parseLimit = (raw: string) => {
+      const parsed = Math.max(0, Math.floor(Number(raw)));
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+    };
     onUpdateOwnWorldTradePolicy(
       memberMarket.id,
       activeCountryId,
@@ -824,6 +881,8 @@ export default function MarketsModal({
       {
         allowExportToWorld: draft.allowExportToWorld,
         allowImportFromWorld: draft.allowImportFromWorld,
+        maxExportAmountPerTurnToWorld: parseLimit(draft.maxExportAmountPerTurnToWorld),
+        maxImportAmountPerTurnFromWorld: parseLimit(draft.maxImportAmountPerTurnFromWorld),
       },
     );
   };
@@ -840,18 +899,24 @@ export default function MarketsModal({
         base: {
           allowExportToWorld: true,
           allowImportFromWorld: true,
+          maxExportAmountPerTurnToWorld: undefined as number | undefined,
+          maxImportAmountPerTurnFromWorld: undefined as number | undefined,
         },
         marketOverrides: [] as Array<{
           id: string;
           name: string;
           allowExportToWorld: boolean;
           allowImportFromWorld: boolean;
+          maxExportAmountPerTurnToWorld?: number;
+          maxImportAmountPerTurnFromWorld?: number;
         }>,
         countryOverrides: [] as Array<{
           id: string;
           name: string;
           allowExportToWorld: boolean;
           allowImportFromWorld: boolean;
+          maxExportAmountPerTurnToWorld?: number;
+          maxImportAmountPerTurnFromWorld?: number;
         }>,
       };
     }
@@ -859,6 +924,14 @@ export default function MarketsModal({
     const base = {
       allowExportToWorld: policy?.allowExportToWorld !== false,
       allowImportFromWorld: policy?.allowImportFromWorld !== false,
+      maxExportAmountPerTurnToWorld:
+        policy?.maxExportAmountPerTurnToWorld != null
+          ? Math.max(0, Number(policy.maxExportAmountPerTurnToWorld))
+          : undefined,
+      maxImportAmountPerTurnFromWorld:
+        policy?.maxImportAmountPerTurnFromWorld != null
+          ? Math.max(0, Number(policy.maxImportAmountPerTurnFromWorld))
+          : undefined,
     };
     const marketOverrides = Object.entries(policy?.marketOverridesByMarketId ?? {})
       .map(([id, override]) => ({
@@ -866,10 +939,21 @@ export default function MarketsModal({
         name: markets.find((market) => market.id === id)?.name ?? id,
         allowExportToWorld: override?.allowExportToWorld !== false,
         allowImportFromWorld: override?.allowImportFromWorld !== false,
+        maxExportAmountPerTurnToWorld:
+          override?.maxExportAmountPerTurnToWorld != null
+            ? Math.max(0, Number(override.maxExportAmountPerTurnToWorld))
+            : undefined,
+        maxImportAmountPerTurnFromWorld:
+          override?.maxImportAmountPerTurnFromWorld != null
+            ? Math.max(0, Number(override.maxImportAmountPerTurnFromWorld))
+            : undefined,
       }))
       .filter(
         (item) =>
-          item.allowExportToWorld === false || item.allowImportFromWorld === false,
+          item.allowExportToWorld === false ||
+          item.allowImportFromWorld === false ||
+          item.maxExportAmountPerTurnToWorld != null ||
+          item.maxImportAmountPerTurnFromWorld != null,
       )
       .sort((a, b) => a.name.localeCompare(b.name));
     const countryOverrides = Object.entries(policy?.countryOverridesByCountryId ?? {})
@@ -878,10 +962,21 @@ export default function MarketsModal({
         name: countries.find((country) => country.id === id)?.name ?? id,
         allowExportToWorld: override?.allowExportToWorld !== false,
         allowImportFromWorld: override?.allowImportFromWorld !== false,
+        maxExportAmountPerTurnToWorld:
+          override?.maxExportAmountPerTurnToWorld != null
+            ? Math.max(0, Number(override.maxExportAmountPerTurnToWorld))
+            : undefined,
+        maxImportAmountPerTurnFromWorld:
+          override?.maxImportAmountPerTurnFromWorld != null
+            ? Math.max(0, Number(override.maxImportAmountPerTurnFromWorld))
+            : undefined,
       }))
       .filter(
         (item) =>
-          item.allowExportToWorld === false || item.allowImportFromWorld === false,
+          item.allowExportToWorld === false ||
+          item.allowImportFromWorld === false ||
+          item.maxExportAmountPerTurnToWorld != null ||
+          item.maxImportAmountPerTurnFromWorld != null,
       )
       .sort((a, b) => a.name.localeCompare(b.name));
     return { base, marketOverrides, countryOverrides };
@@ -2206,8 +2301,25 @@ export default function MarketsModal({
                           ))
                         )}
                       </select>
-                      <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
-                    </div>
+                        <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                      </div>
+                      {selectedWorldPolicyMarket && (
+                        <div className="inline-flex items-center gap-2 text-xs text-white/70 mt-1">
+                          {selectedWorldPolicyMarket.logoDataUrl ? (
+                            <img
+                              src={selectedWorldPolicyMarket.logoDataUrl}
+                              alt={selectedWorldPolicyMarket.name}
+                              className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                            />
+                          ) : (
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-white/20"
+                              style={{ backgroundColor: selectedWorldPolicyMarket.color ?? '#64748b' }}
+                            />
+                          )}
+                          {selectedWorldPolicyMarket.name}
+                        </div>
+                      )}
                   </label>
                 )}
                 {worldTradePolicyTargetMode === 'country' && (
@@ -2236,8 +2348,25 @@ export default function MarketsModal({
                           ))
                         )}
                       </select>
-                      <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
-                    </div>
+                        <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                      </div>
+                      {selectedWorldPolicyCountry && (
+                        <div className="inline-flex items-center gap-2 text-xs text-white/70 mt-1">
+                          {selectedWorldPolicyCountry.flagDataUrl ? (
+                            <img
+                              src={selectedWorldPolicyCountry.flagDataUrl}
+                              alt={selectedWorldPolicyCountry.name}
+                              className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                            />
+                          ) : (
+                            <span
+                              className="w-2.5 h-2.5 rounded-full border border-white/20"
+                              style={{ backgroundColor: selectedWorldPolicyCountry.color ?? '#64748b' }}
+                            />
+                          )}
+                          {selectedWorldPolicyCountry.name}
+                        </div>
+                      )}
                   </label>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2319,15 +2448,101 @@ export default function MarketsModal({
                       <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
                     </div>
                   </label>
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    <Tooltip
+                      label="Лимит экспорта за ход"
+                      description="Максимум единиц ресурса, который ваш рынок может продать во внешние сделки за один ход. После достижения лимита экспорт блокируется до следующего хода."
+                      side="bottom"
+                    >
+                      <span className="inline-flex">Лимит экспорта за ход (ед.)</span>
+                    </Tooltip>
+                    <input
+                      type="number"
+                      min={0}
+                      value={
+                        getWorldTradePolicyDraft(
+                          worldTradePolicyModalResource.id,
+                          worldTradePolicyTargetMode,
+                          worldTradePolicyTargetId || undefined,
+                        ).maxExportAmountPerTurnToWorld ?? ''
+                      }
+                      onChange={(event) =>
+                        updateWorldTradePolicyDraft(
+                          worldTradePolicyModalResource.id,
+                          worldTradePolicyTargetMode,
+                          worldTradePolicyTargetId || undefined,
+                          { maxExportAmountPerTurnToWorld: event.target.value },
+                        )
+                      }
+                      disabled={
+                        !canEditOwnMarket ||
+                        ((worldTradePolicyTargetMode === 'country' ||
+                          worldTradePolicyTargetMode === 'market') &&
+                          !worldTradePolicyTargetId)
+                      }
+                      placeholder="Без лимита"
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60 disabled:opacity-70"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    <Tooltip
+                      label="Лимит импорта за ход"
+                      description="Максимум единиц ресурса, который ваш рынок может купить во внешних сделках за один ход. После достижения лимита импорт блокируется до следующего хода."
+                      side="bottom"
+                    >
+                      <span className="inline-flex">Лимит импорта за ход (ед.)</span>
+                    </Tooltip>
+                    <input
+                      type="number"
+                      min={0}
+                      value={
+                        getWorldTradePolicyDraft(
+                          worldTradePolicyModalResource.id,
+                          worldTradePolicyTargetMode,
+                          worldTradePolicyTargetId || undefined,
+                        ).maxImportAmountPerTurnFromWorld ?? ''
+                      }
+                      onChange={(event) =>
+                        updateWorldTradePolicyDraft(
+                          worldTradePolicyModalResource.id,
+                          worldTradePolicyTargetMode,
+                          worldTradePolicyTargetId || undefined,
+                          { maxImportAmountPerTurnFromWorld: event.target.value },
+                        )
+                      }
+                      disabled={
+                        !canEditOwnMarket ||
+                        ((worldTradePolicyTargetMode === 'country' ||
+                          worldTradePolicyTargetMode === 'market') &&
+                          !worldTradePolicyTargetId)
+                      }
+                      placeholder="Без лимита"
+                      className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60 disabled:opacity-70"
+                    />
+                  </label>
                 </div>
                 </div>
                 <div className="min-h-0 overflow-y-auto legend-scroll rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-                  <div className="text-white/85 text-sm font-semibold">Наложенные ограничения</div>
+                  <Tooltip
+                    label="Наложенные ограничения"
+                    description="Приоритет применения: правило по стране выше правила по рынку, а правило по рынку выше общего правила."
+                    side="bottom"
+                  >
+                    <div className="inline-flex text-white/85 text-sm font-semibold">
+                      Наложенные ограничения
+                    </div>
+                  </Tooltip>
                   <div className="text-xs text-white/55">
                     Сводка по активным ограничениям для выбранного товара.
                   </div>
                   <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
-                    <div className="text-xs text-white/75 font-semibold">Общие правила</div>
+                    <Tooltip
+                      label="Общие правила"
+                      description="Базовый уровень. Используется, если нет более точного правила для конкретного рынка или страны."
+                      side="bottom"
+                    >
+                      <div className="inline-flex text-xs text-white/75 font-semibold">Общие правила</div>
+                    </Tooltip>
                     <div className="flex flex-wrap gap-2 text-xs">
                       <span
                         className={
@@ -2347,10 +2562,32 @@ export default function MarketsModal({
                       >
                         Импорт {worldTradePolicyActiveDetails.base.allowImportFromWorld ? 'разрешен' : 'запрещен'}
                       </span>
+                      {worldTradePolicyActiveDetails.base.maxExportAmountPerTurnToWorld != null && (
+                        <span className="px-2 py-1 rounded-md border border-sky-400/30 bg-sky-500/10 text-sky-200">
+                          Лимит экспорта: {formatCompactNumber(
+                            worldTradePolicyActiveDetails.base.maxExportAmountPerTurnToWorld,
+                            0,
+                          )}
+                        </span>
+                      )}
+                      {worldTradePolicyActiveDetails.base.maxImportAmountPerTurnFromWorld != null && (
+                        <span className="px-2 py-1 rounded-md border border-sky-400/30 bg-sky-500/10 text-sky-200">
+                          Лимит импорта: {formatCompactNumber(
+                            worldTradePolicyActiveDetails.base.maxImportAmountPerTurnFromWorld,
+                            0,
+                          )}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
-                    <div className="text-xs text-white/75 font-semibold">По рынкам</div>
+                    <Tooltip
+                      label="По рынкам"
+                      description="Средний приоритет. Переопределяет общее правило, но уступает персональному правилу по стране."
+                      side="bottom"
+                    >
+                      <div className="inline-flex text-xs text-white/75 font-semibold">По рынкам</div>
+                    </Tooltip>
                     {worldTradePolicyActiveDetails.marketOverrides.length === 0 ? (
                       <div className="text-xs text-white/45">Нет ограничений по рынкам.</div>
                     ) : (
@@ -2360,7 +2597,24 @@ export default function MarketsModal({
                             key={`world-policy-market-summary:${item.id}`}
                             className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5"
                           >
-                            <span className="text-xs text-white/75">{item.name}</span>
+                            <span className="inline-flex items-center gap-2 text-xs text-white/75">
+                              {markets.find((market) => market.id === item.id)?.logoDataUrl ? (
+                                <img
+                                  src={markets.find((market) => market.id === item.id)?.logoDataUrl}
+                                  alt={item.name}
+                                  className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                                />
+                              ) : (
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-white/20"
+                                  style={{
+                                    backgroundColor:
+                                      markets.find((market) => market.id === item.id)?.color ?? '#64748b',
+                                  }}
+                                />
+                              )}
+                              {item.name}
+                            </span>
                             <span className="flex flex-wrap gap-1.5 text-[11px]">
                               <span
                                 className={
@@ -2380,6 +2634,28 @@ export default function MarketsModal({
                               >
                                 Импорт {item.allowImportFromWorld ? 'разрешен' : 'запрещен'}
                               </span>
+                              {item.maxExportAmountPerTurnToWorld != null && (
+                                <Tooltip
+                                  label="Лимит экспорта"
+                                  description="Ограничение действует на суммарный внешний экспорт вашего рынка за один ход для этого ресурса."
+                                  side="bottom"
+                                >
+                                  <span className="px-1.5 py-0.5 rounded border border-sky-400/25 bg-sky-500/10 text-sky-200">
+                                    Лимит экспорта {formatCompactNumber(item.maxExportAmountPerTurnToWorld, 0)}
+                                  </span>
+                                </Tooltip>
+                              )}
+                              {item.maxImportAmountPerTurnFromWorld != null && (
+                                <Tooltip
+                                  label="Лимит импорта"
+                                  description="Ограничение действует на суммарный внешний импорт вашего рынка за один ход для этого ресурса."
+                                  side="bottom"
+                                >
+                                  <span className="px-1.5 py-0.5 rounded border border-sky-400/25 bg-sky-500/10 text-sky-200">
+                                    Лимит импорта {formatCompactNumber(item.maxImportAmountPerTurnFromWorld, 0)}
+                                  </span>
+                                </Tooltip>
+                              )}
                             </span>
                           </div>
                         ))}
@@ -2387,7 +2663,13 @@ export default function MarketsModal({
                     )}
                   </div>
                   <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
-                    <div className="text-xs text-white/75 font-semibold">По странам</div>
+                    <Tooltip
+                      label="По странам"
+                      description="Высший приоритет. Если для страны задано правило, оно перекрывает и правила по рынку, и общие правила."
+                      side="bottom"
+                    >
+                      <div className="inline-flex text-xs text-white/75 font-semibold">По странам</div>
+                    </Tooltip>
                     {worldTradePolicyActiveDetails.countryOverrides.length === 0 ? (
                       <div className="text-xs text-white/45">Нет ограничений по странам.</div>
                     ) : (
@@ -2397,7 +2679,24 @@ export default function MarketsModal({
                             key={`world-policy-country-summary:${item.id}`}
                             className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5"
                           >
-                            <span className="text-xs text-white/75">{item.name}</span>
+                            <span className="inline-flex items-center gap-2 text-xs text-white/75">
+                              {countries.find((country) => country.id === item.id)?.flagDataUrl ? (
+                                <img
+                                  src={countries.find((country) => country.id === item.id)?.flagDataUrl}
+                                  alt={item.name}
+                                  className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                                />
+                              ) : (
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border border-white/20"
+                                  style={{
+                                    backgroundColor:
+                                      countries.find((country) => country.id === item.id)?.color ?? '#64748b',
+                                  }}
+                                />
+                              )}
+                              {item.name}
+                            </span>
                             <span className="flex flex-wrap gap-1.5 text-[11px]">
                               <span
                                 className={
@@ -2417,6 +2716,28 @@ export default function MarketsModal({
                               >
                                 Импорт {item.allowImportFromWorld ? 'разрешен' : 'запрещен'}
                               </span>
+                              {item.maxExportAmountPerTurnToWorld != null && (
+                                <Tooltip
+                                  label="Лимит экспорта"
+                                  description="Ограничение действует на суммарный внешний экспорт вашего рынка за один ход для этого ресурса."
+                                  side="bottom"
+                                >
+                                  <span className="px-1.5 py-0.5 rounded border border-sky-400/25 bg-sky-500/10 text-sky-200">
+                                    Лимит экспорта {formatCompactNumber(item.maxExportAmountPerTurnToWorld, 0)}
+                                  </span>
+                                </Tooltip>
+                              )}
+                              {item.maxImportAmountPerTurnFromWorld != null && (
+                                <Tooltip
+                                  label="Лимит импорта"
+                                  description="Ограничение действует на суммарный внешний импорт вашего рынка за один ход для этого ресурса."
+                                  side="bottom"
+                                >
+                                  <span className="px-1.5 py-0.5 rounded border border-sky-400/25 bg-sky-500/10 text-sky-200">
+                                    Лимит импорта {formatCompactNumber(item.maxImportAmountPerTurnFromWorld, 0)}
+                                  </span>
+                                </Tooltip>
+                              )}
                             </span>
                           </div>
                         ))}

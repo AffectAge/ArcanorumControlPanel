@@ -168,11 +168,15 @@ export type MarketTradePolicyByCountryId = Record<
 export type MarketWorldTradePolicyOverride = {
   allowExportToWorld?: boolean;
   allowImportFromWorld?: boolean;
+  maxExportAmountPerTurnToWorld?: number;
+  maxImportAmountPerTurnFromWorld?: number;
 };
 
 export type MarketWorldResourceTradePolicy = {
   allowExportToWorld?: boolean;
   allowImportFromWorld?: boolean;
+  maxExportAmountPerTurnToWorld?: number;
+  maxImportAmountPerTurnFromWorld?: number;
   countryOverridesByCountryId?: Record<string, MarketWorldTradePolicyOverride>;
   marketOverridesByMarketId?: Record<string, MarketWorldTradePolicyOverride>;
 };
