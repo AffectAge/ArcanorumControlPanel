@@ -102,6 +102,44 @@ const normalizeTradeAmountLimit = (value: unknown): number | undefined => {
   return safe > 0 ? safe : undefined;
 };
 
+const isWorldTradeAllowedForResource = (params: {
+  market?: Market;
+  resourceId: string;
+  direction: 'import' | 'export';
+  counterpartyCountryId?: string;
+  counterpartyMarketId?: string;
+}) => {
+  const {
+    market,
+    resourceId,
+    direction,
+    counterpartyCountryId,
+    counterpartyMarketId,
+  } = params;
+  if (!market) return true;
+  const policy = market.worldTradePolicyByResourceId?.[resourceId];
+  if (!policy) return true;
+  const key = direction === 'import' ? 'allowImportFromWorld' : 'allowExportToWorld';
+  const readFlag = (value: { allowImportFromWorld?: boolean; allowExportToWorld?: boolean }) =>
+    value[key] !== false;
+  let allowed = readFlag(policy);
+  const marketOverride =
+    counterpartyMarketId != null
+      ? policy.marketOverridesByMarketId?.[counterpartyMarketId]
+      : undefined;
+  if (marketOverride) {
+    allowed = readFlag(marketOverride);
+  }
+  const countryOverride =
+    counterpartyCountryId != null
+      ? policy.countryOverridesByCountryId?.[counterpartyCountryId]
+      : undefined;
+  if (countryOverride) {
+    allowed = readFlag(countryOverride);
+  }
+  return allowed;
+};
+
 const normalizeResourcePrice = (value: unknown, fallback = DEFAULT_RESOURCE_BASE_PRICE) => {
   if (!Number.isFinite(value)) return fallback;
   return Math.max(0.01, Number(value));
@@ -1053,6 +1091,7 @@ function App() {
             payload.allowInfrastructureAccessWithoutTreaties,
           ),
           resourceTradePolicyByCountryId: {},
+          worldTradePolicyByResourceId: {},
           memberCountryIds: members,
           warehouseByResourceId: {},
           priceByResourceId: Object.fromEntries(
@@ -2281,6 +2320,24 @@ function App() {
             const sellerMarket = seller.ownerCountryId
               ? marketByCountry.get(seller.ownerCountryId)
               : undefined;
+            if (canUseSharedInfrastructure) {
+              const buyerAllowsImport = isWorldTradeAllowedForResource({
+                market: buyerMarket,
+                resourceId,
+                direction: 'import',
+                counterpartyCountryId: seller.ownerCountryId,
+                counterpartyMarketId: sellerMarket?.id,
+              });
+              if (!buyerAllowsImport) continue;
+              const sellerAllowsExport = isWorldTradeAllowedForResource({
+                market: sellerMarket,
+                resourceId,
+                direction: 'export',
+                counterpartyCountryId: buyer.ownerCountryId,
+                counterpartyMarketId: buyerMarket?.id,
+              });
+              if (!sellerAllowsExport) continue;
+            }
             if (resourceCategoryId) {
               const sellerInfrastructureByCategory =
                 remainingBuyerInfrastructureByProvinceIdAndCategory.get(seller.provinceId) ?? {
@@ -3325,6 +3382,69 @@ function App() {
                   ),
                 ])
                 .filter(([, byResource]) => Object.keys(byResource).length > 0),
+            ),
+            worldTradePolicyByResourceId: Object.fromEntries(
+              Object.entries(market.worldTradePolicyByResourceId ?? {})
+                .filter(([resourceId]) => validResourceIds.has(resourceId))
+                .map(([resourceId, policy]) => [
+                  resourceId,
+                  {
+                    allowExportToWorld:
+                      policy?.allowExportToWorld === false ? false : undefined,
+                    allowImportFromWorld:
+                      policy?.allowImportFromWorld === false ? false : undefined,
+                    countryOverridesByCountryId: Object.fromEntries(
+                      Object.entries(policy?.countryOverridesByCountryId ?? {})
+                        .filter(([countryId]) => validCountryIds.has(countryId))
+                        .map(([countryId, override]) => [
+                          countryId,
+                          {
+                            allowExportToWorld:
+                              override?.allowExportToWorld === false ? false : undefined,
+                            allowImportFromWorld:
+                              override?.allowImportFromWorld === false ? false : undefined,
+                          },
+                        ])
+                        .filter(([, override]) =>
+                          Boolean(
+                            override.allowExportToWorld === false ||
+                              override.allowImportFromWorld === false,
+                          ),
+                        ),
+                    ),
+                    marketOverridesByMarketId: Object.fromEntries(
+                      Object.entries(policy?.marketOverridesByMarketId ?? {})
+                        .filter(([otherMarketId]) =>
+                          (save.data.markets ?? []).some(
+                            (entry) => entry.id === otherMarketId,
+                          ),
+                        )
+                        .map(([otherMarketId, override]) => [
+                          otherMarketId,
+                          {
+                            allowExportToWorld:
+                              override?.allowExportToWorld === false ? false : undefined,
+                            allowImportFromWorld:
+                              override?.allowImportFromWorld === false ? false : undefined,
+                          },
+                        ])
+                        .filter(([, override]) =>
+                          Boolean(
+                            override.allowExportToWorld === false ||
+                              override.allowImportFromWorld === false,
+                          ),
+                        ),
+                    ),
+                  },
+                ])
+                .filter(([, policy]) =>
+                  Boolean(
+                    policy.allowExportToWorld === false ||
+                      policy.allowImportFromWorld === false ||
+                      Object.keys(policy.countryOverridesByCountryId ?? {}).length > 0 ||
+                      Object.keys(policy.marketOverridesByMarketId ?? {}).length > 0,
+                  ),
+                ),
             ),
             memberCountryIds: members,
             warehouseByResourceId: Object.fromEntries(
@@ -5679,6 +5799,114 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     });
   };
 
+  const updateOwnMarketWorldTradePolicyResource = (
+    marketId: string,
+    actorCountryId: string | undefined,
+    resourceId: string,
+    targetMode: 'all' | 'market' | 'country',
+    targetId: string | undefined,
+    policy?: {
+      allowExportToWorld?: boolean;
+      allowImportFromWorld?: boolean;
+    },
+  ) => {
+    if (!actorCountryId || !resourceId) return;
+    setMarkets((prev) =>
+      prev.map((market) => {
+        if (market.id !== marketId) return market;
+        if (market.creatorCountryId !== actorCountryId) return market;
+        const nextByResource = { ...(market.worldTradePolicyByResourceId ?? {}) };
+        const currentPolicy = { ...(nextByResource[resourceId] ?? {}) };
+        const normalizedPolicy = policy
+          ? {
+              allowExportToWorld:
+                policy.allowExportToWorld === false ? false : undefined,
+              allowImportFromWorld:
+                policy.allowImportFromWorld === false ? false : undefined,
+            }
+          : undefined;
+        const hasAnyRestriction = Boolean(
+          normalizedPolicy &&
+            (normalizedPolicy.allowExportToWorld === false ||
+              normalizedPolicy.allowImportFromWorld === false),
+        );
+        if (targetMode === 'country' && targetId) {
+          const nextOverrides = {
+            ...(currentPolicy.countryOverridesByCountryId ?? {}),
+          };
+          if (hasAnyRestriction && normalizedPolicy) {
+            nextOverrides[targetId] = normalizedPolicy;
+          } else {
+            delete nextOverrides[targetId];
+          }
+          if (Object.keys(nextOverrides).length > 0) {
+            currentPolicy.countryOverridesByCountryId = nextOverrides;
+          } else {
+            delete currentPolicy.countryOverridesByCountryId;
+          }
+        } else if (targetMode === 'market' && targetId) {
+          const nextOverrides = {
+            ...(currentPolicy.marketOverridesByMarketId ?? {}),
+          };
+          if (hasAnyRestriction && normalizedPolicy) {
+            nextOverrides[targetId] = normalizedPolicy;
+          } else {
+            delete nextOverrides[targetId];
+          }
+          if (Object.keys(nextOverrides).length > 0) {
+            currentPolicy.marketOverridesByMarketId = nextOverrides;
+          } else {
+            delete currentPolicy.marketOverridesByMarketId;
+          }
+        } else {
+          const nextBase = hasAnyRestriction && normalizedPolicy ? normalizedPolicy : {};
+          const currentCountryOverrides = currentPolicy.countryOverridesByCountryId;
+          const currentMarketOverrides = currentPolicy.marketOverridesByMarketId;
+          const mergedPolicy = {
+            ...nextBase,
+            ...(currentCountryOverrides && Object.keys(currentCountryOverrides).length > 0
+              ? { countryOverridesByCountryId: currentCountryOverrides }
+              : {}),
+            ...(currentMarketOverrides && Object.keys(currentMarketOverrides).length > 0
+              ? { marketOverridesByMarketId: currentMarketOverrides }
+              : {}),
+          };
+          if (Object.keys(mergedPolicy).length > 0) {
+            nextByResource[resourceId] = mergedPolicy;
+          } else {
+            delete nextByResource[resourceId];
+          }
+          return {
+            ...market,
+            worldTradePolicyByResourceId:
+              Object.keys(nextByResource).length > 0 ? nextByResource : undefined,
+          };
+        }
+
+        const hasBaseRestriction = Boolean(
+          currentPolicy.allowExportToWorld === false ||
+            currentPolicy.allowImportFromWorld === false,
+        );
+        const hasCountryOverrides = Object.keys(
+          currentPolicy.countryOverridesByCountryId ?? {},
+        ).length > 0;
+        const hasMarketOverrides = Object.keys(
+          currentPolicy.marketOverridesByMarketId ?? {},
+        ).length > 0;
+        if (hasBaseRestriction || hasCountryOverrides || hasMarketOverrides) {
+          nextByResource[resourceId] = currentPolicy;
+        } else {
+          delete nextByResource[resourceId];
+        }
+        return {
+          ...market,
+          worldTradePolicyByResourceId:
+            Object.keys(nextByResource).length > 0 ? nextByResource : undefined,
+        };
+      }),
+    );
+  };
+
   const acceptDiplomacyProposal = (proposalId: string) => {
     const proposal = diplomacyProposals.find((entry) => entry.id === proposalId);
     if (!proposal) return;
@@ -7927,6 +8155,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onInviteByTreaty={inviteCountryToMarketByTreaty}
         onRequestJoinMarket={requestJoinMarketByTreaty}
         onUpdateOwnTradePolicy={updateOwnMarketTradePolicyResource}
+        onUpdateOwnWorldTradePolicy={updateOwnMarketWorldTradePolicyResource}
       />
 
       <HotseatPanel

@@ -165,6 +165,23 @@ export type MarketTradePolicyByCountryId = Record<
   Record<string, MarketResourceTradePolicy>
 >;
 
+export type MarketWorldTradePolicyOverride = {
+  allowExportToWorld?: boolean;
+  allowImportFromWorld?: boolean;
+};
+
+export type MarketWorldResourceTradePolicy = {
+  allowExportToWorld?: boolean;
+  allowImportFromWorld?: boolean;
+  countryOverridesByCountryId?: Record<string, MarketWorldTradePolicyOverride>;
+  marketOverridesByMarketId?: Record<string, MarketWorldTradePolicyOverride>;
+};
+
+export type MarketWorldTradePolicyByResourceId = Record<
+  string,
+  MarketWorldResourceTradePolicy
+>;
+
 export type Market = {
   id: string;
   name: string;
@@ -174,6 +191,7 @@ export type Market = {
   logoDataUrl?: string;
   allowInfrastructureAccessWithoutTreaties?: boolean;
   resourceTradePolicyByCountryId?: MarketTradePolicyByCountryId;
+  worldTradePolicyByResourceId?: MarketWorldTradePolicyByResourceId;
   memberCountryIds: string[];
   warehouseByResourceId?: Record<string, number>;
   priceByResourceId?: Record<string, number>;

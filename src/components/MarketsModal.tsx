@@ -79,6 +79,17 @@ type MarketsModalProps = {
       maxImportAmountPerTurnFromMarketMembers?: number;
     },
   ) => void;
+  onUpdateOwnWorldTradePolicy: (
+    marketId: string,
+    actorCountryId: string | undefined,
+    resourceId: string,
+    targetMode: 'all' | 'market' | 'country',
+    targetId: string | undefined,
+    policy?: {
+      allowExportToWorld?: boolean;
+      allowImportFromWorld?: boolean;
+    },
+  ) => void;
 };
 
 type MarketsTab = 'market' | 'goods' | 'world';
@@ -252,6 +263,7 @@ export default function MarketsModal({
   onInviteByTreaty,
   onRequestJoinMarket,
   onUpdateOwnTradePolicy,
+  onUpdateOwnWorldTradePolicy,
 }: MarketsModalProps) {
   const [tab, setTab] = useState<MarketsTab>('market');
   const [newMarketName, setNewMarketName] = useState('');
@@ -266,6 +278,13 @@ export default function MarketsModal({
   >(undefined);
   const [tradePolicyModalTargetCountryId, setTradePolicyModalTargetCountryId] =
     useState<string>('');
+  const [worldTradePolicyModalResourceId, setWorldTradePolicyModalResourceId] = useState<
+    string | undefined
+  >(undefined);
+  const [worldTradePolicyTargetMode, setWorldTradePolicyTargetMode] = useState<
+    'all' | 'market' | 'country'
+  >('all');
+  const [worldTradePolicyTargetId, setWorldTradePolicyTargetId] = useState<string>('');
   const [tradePolicyDraftByResourceId, setTradePolicyDraftByResourceId] = useState<
     Record<
       string,
@@ -288,6 +307,41 @@ export default function MarketsModal({
             allowImportFromMarketMembers: boolean;
             maxExportAmountPerTurnToMarketMembers: string;
             maxImportAmountPerTurnFromMarketMembers: string;
+          }
+        >
+      >
+    >({});
+  const [worldTradePolicyDraftByResourceId, setWorldTradePolicyDraftByResourceId] = useState<
+    Record<
+      string,
+      {
+        allowExportToWorld: boolean;
+        allowImportFromWorld: boolean;
+      }
+    >
+  >({});
+  const [worldTradePolicyDraftByResourceAndCountryId, setWorldTradePolicyDraftByResourceAndCountryId] =
+    useState<
+      Record<
+        string,
+        Record<
+          string,
+          {
+            allowExportToWorld: boolean;
+            allowImportFromWorld: boolean;
+          }
+        >
+      >
+    >({});
+  const [worldTradePolicyDraftByResourceAndMarketId, setWorldTradePolicyDraftByResourceAndMarketId] =
+    useState<
+      Record<
+        string,
+        Record<
+          string,
+          {
+            allowExportToWorld: boolean;
+            allowImportFromWorld: boolean;
           }
         >
       >
@@ -413,6 +467,88 @@ export default function MarketsModal({
     setTradePolicyDraftByResourceAndCountryId(nextByResourceAndCountry);
   }, [open, memberMarket, activeCountryId, resources]);
 
+  useEffect(() => {
+    if (!open || !memberMarket) {
+      setWorldTradePolicyDraftByResourceId({});
+      setWorldTradePolicyDraftByResourceAndCountryId({});
+      setWorldTradePolicyDraftByResourceAndMarketId({});
+      return;
+    }
+    const nextBase: Record<
+      string,
+      {
+        allowExportToWorld: boolean;
+        allowImportFromWorld: boolean;
+      }
+    > = {};
+    const nextByCountry: Record<
+      string,
+      Record<
+        string,
+        {
+          allowExportToWorld: boolean;
+          allowImportFromWorld: boolean;
+        }
+      >
+    > = {};
+    const nextByMarket: Record<
+      string,
+      Record<
+        string,
+        {
+          allowExportToWorld: boolean;
+          allowImportFromWorld: boolean;
+        }
+      >
+    > = {};
+    resources.forEach((resource) => {
+      const policy = memberMarket.worldTradePolicyByResourceId?.[resource.id];
+      nextBase[resource.id] = {
+        allowExportToWorld: policy?.allowExportToWorld !== false,
+        allowImportFromWorld: policy?.allowImportFromWorld !== false,
+      };
+      const countryOverrides: Record<
+        string,
+        {
+          allowExportToWorld: boolean;
+          allowImportFromWorld: boolean;
+        }
+      > = {};
+      Object.entries(policy?.countryOverridesByCountryId ?? {}).forEach(
+        ([countryId, override]) => {
+          countryOverrides[countryId] = {
+            allowExportToWorld: override?.allowExportToWorld !== false,
+            allowImportFromWorld: override?.allowImportFromWorld !== false,
+          };
+        },
+      );
+      if (Object.keys(countryOverrides).length > 0) {
+        nextByCountry[resource.id] = countryOverrides;
+      }
+      const marketOverrides: Record<
+        string,
+        {
+          allowExportToWorld: boolean;
+          allowImportFromWorld: boolean;
+        }
+      > = {};
+      Object.entries(policy?.marketOverridesByMarketId ?? {}).forEach(
+        ([marketId, override]) => {
+          marketOverrides[marketId] = {
+            allowExportToWorld: override?.allowExportToWorld !== false,
+            allowImportFromWorld: override?.allowImportFromWorld !== false,
+          };
+        },
+      );
+      if (Object.keys(marketOverrides).length > 0) {
+        nextByMarket[resource.id] = marketOverrides;
+      }
+    });
+    setWorldTradePolicyDraftByResourceId(nextBase);
+    setWorldTradePolicyDraftByResourceAndCountryId(nextByCountry);
+    setWorldTradePolicyDraftByResourceAndMarketId(nextByMarket);
+  }, [open, memberMarket, resources]);
+
   const assignedMarketByCountry = useMemo(() => {
     const map = new Map<string, string>();
     markets.forEach((market) => {
@@ -468,6 +604,45 @@ export default function MarketsModal({
       return Boolean(market.leaderCountryId);
     });
   }, [markets, activeCountryId, memberMarket]);
+
+  const worldPolicyMarketTargets = useMemo(() => {
+    if (!memberMarket) return [] as Market[];
+    return markets.filter((market) => market.id !== memberMarket.id);
+  }, [markets, memberMarket]);
+
+  const worldPolicyCountryTargets = useMemo(() => {
+    if (!memberMarket) return [] as Country[];
+    const ownMemberIds = new Set(memberMarket.memberCountryIds);
+    return countries.filter((country) => !ownMemberIds.has(country.id));
+  }, [countries, memberMarket]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (worldTradePolicyTargetMode === 'market') {
+      const firstMarketId = worldPolicyMarketTargets[0]?.id ?? '';
+      setWorldTradePolicyTargetId((prev) =>
+        prev && worldPolicyMarketTargets.some((market) => market.id === prev)
+          ? prev
+          : firstMarketId,
+      );
+      return;
+    }
+    if (worldTradePolicyTargetMode === 'country') {
+      const firstCountryId = worldPolicyCountryTargets[0]?.id ?? '';
+      setWorldTradePolicyTargetId((prev) =>
+        prev && worldPolicyCountryTargets.some((country) => country.id === prev)
+          ? prev
+          : firstCountryId,
+      );
+      return;
+    }
+    setWorldTradePolicyTargetId('');
+  }, [
+    open,
+    worldTradePolicyTargetMode,
+    worldPolicyMarketTargets,
+    worldPolicyCountryTargets,
+  ]);
 
   const canCreateMarket = Boolean(
     activeCountryId &&
@@ -563,9 +738,154 @@ export default function MarketsModal({
       },
     );
   };
+
+  const createEmptyWorldTradePolicyDraft = () => ({
+    allowExportToWorld: true,
+    allowImportFromWorld: true,
+  });
+
+  const getWorldTradePolicyDraft = (
+    resourceId: string,
+    targetMode: 'all' | 'market' | 'country',
+    targetId?: string,
+  ) => {
+    if (targetMode === 'country' && targetId) {
+      return (
+        worldTradePolicyDraftByResourceAndCountryId[resourceId]?.[targetId] ??
+        createEmptyWorldTradePolicyDraft()
+      );
+    }
+    if (targetMode === 'market' && targetId) {
+      return (
+        worldTradePolicyDraftByResourceAndMarketId[resourceId]?.[targetId] ??
+        createEmptyWorldTradePolicyDraft()
+      );
+    }
+    return worldTradePolicyDraftByResourceId[resourceId] ?? createEmptyWorldTradePolicyDraft();
+  };
+
+  const updateWorldTradePolicyDraft = (
+    resourceId: string,
+    targetMode: 'all' | 'market' | 'country',
+    targetId: string | undefined,
+    patch: Partial<{
+      allowExportToWorld: boolean;
+      allowImportFromWorld: boolean;
+    }>,
+  ) => {
+    if (targetMode === 'country' && targetId) {
+      setWorldTradePolicyDraftByResourceAndCountryId((prev) => ({
+        ...prev,
+        [resourceId]: {
+          ...(prev[resourceId] ?? {}),
+          [targetId]: {
+            ...(prev[resourceId]?.[targetId] ?? createEmptyWorldTradePolicyDraft()),
+            ...patch,
+          },
+        },
+      }));
+      return;
+    }
+    if (targetMode === 'market' && targetId) {
+      setWorldTradePolicyDraftByResourceAndMarketId((prev) => ({
+        ...prev,
+        [resourceId]: {
+          ...(prev[resourceId] ?? {}),
+          [targetId]: {
+            ...(prev[resourceId]?.[targetId] ?? createEmptyWorldTradePolicyDraft()),
+            ...patch,
+          },
+        },
+      }));
+      return;
+    }
+    setWorldTradePolicyDraftByResourceId((prev) => ({
+      ...prev,
+      [resourceId]: {
+        ...(prev[resourceId] ?? createEmptyWorldTradePolicyDraft()),
+        ...patch,
+      },
+    }));
+  };
+
+  const saveWorldTradePolicyForResource = (
+    resourceId: string,
+    targetMode: 'all' | 'market' | 'country',
+    targetId?: string,
+  ) => {
+    if (!memberMarket || !activeCountryId) return;
+    const draft = getWorldTradePolicyDraft(resourceId, targetMode, targetId);
+    onUpdateOwnWorldTradePolicy(
+      memberMarket.id,
+      activeCountryId,
+      resourceId,
+      targetMode,
+      targetId,
+      {
+        allowExportToWorld: draft.allowExportToWorld,
+        allowImportFromWorld: draft.allowImportFromWorld,
+      },
+    );
+  };
+
   const tradePolicyModalResource = resources.find(
     (resource) => resource.id === tradePolicyModalResourceId,
   );
+  const worldTradePolicyModalResource = resources.find(
+    (resource) => resource.id === worldTradePolicyModalResourceId,
+  );
+  const worldTradePolicyActiveDetails = useMemo(() => {
+    if (!memberMarket || !worldTradePolicyModalResource) {
+      return {
+        base: {
+          allowExportToWorld: true,
+          allowImportFromWorld: true,
+        },
+        marketOverrides: [] as Array<{
+          id: string;
+          name: string;
+          allowExportToWorld: boolean;
+          allowImportFromWorld: boolean;
+        }>,
+        countryOverrides: [] as Array<{
+          id: string;
+          name: string;
+          allowExportToWorld: boolean;
+          allowImportFromWorld: boolean;
+        }>,
+      };
+    }
+    const policy = memberMarket.worldTradePolicyByResourceId?.[worldTradePolicyModalResource.id];
+    const base = {
+      allowExportToWorld: policy?.allowExportToWorld !== false,
+      allowImportFromWorld: policy?.allowImportFromWorld !== false,
+    };
+    const marketOverrides = Object.entries(policy?.marketOverridesByMarketId ?? {})
+      .map(([id, override]) => ({
+        id,
+        name: markets.find((market) => market.id === id)?.name ?? id,
+        allowExportToWorld: override?.allowExportToWorld !== false,
+        allowImportFromWorld: override?.allowImportFromWorld !== false,
+      }))
+      .filter(
+        (item) =>
+          item.allowExportToWorld === false || item.allowImportFromWorld === false,
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const countryOverrides = Object.entries(policy?.countryOverridesByCountryId ?? {})
+      .map(([id, override]) => ({
+        id,
+        name: countries.find((country) => country.id === id)?.name ?? id,
+        allowExportToWorld: override?.allowExportToWorld !== false,
+        allowImportFromWorld: override?.allowImportFromWorld !== false,
+      }))
+      .filter(
+        (item) =>
+          item.allowExportToWorld === false || item.allowImportFromWorld === false,
+      )
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { base, marketOverrides, countryOverrides };
+  }, [memberMarket, worldTradePolicyModalResource, markets, countries]);
 
   const goodsStats = useMemo(() => {
     const memberSet = new Set(memberMarket?.memberCountryIds ?? []);
@@ -1706,20 +2026,35 @@ export default function MarketsModal({
                         className="w-full rounded-xl border border-white/10 bg-black/30 p-3"
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="inline-flex items-center gap-2 text-white/90">
-                            {row.resourceIconDataUrl ? (
-                              <img
-                                src={row.resourceIconDataUrl}
-                                alt={row.resourceName}
-                                className="w-4 h-4 rounded-sm border border-white/15 object-cover"
-                              />
-                            ) : (
-                              <span
-                                className="w-2.5 h-2.5 rounded-full"
-                                style={{ backgroundColor: row.resourceColor }}
-                              />
+                          <div className="space-y-2">
+                            <div className="inline-flex items-center gap-2 text-white/90">
+                              {row.resourceIconDataUrl ? (
+                                <img
+                                  src={row.resourceIconDataUrl}
+                                  alt={row.resourceName}
+                                  className="w-4 h-4 rounded-sm border border-white/15 object-cover"
+                                />
+                              ) : (
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: row.resourceColor }}
+                                />
+                              )}
+                              <span className="text-sm">{row.resourceName}</span>
+                            </div>
+                            {memberMarket && activeCountryId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setWorldTradePolicyModalResourceId(row.resourceId);
+                                  setWorldTradePolicyTargetMode('all');
+                                  setWorldTradePolicyTargetId('');
+                                }}
+                                className="h-7 px-2.5 rounded-md border border-sky-400/35 bg-sky-500/10 text-sky-200 text-xs hover:bg-sky-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
+                              >
+                                Ограничения импорта/экспорта
+                              </button>
                             )}
-                            <span className="text-sm">{row.resourceName}</span>
                           </div>
                           <div className="flex flex-wrap items-center justify-end gap-2">
                             <MiniGraphCard
@@ -1793,6 +2128,338 @@ export default function MarketsModal({
             )}
           </div>
         </div>
+        {memberMarket && activeCountryId && worldTradePolicyModalResource && (
+          <div className="fixed inset-0 z-[94] bg-black/75 backdrop-blur-sm">
+            <div className="absolute inset-3 rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden flex flex-col">
+              <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                <div className="text-white text-base font-semibold">
+                  Ограничения мирового рынка: {worldTradePolicyModalResource.name}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorldTradePolicyModalResourceId(undefined);
+                    setWorldTradePolicyTargetMode('all');
+                    setWorldTradePolicyTargetId('');
+                  }}
+                  className="h-8 w-8 rounded-md border border-white/10 bg-black/30 text-white/70 inline-flex items-center justify-center hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 p-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="min-h-0 overflow-y-auto legend-scroll rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+                {!canEditOwnMarket && (
+                  <div className="text-[11px] text-amber-200/80 rounded-md border border-amber-400/30 bg-amber-500/10 px-2 py-1.5">
+                    Режим просмотра: менять настройки может только создатель рынка.
+                  </div>
+                )}
+                <label className="flex flex-col gap-1 text-white/70 text-sm">
+                  Тип ограничения
+                  <div className="relative">
+                    <select
+                      value={worldTradePolicyTargetMode}
+                      onChange={(event) =>
+                        setWorldTradePolicyTargetMode(
+                          event.target.value as 'all' | 'market' | 'country',
+                        )
+                      }
+                      disabled={!canEditOwnMarket}
+                      className="h-9 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none disabled:opacity-70"
+                    >
+                      <option value="all" className="bg-[#0b111b] text-white">
+                        Для всех внешних рынков и стран
+                      </option>
+                      <option value="market" className="bg-[#0b111b] text-white">
+                        Для конкретного рынка
+                      </option>
+                      <option value="country" className="bg-[#0b111b] text-white">
+                        Для конкретной страны
+                      </option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                  </div>
+                </label>
+                {worldTradePolicyTargetMode === 'market' && (
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Рынок-партнер
+                    <div className="relative">
+                      <select
+                        value={worldTradePolicyTargetId}
+                        onChange={(event) => setWorldTradePolicyTargetId(event.target.value)}
+                        disabled={!canEditOwnMarket || worldPolicyMarketTargets.length === 0}
+                        className="h-9 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none disabled:opacity-70"
+                      >
+                        {worldPolicyMarketTargets.length === 0 ? (
+                          <option value="" className="bg-[#0b111b] text-white">
+                            Нет внешних рынков
+                          </option>
+                        ) : (
+                          worldPolicyMarketTargets.map((market) => (
+                            <option
+                              key={`world-policy-market:${market.id}`}
+                              value={market.id}
+                              className="bg-[#0b111b] text-white"
+                            >
+                              {market.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </label>
+                )}
+                {worldTradePolicyTargetMode === 'country' && (
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Страна-партнер
+                    <div className="relative">
+                      <select
+                        value={worldTradePolicyTargetId}
+                        onChange={(event) => setWorldTradePolicyTargetId(event.target.value)}
+                        disabled={!canEditOwnMarket || worldPolicyCountryTargets.length === 0}
+                        className="h-9 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none disabled:opacity-70"
+                      >
+                        {worldPolicyCountryTargets.length === 0 ? (
+                          <option value="" className="bg-[#0b111b] text-white">
+                            Нет внешних стран
+                          </option>
+                        ) : (
+                          worldPolicyCountryTargets.map((country) => (
+                            <option
+                              key={`world-policy-country:${country.id}`}
+                              value={country.id}
+                              className="bg-[#0b111b] text-white"
+                            >
+                              {country.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </label>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Экспорт с нашего рынка
+                    <div className="relative">
+                      <select
+                        value={
+                          getWorldTradePolicyDraft(
+                            worldTradePolicyModalResource.id,
+                            worldTradePolicyTargetMode,
+                            worldTradePolicyTargetId || undefined,
+                          ).allowExportToWorld
+                            ? 'allow'
+                            : 'deny'
+                        }
+                        onChange={(event) =>
+                          updateWorldTradePolicyDraft(
+                            worldTradePolicyModalResource.id,
+                            worldTradePolicyTargetMode,
+                            worldTradePolicyTargetId || undefined,
+                            { allowExportToWorld: event.target.value === 'allow' },
+                          )
+                        }
+                        disabled={
+                          !canEditOwnMarket ||
+                          ((worldTradePolicyTargetMode === 'country' ||
+                            worldTradePolicyTargetMode === 'market') &&
+                            !worldTradePolicyTargetId)
+                        }
+                        className="h-9 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none disabled:opacity-70"
+                      >
+                        <option value="allow" className="bg-[#0b111b] text-white">
+                          Разрешить
+                        </option>
+                        <option value="deny" className="bg-[#0b111b] text-white">
+                          Запретить
+                        </option>
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </label>
+                  <label className="flex flex-col gap-1 text-white/70 text-sm">
+                    Импорт на наш рынок
+                    <div className="relative">
+                      <select
+                        value={
+                          getWorldTradePolicyDraft(
+                            worldTradePolicyModalResource.id,
+                            worldTradePolicyTargetMode,
+                            worldTradePolicyTargetId || undefined,
+                          ).allowImportFromWorld
+                            ? 'allow'
+                            : 'deny'
+                        }
+                        onChange={(event) =>
+                          updateWorldTradePolicyDraft(
+                            worldTradePolicyModalResource.id,
+                            worldTradePolicyTargetMode,
+                            worldTradePolicyTargetId || undefined,
+                            { allowImportFromWorld: event.target.value === 'allow' },
+                          )
+                        }
+                        disabled={
+                          !canEditOwnMarket ||
+                          ((worldTradePolicyTargetMode === 'country' ||
+                            worldTradePolicyTargetMode === 'market') &&
+                            !worldTradePolicyTargetId)
+                        }
+                        className="h-9 w-full rounded-lg bg-[#0b111b] border border-white/10 px-3 pr-8 text-white text-sm focus:outline-none focus:border-emerald-400/60 appearance-none disabled:opacity-70"
+                      >
+                        <option value="allow" className="bg-[#0b111b] text-white">
+                          Разрешить
+                        </option>
+                        <option value="deny" className="bg-[#0b111b] text-white">
+                          Запретить
+                        </option>
+                      </select>
+                      <ChevronDown className="w-4 h-4 text-white/45 pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+                    </div>
+                  </label>
+                </div>
+                </div>
+                <div className="min-h-0 overflow-y-auto legend-scroll rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+                  <div className="text-white/85 text-sm font-semibold">Наложенные ограничения</div>
+                  <div className="text-xs text-white/55">
+                    Сводка по активным ограничениям для выбранного товара.
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-xs text-white/75 font-semibold">Общие правила</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <span
+                        className={
+                          worldTradePolicyActiveDetails.base.allowExportToWorld
+                            ? 'px-2 py-1 rounded-md border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                            : 'px-2 py-1 rounded-md border border-rose-400/30 bg-rose-500/10 text-rose-200'
+                        }
+                      >
+                        Экспорт {worldTradePolicyActiveDetails.base.allowExportToWorld ? 'разрешен' : 'запрещен'}
+                      </span>
+                      <span
+                        className={
+                          worldTradePolicyActiveDetails.base.allowImportFromWorld
+                            ? 'px-2 py-1 rounded-md border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                            : 'px-2 py-1 rounded-md border border-rose-400/30 bg-rose-500/10 text-rose-200'
+                        }
+                      >
+                        Импорт {worldTradePolicyActiveDetails.base.allowImportFromWorld ? 'разрешен' : 'запрещен'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-xs text-white/75 font-semibold">По рынкам</div>
+                    {worldTradePolicyActiveDetails.marketOverrides.length === 0 ? (
+                      <div className="text-xs text-white/45">Нет ограничений по рынкам.</div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {worldTradePolicyActiveDetails.marketOverrides.map((item) => (
+                          <div
+                            key={`world-policy-market-summary:${item.id}`}
+                            className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5"
+                          >
+                            <span className="text-xs text-white/75">{item.name}</span>
+                            <span className="flex flex-wrap gap-1.5 text-[11px]">
+                              <span
+                                className={
+                                  item.allowExportToWorld
+                                    ? 'px-1.5 py-0.5 rounded border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                                    : 'px-1.5 py-0.5 rounded border border-rose-400/30 bg-rose-500/10 text-rose-200'
+                                }
+                              >
+                                Экспорт {item.allowExportToWorld ? 'разрешен' : 'запрещен'}
+                              </span>
+                              <span
+                                className={
+                                  item.allowImportFromWorld
+                                    ? 'px-1.5 py-0.5 rounded border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                                    : 'px-1.5 py-0.5 rounded border border-rose-400/30 bg-rose-500/10 text-rose-200'
+                                }
+                              >
+                                Импорт {item.allowImportFromWorld ? 'разрешен' : 'запрещен'}
+                              </span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
+                    <div className="text-xs text-white/75 font-semibold">По странам</div>
+                    {worldTradePolicyActiveDetails.countryOverrides.length === 0 ? (
+                      <div className="text-xs text-white/45">Нет ограничений по странам.</div>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {worldTradePolicyActiveDetails.countryOverrides.map((item) => (
+                          <div
+                            key={`world-policy-country-summary:${item.id}`}
+                            className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-black/20 px-2 py-1.5"
+                          >
+                            <span className="text-xs text-white/75">{item.name}</span>
+                            <span className="flex flex-wrap gap-1.5 text-[11px]">
+                              <span
+                                className={
+                                  item.allowExportToWorld
+                                    ? 'px-1.5 py-0.5 rounded border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                                    : 'px-1.5 py-0.5 rounded border border-rose-400/30 bg-rose-500/10 text-rose-200'
+                                }
+                              >
+                                Экспорт {item.allowExportToWorld ? 'разрешен' : 'запрещен'}
+                              </span>
+                              <span
+                                className={
+                                  item.allowImportFromWorld
+                                    ? 'px-1.5 py-0.5 rounded border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                                    : 'px-1.5 py-0.5 rounded border border-rose-400/30 bg-rose-500/10 text-rose-200'
+                                }
+                              >
+                                Импорт {item.allowImportFromWorld ? 'разрешен' : 'запрещен'}
+                              </span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-3 border-t border-white/10 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWorldTradePolicyModalResourceId(undefined);
+                    setWorldTradePolicyTargetMode('all');
+                    setWorldTradePolicyTargetId('');
+                  }}
+                  className="h-9 px-4 rounded-lg border border-white/15 bg-black/30 text-white/75 text-sm"
+                >
+                  Закрыть
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveWorldTradePolicyForResource(
+                      worldTradePolicyModalResource.id,
+                      worldTradePolicyTargetMode,
+                      worldTradePolicyTargetId || undefined,
+                    );
+                  }}
+                  disabled={
+                    !canEditOwnMarket ||
+                    ((worldTradePolicyTargetMode === 'country' ||
+                      worldTradePolicyTargetMode === 'market') &&
+                      !worldTradePolicyTargetId)
+                  }
+                  className="h-9 px-4 rounded-lg border border-emerald-400/35 bg-emerald-500/15 text-emerald-200 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {memberMarket && activeCountryId && tradePolicyModalResource && (
           <div className="fixed inset-0 z-[95] bg-black/70 backdrop-blur-sm flex items-center justify-center">
             <div className="w-[520px] max-w-[calc(100vw-2rem)] rounded-2xl border border-white/10 bg-[#0b111b] shadow-2xl overflow-hidden">
