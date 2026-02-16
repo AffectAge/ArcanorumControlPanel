@@ -2228,6 +2228,21 @@ function App() {
             if (buyerInfrastructureLeft <= 0) return;
           }
 
+          const isOwnOrSameMarketSellerForBuyer = (seller: BuildingRuntime) =>
+            Boolean(seller.provinceOwnerCountryId) &&
+            (buyerMarket?.memberCountryIds.includes(
+              seller.provinceOwnerCountryId as string,
+            ) ??
+              false);
+          const baseResourcePrice = normalizeResourcePrice(resource?.basePrice);
+          const marketUnitPrice = normalizeResourcePrice(
+            buyerMarket?.priceByResourceId?.[resourceId],
+            baseResourcePrice,
+          );
+          const worldUnitPrice = normalizeResourcePrice(
+            worldMarket.priceByResourceId?.[resourceId],
+            baseResourcePrice,
+          );
           const prioritizedSellers = runtime
             .filter((seller) => seller !== buyer)
             .sort((a, b) => {
@@ -2236,15 +2251,19 @@ function App() {
                   Boolean(buyer.ownerCountryId) &&
                   seller.provinceOwnerCountryId === buyer.ownerCountryId;
                 if (isOwnCountry) return 0;
-                const isSameMarket =
-                  Boolean(buyerMarket) &&
-                  Boolean(seller.provinceOwnerCountryId) &&
-                  buyerMarket!.memberCountryIds.includes(
-                    seller.provinceOwnerCountryId as string,
-                  );
+                const isSameMarket = isOwnOrSameMarketSellerForBuyer(seller);
                 if (isSameMarket) return 1;
                 return 2;
               };
+              const priceA = isOwnOrSameMarketSellerForBuyer(a)
+                ? marketUnitPrice
+                : worldUnitPrice;
+              const priceB = isOwnOrSameMarketSellerForBuyer(b)
+                ? marketUnitPrice
+                : worldUnitPrice;
+              if (Math.abs(priceA - priceB) > MARKET_PRICE_EPSILON) {
+                return priceA - priceB;
+              }
               return rankSeller(a) - rankSeller(b);
             });
 
@@ -2255,10 +2274,7 @@ function App() {
             const sellerWarehouse = seller.entry.warehouseByResourceId ?? {};
             const sellerStock = Math.max(0, sellerWarehouse[resourceId] ?? 0);
             if (sellerStock <= 0) continue;
-            const isOwnOrSameMarketSeller =
-              Boolean(buyerMarket) &&
-              Boolean(seller.provinceOwnerCountryId) &&
-              buyerMarket!.memberCountryIds.includes(seller.provinceOwnerCountryId as string);
+            const isOwnOrSameMarketSeller = isOwnOrSameMarketSellerForBuyer(seller);
             const canUseSharedInfrastructure = !isOwnOrSameMarketSeller;
             let sellerInfrastructureLeft = Number.POSITIVE_INFINITY;
             let sellerMarketSharedInfrastructureLeft = Number.POSITIVE_INFINITY;
@@ -2300,13 +2316,7 @@ function App() {
                 if (sellerMarketSharedInfrastructureLeft <= 0) continue;
               }
             }
-            const buyerMarketPrices = isOwnOrSameMarketSeller
-              ? buyerMarket?.priceByResourceId ?? {}
-              : worldMarket.priceByResourceId ?? {};
-            const unitPrice = normalizeResourcePrice(
-              buyerMarketPrices[resourceId],
-              normalizeResourcePrice(resourceById.get(resourceId)?.basePrice),
-            );
+            const unitPrice = isOwnOrSameMarketSeller ? marketUnitPrice : worldUnitPrice;
 
             const buyerFunds = Math.max(0, buyer.entry.ducats ?? 0);
             const affordable = Math.floor(buyerFunds / unitPrice);
