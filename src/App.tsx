@@ -18,6 +18,7 @@ import DiplomacyModal from './components/DiplomacyModal';
 import DiplomacyProposalsModal from './components/DiplomacyProposalsModal';
 import LogisticsModal from './components/LogisticsModal';
 import MarketModal from './components/MarketModal';
+import PopulationModal from './components/PopulationModal';
 import LegacyTooltipBridge from './components/LegacyTooltipBridge';
 import startingDataJson from './data/starting-data.json';
 import {
@@ -52,6 +53,9 @@ import type {
   LogisticsState,
   LogisticsEdge,
   LogisticsRouteType,
+  PopulationBucket,
+  PopulationEmploymentSector,
+  PopulationByProvinceId,
   Market,
   MarketWorldResourceTradePolicy,
   WorldMarket,
@@ -333,6 +337,7 @@ const normalizeBuildingDefinitions = (
   list.map((building) => ({
     ...building,
     startingDucats: normalizePositiveNumber(building.startingDucats),
+    laborDemand: normalizePositiveNumber(building.laborDemand),
     consumptionByResourceId: normalizeResourceMap(building.consumptionByResourceId),
     extractionByResourceId: normalizeResourceMap(building.extractionByResourceId),
     productionByResourceId: normalizeResourceMap(building.productionByResourceId),
@@ -665,6 +670,111 @@ const createDefaultWorldMarket = (
   ),
 });
 
+const normalizePopulationCount = (value: unknown) => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.floor(Number(value)));
+};
+
+const DEFAULT_POPULATION_WORKING_SHARE = 0.52;
+const normalizeWorkingShare = (value: unknown) => {
+  if (!Number.isFinite(value)) return DEFAULT_POPULATION_WORKING_SHARE;
+  return clamp01(Number(value));
+};
+
+const normalizePopulationEmploymentBySector = (
+  value?: Partial<Record<PopulationEmploymentSector, number>>,
+) => {
+  const next: Partial<Record<PopulationEmploymentSector, number>> = {};
+  (['industry', 'agri', 'services', 'state'] as PopulationEmploymentSector[]).forEach(
+    (sector) => {
+      const amount = normalizePopulationCount(value?.[sector]);
+      if (amount > 0) {
+        next[sector] = amount;
+      }
+    },
+  );
+  return next;
+};
+
+const createDefaultPopulationBucketForProvince = (
+  province: ProvinceData,
+): PopulationBucket => {
+  const total = 50000;
+  const maleCount = Math.floor(total * 0.49);
+  const femaleCount = total - maleCount;
+  return {
+    id: createId(),
+    cultureId: province.cultureId,
+    religionId: province.religionId,
+    maleCount,
+    femaleCount,
+    workingShare: DEFAULT_POPULATION_WORKING_SHARE,
+    employed: 0,
+    unemployed: maleCount + femaleCount,
+    employmentBySector: {},
+  };
+};
+
+const mergePopulationBucketsByCultureReligion = (
+  buckets: PopulationBucket[],
+): PopulationBucket[] => {
+  const merged = new Map<string, PopulationBucket>();
+  buckets.forEach((bucket) => {
+    const key = `${bucket.cultureId ?? ''}::${bucket.religionId ?? ''}`;
+    const maleCount = normalizePopulationCount(bucket.maleCount);
+    const femaleCount = normalizePopulationCount(bucket.femaleCount);
+    if (maleCount <= 0 && femaleCount <= 0) return;
+    const current = merged.get(key);
+    if (current) {
+      const currentPopulation = current.maleCount + current.femaleCount;
+      const incomingPopulation = maleCount + femaleCount;
+      const totalPopulation = currentPopulation + incomingPopulation;
+      const incomingWorkingShare = normalizeWorkingShare(bucket.workingShare);
+      const currentWorkingShare = normalizeWorkingShare(current.workingShare);
+      current.maleCount += maleCount;
+      current.femaleCount += femaleCount;
+      current.workingShare =
+        totalPopulation > 0
+          ? (currentWorkingShare * currentPopulation +
+              incomingWorkingShare * incomingPopulation) /
+            totalPopulation
+          : DEFAULT_POPULATION_WORKING_SHARE;
+      current.employed = normalizePopulationCount(current.employed) + normalizePopulationCount(bucket.employed);
+      current.unemployed =
+        normalizePopulationCount(current.unemployed) + normalizePopulationCount(bucket.unemployed);
+      const mergedEmploymentBySector = {
+        ...normalizePopulationEmploymentBySector(current.employmentBySector),
+      };
+      Object.entries(normalizePopulationEmploymentBySector(bucket.employmentBySector)).forEach(
+        ([sector, amount]) => {
+          mergedEmploymentBySector[sector as PopulationEmploymentSector] = Math.max(
+            0,
+            (mergedEmploymentBySector[sector as PopulationEmploymentSector] ?? 0) + amount,
+          );
+        },
+      );
+      current.employmentBySector = mergedEmploymentBySector;
+      return;
+    }
+    merged.set(key, {
+      id: bucket.id || createId(),
+      cultureId: bucket.cultureId,
+      religionId: bucket.religionId,
+      maleCount,
+      femaleCount,
+      workingShare: normalizeWorkingShare(bucket.workingShare),
+      employed: normalizePopulationCount(bucket.employed),
+      unemployed: normalizePopulationCount(bucket.unemployed),
+      employmentBySector: normalizePopulationEmploymentBySector(
+        bucket.employmentBySector,
+      ),
+    });
+  });
+  return Array.from(merged.values()).sort(
+    (a, b) => b.maleCount + b.femaleCount - (a.maleCount + a.femaleCount),
+  );
+};
+
 const initialMapLayers: MapLayer[] = [
   { id: 'political', name: 'Политическая', visible: true },
   { id: 'cultural', name: 'Культурная', visible: false },
@@ -719,6 +829,7 @@ function App() {
   const [adminOpen, setAdminOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [industryOpen, setIndustryOpen] = useState(false);
+  const [populationOpen, setPopulationOpen] = useState(false);
   const [diplomacyOpen, setDiplomacyOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>(() =>
     cloneTraits(startingData.climates),
@@ -758,6 +869,8 @@ function App() {
   const [logistics, setLogistics] = useState<LogisticsState>(
     createDefaultLogisticsState(),
   );
+  const [populationByProvinceId, setPopulationByProvinceId] =
+    useState<PopulationByProvinceId>({});
   const [markets, setMarkets] = useState<Market[]>([]);
   const [worldMarket, setWorldMarket] = useState<WorldMarket>(() =>
     createDefaultWorldMarket(cloneResources(startingData.resources)),
@@ -881,6 +994,48 @@ function App() {
       memberMarketIds: markets.map((market) => market.id),
     }));
   }, [markets]);
+
+  useEffect(() => {
+    setPopulationByProvinceId((prev) => {
+      const next: PopulationByProvinceId = {};
+      let changed = false;
+      Object.entries(provinces).forEach(([provinceId, province]) => {
+        if (!province.ownerCountryId) {
+          if ((prev[provinceId]?.length ?? 0) > 0) {
+            changed = true;
+          }
+          return;
+        }
+        const sourceBuckets =
+          prev[provinceId] && prev[provinceId].length > 0
+            ? prev[provinceId]
+            : [createDefaultPopulationBucketForProvince(province)];
+        const merged = mergePopulationBucketsByCultureReligion(sourceBuckets);
+        next[provinceId] = merged;
+        const prevBuckets = prev[provinceId] ?? [];
+        const same =
+          prevBuckets.length === merged.length &&
+          prevBuckets.every((bucket, index) => {
+            const target = merged[index];
+            return (
+              target &&
+              (bucket.cultureId ?? '') === (target.cultureId ?? '') &&
+              (bucket.religionId ?? '') === (target.religionId ?? '') &&
+              normalizePopulationCount(bucket.maleCount) === target.maleCount &&
+              normalizePopulationCount(bucket.femaleCount) === target.femaleCount
+            );
+          });
+        if (!same) {
+          changed = true;
+        }
+      });
+      const prevKeys = Object.keys(prev);
+      if (!changed && prevKeys.length === Object.keys(next).length) {
+        return prev;
+      }
+      return next;
+    });
+  }, [provinces]);
 
   const getActiveColonizationsCount = (countryId?: string) => {
     if (!countryId) return 0;
@@ -2140,6 +2295,7 @@ function App() {
 
   const applyBuildingEconomyTurn = () => {
     type BuildingRuntime = {
+      runtimeKey: string;
       provinceId: string;
       provinceOwnerCountryId?: string;
       entry: BuiltBuilding;
@@ -2156,6 +2312,50 @@ function App() {
       });
     });
     setProvinces((prev) => {
+      const classifyEmploymentSector = (
+        definition?: BuildingDefinition,
+      ): PopulationEmploymentSector => {
+        if (!definition) return 'state';
+        if (definition.industryId) return 'industry';
+        if (Object.keys(definition.extractionByResourceId ?? {}).length > 0) return 'agri';
+        if (
+          Object.keys(definition.productionByResourceId ?? {}).length > 0 ||
+          Object.keys(definition.consumptionByResourceId ?? {}).length > 0
+        ) {
+          return 'services';
+        }
+        return 'state';
+      };
+      const allocateIntegerByShares = (
+        total: number,
+        items: Array<{ key: string; share: number }>,
+      ) => {
+        if (total <= 0 || items.length === 0) return new Map<string, number>();
+        const sumShares = items.reduce(
+          (sum, item) => sum + Math.max(0, Number(item.share) || 0),
+          0,
+        );
+        if (sumShares <= 0) return new Map<string, number>();
+        const base = new Map<string, number>();
+        const remainders: Array<{ key: string; remainder: number }> = [];
+        let assigned = 0;
+        items.forEach((item) => {
+          const share = Math.max(0, Number(item.share) || 0);
+          const raw = (total * share) / sumShares;
+          const floored = Math.max(0, Math.floor(raw));
+          base.set(item.key, floored);
+          assigned += floored;
+          remainders.push({ key: item.key, remainder: raw - floored });
+        });
+        let leftover = Math.max(0, total - assigned);
+        remainders.sort((a, b) => b.remainder - a.remainder);
+        for (let index = 0; index < remainders.length && leftover > 0; index += 1) {
+          const current = remainders[index];
+          base.set(current.key, Math.max(0, (base.get(current.key) ?? 0) + 1));
+          leftover -= 1;
+        }
+        return base;
+      };
       const demandByMarketAndResource = new Map<string, Record<string, number>>();
       const factualSupplyCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
       const marketVolumeCurrentTurnByMarketAndResource = new Map<string, Record<string, number>>();
@@ -2199,6 +2399,31 @@ function App() {
       if (!hasBuiltBuildings) {
         pendingMarketPriceMetricsRef.current = null;
         pendingSharedInfrastructureConsumedRef.current = null;
+        const nextPopulation: PopulationByProvinceId = {};
+        Object.entries(prev).forEach(([provinceId, province]) => {
+          if (!province.ownerCountryId) return;
+          const sourceBuckets =
+            populationByProvinceId[provinceId] && populationByProvinceId[provinceId].length > 0
+              ? populationByProvinceId[provinceId]
+              : [createDefaultPopulationBucketForProvince(province)];
+          nextPopulation[provinceId] = mergePopulationBucketsByCultureReligion(sourceBuckets).map(
+            (bucket) => {
+              const workingShare = normalizeWorkingShare(bucket.workingShare);
+              const totalPopulation =
+                normalizePopulationCount(bucket.maleCount) +
+                normalizePopulationCount(bucket.femaleCount);
+              const laborSupply = Math.max(0, Math.floor(totalPopulation * workingShare));
+              return {
+                ...bucket,
+                workingShare,
+                employed: 0,
+                unemployed: laborSupply,
+                employmentBySector: {},
+              };
+            },
+          );
+        });
+        setPopulationByProvinceId(nextPopulation);
         let changed = false;
         const nextWithoutConsumption: ProvinceRecord = { ...prev };
         Object.values(nextWithoutConsumption).forEach((province) => {
@@ -2217,6 +2442,10 @@ function App() {
 
       const next: ProvinceRecord = {};
       const runtime: BuildingRuntime[] = [];
+      const laborCoverageByRuntimeKey = new Map<string, number>();
+      const laborAssignedByRuntimeKey = new Map<string, number>();
+      const laborDemandByRuntimeKey = new Map<string, number>();
+      const nextPopulationByProvinceId: PopulationByProvinceId = {};
       const remainingBuyerInfrastructureByProvinceIdAndCategory = new Map<
         string,
         Record<string, number>
@@ -2259,6 +2488,9 @@ function App() {
             Number.isFinite(entry.lastProductivity)
               ? clamp01(Number(entry.lastProductivity))
               : 1,
+          lastLaborDemand: 0,
+          lastLaborAssigned: 0,
+          lastLaborCoverage: 1,
           lastPurchaseNeedByResourceId: undefined,
           lastPurchasedByResourceId: undefined,
           lastPurchaseCostDucats: 0,
@@ -2277,12 +2509,14 @@ function App() {
         buildingsBuilt: nextBuilt,
       };
 
-      nextBuilt.forEach((entry) => {
+      nextBuilt.forEach((entry, entryIndex) => {
         const ownerCountryId = getOwnerCountryIdForBuilding(
           entry.owner,
           province.ownerCountryId,
         );
+        const runtimeKey = `${provinceId}:${entryIndex}`;
         runtime.push({
+          runtimeKey,
           provinceId,
           provinceOwnerCountryId: province.ownerCountryId,
           entry,
@@ -2290,6 +2524,101 @@ function App() {
           ownerCountryId,
         });
       });
+    });
+
+    const runtimeByProvinceId = new Map<string, BuildingRuntime[]>();
+    runtime.forEach((item) => {
+      const current = runtimeByProvinceId.get(item.provinceId) ?? [];
+      current.push(item);
+      runtimeByProvinceId.set(item.provinceId, current);
+    });
+    Object.entries(next).forEach(([provinceId, province]) => {
+      if (!province.ownerCountryId) return;
+      const sourceBuckets =
+        populationByProvinceId[provinceId] && populationByProvinceId[provinceId].length > 0
+          ? populationByProvinceId[provinceId]
+          : [createDefaultPopulationBucketForProvince(province)];
+      const normalizedBuckets = mergePopulationBucketsByCultureReligion(sourceBuckets).map(
+        (bucket) => ({
+          ...bucket,
+          workingShare: normalizeWorkingShare(bucket.workingShare),
+          employed: 0,
+          unemployed: 0,
+          employmentBySector: {},
+        }),
+      );
+      const provinceRuntime = runtimeByProvinceId.get(provinceId) ?? [];
+      const demandRows = provinceRuntime
+        .map((item) => ({
+          runtimeKey: item.runtimeKey,
+          demand: Math.max(0, Math.floor(item.definition?.laborDemand ?? 0)),
+          sector: classifyEmploymentSector(item.definition),
+        }))
+        .filter((item) => item.demand > 0);
+      const totalDemand = demandRows.reduce((sum, item) => sum + item.demand, 0);
+      const supplyRows = normalizedBuckets.map((bucket) => {
+        const totalPopulation =
+          normalizePopulationCount(bucket.maleCount) +
+          normalizePopulationCount(bucket.femaleCount);
+        const laborSupply = Math.max(
+          0,
+          Math.floor(totalPopulation * normalizeWorkingShare(bucket.workingShare)),
+        );
+        return { bucketId: bucket.id, laborSupply };
+      });
+      const totalSupply = supplyRows.reduce((sum, item) => sum + item.laborSupply, 0);
+      const totalAssigned = Math.min(totalDemand, totalSupply);
+      const assignedByRuntime = allocateIntegerByShares(
+        totalAssigned,
+        demandRows.map((item) => ({ key: item.runtimeKey, share: item.demand })),
+      );
+      demandRows.forEach((row) => {
+        const assigned = Math.max(0, assignedByRuntime.get(row.runtimeKey) ?? 0);
+        laborAssignedByRuntimeKey.set(row.runtimeKey, assigned);
+        laborDemandByRuntimeKey.set(row.runtimeKey, row.demand);
+        laborCoverageByRuntimeKey.set(
+          row.runtimeKey,
+          row.demand > 0 ? clamp01(assigned / row.demand) : 1,
+        );
+      });
+      const employedByBucket = totalDemand > 0
+        ? totalSupply <= totalDemand
+          ? new Map(supplyRows.map((row) => [row.bucketId, row.laborSupply]))
+          : allocateIntegerByShares(
+              totalDemand,
+              supplyRows.map((row) => ({ key: row.bucketId, share: row.laborSupply })),
+            )
+        : new Map<string, number>();
+      const sectorDemandMap = new Map<PopulationEmploymentSector, number>();
+      demandRows.forEach((row) => {
+        sectorDemandMap.set(row.sector, (sectorDemandMap.get(row.sector) ?? 0) + row.demand);
+      });
+      const sectorEmploymentShares = ([
+        'industry',
+        'agri',
+        'services',
+        'state',
+      ] as PopulationEmploymentSector[]).map((sector) => ({
+        key: sector,
+        share: Math.max(0, sectorDemandMap.get(sector) ?? 0),
+      }));
+      normalizedBuckets.forEach((bucket) => {
+        const supply = supplyRows.find((item) => item.bucketId === bucket.id)?.laborSupply ?? 0;
+        const employed = Math.min(
+          supply,
+          Math.max(0, employedByBucket.get(bucket.id) ?? 0),
+        );
+        const unemployed = Math.max(0, supply - employed);
+        const sectorEmployment = allocateIntegerByShares(employed, sectorEmploymentShares);
+        bucket.employed = employed;
+        bucket.unemployed = unemployed;
+        bucket.employmentBySector = Object.fromEntries(
+          (['industry', 'agri', 'services', 'state'] as PopulationEmploymentSector[])
+            .map((sector) => [sector, Math.max(0, sectorEmployment.get(sector) ?? 0)])
+            .filter(([, value]) => value > 0),
+        ) as Partial<Record<PopulationEmploymentSector, number>>;
+      });
+      nextPopulationByProvinceId[provinceId] = normalizedBuckets;
     });
 
     runtime.forEach((entry) => {
@@ -2761,18 +3090,36 @@ function App() {
         });
       }
 
+      const laborDemand = Math.max(0, Math.floor(buyer.definition?.laborDemand ?? 0));
+      const laborAssigned = Math.max(
+        0,
+        laborAssignedByRuntimeKey.get(buyer.runtimeKey) ??
+          (laborDemand > 0 ? Math.floor(laborDemand * (laborCoverageByRuntimeKey.get(buyer.runtimeKey) ?? 0)) : 0),
+      );
+      const laborCoverage = laborDemand > 0 ? clamp01(laborAssigned / laborDemand) : 1;
+      buyer.entry.lastLaborDemand = laborDemand;
+      buyer.entry.lastLaborAssigned = laborAssigned;
+      buyer.entry.lastLaborCoverage = laborCoverage;
       let productivity = 1;
       const actualConsumedByResourceId: Record<string, number> = {};
       const actualExtractedByResourceId: Record<string, number> = {};
       const actualProducedByResourceId: Record<string, number> = {};
+      let resourceProductivity = 1;
       if (consumptionEntries.length > 0) {
-        productivity = consumptionEntries.reduce((minRatio, [resourceId, requiredAmount]) => {
+        resourceProductivity = consumptionEntries.reduce((minRatio, [resourceId, requiredAmount]) => {
           if (requiredAmount <= 0) return minRatio;
           const available = Math.max(0, buyerWarehouse[resourceId] ?? 0);
           return Math.min(minRatio, available / requiredAmount);
         }, 1);
-        productivity = Number.isFinite(productivity) ? clamp01(productivity) : 0;
+        resourceProductivity = Number.isFinite(resourceProductivity)
+          ? clamp01(resourceProductivity)
+          : 0;
+      }
+      productivity = Number.isFinite(Math.min(resourceProductivity, laborCoverage))
+        ? clamp01(Math.min(resourceProductivity, laborCoverage))
+        : 0;
 
+      if (consumptionEntries.length > 0) {
         consumptionEntries.forEach(([resourceId, requiredAmount]) => {
           const amountToConsume = requiredAmount * productivity;
           if (amountToConsume <= 0) return;
@@ -2794,40 +3141,44 @@ function App() {
           productionMaxCurrentTurnByMarketAndResource.get(buyerMarketId) ?? {};
         Object.entries(extraction ?? {}).forEach(([resourceId, amount]) => {
           if (!Number.isFinite(amount) || amount <= 0) return;
+          const cappedAmount = Math.max(0, amount * laborCoverage);
           productionMax[resourceId] = Math.max(
             0,
-            (productionMax[resourceId] ?? 0) + amount,
+            (productionMax[resourceId] ?? 0) + cappedAmount,
           );
           productionMaxCurrentTurnByWorldResource[resourceId] = Math.max(
             0,
-            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + cappedAmount,
           );
         });
         Object.entries(production ?? {}).forEach(([resourceId, amount]) => {
           if (!Number.isFinite(amount) || amount <= 0) return;
+          const cappedAmount = Math.max(0, amount * laborCoverage);
           productionMax[resourceId] = Math.max(
             0,
-            (productionMax[resourceId] ?? 0) + amount,
+            (productionMax[resourceId] ?? 0) + cappedAmount,
           );
           productionMaxCurrentTurnByWorldResource[resourceId] = Math.max(
             0,
-            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + cappedAmount,
           );
         });
         productionMaxCurrentTurnByMarketAndResource.set(buyerMarketId, productionMax);
       } else {
         Object.entries(extraction ?? {}).forEach(([resourceId, amount]) => {
           if (!Number.isFinite(amount) || amount <= 0) return;
+          const cappedAmount = Math.max(0, amount * laborCoverage);
           productionMaxCurrentTurnByWorldResource[resourceId] = Math.max(
             0,
-            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + cappedAmount,
           );
         });
         Object.entries(production ?? {}).forEach(([resourceId, amount]) => {
           if (!Number.isFinite(amount) || amount <= 0) return;
+          const cappedAmount = Math.max(0, amount * laborCoverage);
           productionMaxCurrentTurnByWorldResource[resourceId] = Math.max(
             0,
-            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + amount,
+            (productionMaxCurrentTurnByWorldResource[resourceId] ?? 0) + cappedAmount,
           );
         });
       }
@@ -2968,7 +3319,8 @@ function App() {
     };
     pendingSharedInfrastructureConsumedRef.current =
       consumedSharedInfrastructureByMarketIdAndCategory;
-      return next;
+    setPopulationByProvinceId(nextPopulationByProvinceId);
+    return next;
     });
   };
 
@@ -3268,6 +3620,7 @@ function App() {
       diplomacy: diplomacyAgreements,
       diplomacyProposals,
       logistics,
+      populationByProvinceId,
       markets,
       worldMarket,
       settings: gameSettings,
@@ -3294,6 +3647,7 @@ function App() {
       diplomacyAgreements,
       diplomacyProposals,
       logistics,
+      populationByProvinceId,
       markets,
       worldMarket,
       gameSettings,
@@ -3336,6 +3690,7 @@ function App() {
   const loadSave = (id: string) => {
     const save = saves.find((entry) => entry.id === id);
     if (!save) return;
+    const normalizedLoadedProvinces = normalizeProvinceRecord(save.data.provinces ?? {});
     setTurn(save.data.turn);
     setCountries(
       save.data.countries.map((country) => ({
@@ -3354,7 +3709,7 @@ function App() {
     );
     setMapLayers(ensureAdditionalMapLayers(save.data.mapLayers ?? initialMapLayers));
     setSelectedProvinceId(save.data.selectedProvinceId);
-    setProvinces(normalizeProvinceRecord(save.data.provinces ?? {}));
+    setProvinces(normalizedLoadedProvinces);
     setClimates(save.data.climates ?? climates);
     setReligions(save.data.religions ?? religions);
     setLandscapes(save.data.landscapes ?? landscapes);
@@ -3392,6 +3747,36 @@ function App() {
     setCompanies(save.data.companies ?? companies);
     setDiplomacyAgreements(save.data.diplomacy ?? []);
     setDiplomacyProposals(save.data.diplomacyProposals ?? []);
+    setPopulationByProvinceId(() => {
+      const source = save.data.populationByProvinceId ?? {};
+      const next: PopulationByProvinceId = {};
+      Object.entries(normalizedLoadedProvinces).forEach(([provinceId, province]) => {
+        if (!province.ownerCountryId) return;
+        const raw = source[provinceId] ?? [];
+        const normalizedRaw = raw.map((bucket) => ({
+          id: bucket.id || createId(),
+          cultureId: bucket.cultureId,
+          religionId: bucket.religionId,
+          maleCount: normalizePopulationCount(bucket.maleCount),
+          femaleCount: normalizePopulationCount(bucket.femaleCount),
+          workingShare: normalizeWorkingShare(bucket.workingShare),
+          employed: normalizePopulationCount(bucket.employed),
+          unemployed: normalizePopulationCount(bucket.unemployed),
+          employmentBySector: normalizePopulationEmploymentBySector(
+            bucket.employmentBySector,
+          ),
+        }));
+        const merged = mergePopulationBucketsByCultureReligion(
+          normalizedRaw.length > 0
+            ? normalizedRaw
+            : [createDefaultPopulationBucketForProvince(province)],
+        );
+        if (merged.length > 0) {
+          next[provinceId] = merged;
+        }
+      });
+      return next;
+    });
     setMarkets(() => {
       const loaded = save.data.markets ?? [];
       const validCountryIds = new Set(
@@ -3948,6 +4333,7 @@ function App() {
     setCompanies(cloneCompanies(startingData.companies));
     setDiplomacyAgreements([]);
     setDiplomacyProposals([]);
+    setPopulationByProvinceId({});
     setMarkets([]);
     setWorldMarket(createDefaultWorldMarket(cloneResources(startingData.resources)));
     setLogistics(createDefaultLogisticsState());
@@ -5455,6 +5841,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     iconDataUrl?: string,
     industryId?: string,
     startingDucats?: number,
+    laborDemand?: number,
     consumptionByResourceId?: Record<string, number>,
     extractionByResourceId?: Record<string, number>,
     productionByResourceId?: Record<string, number>,
@@ -5469,6 +5856,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         iconDataUrl,
         industryId,
         startingDucats: normalizePositiveNumber(startingDucats),
+        laborDemand: normalizePositiveNumber(laborDemand),
         consumptionByResourceId: normalizeResourceMap(consumptionByResourceId),
         extractionByResourceId: normalizeResourceMap(extractionByResourceId),
         productionByResourceId: normalizeResourceMap(productionByResourceId),
@@ -6339,6 +6727,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     patch: Pick<
       BuildingDefinition,
       | 'startingDucats'
+      | 'laborDemand'
       | 'consumptionByResourceId'
       | 'extractionByResourceId'
       | 'productionByResourceId'
@@ -6351,6 +6740,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           ? {
               ...item,
               startingDucats: normalizePositiveNumber(patch.startingDucats),
+              laborDemand: normalizePositiveNumber(patch.laborDemand),
               consumptionByResourceId: normalizeResourceMap(
                 patch.consumptionByResourceId,
               ),
@@ -7772,6 +8162,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       <LeftToolbar
         onOpenIndustry={() => setIndustryOpen(true)}
         onOpenMarkets={() => setMarketsOpen(true)}
+        onOpenPopulation={() => setPopulationOpen(true)}
       />
       {logisticsRoutePlannerActive && (
         <div className="absolute left-1/2 -translate-x-1/2 bottom-24 z-40 rounded-xl border border-cyan-400/40 bg-[#08131f]/90 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-900/30">
@@ -8626,6 +9017,16 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           });
         }}
         onClose={() => setIndustryOpen(false)}
+      />
+      <PopulationModal
+        open={populationOpen}
+        onClose={() => setPopulationOpen(false)}
+        activeCountryId={activeCountryId}
+        countries={countries}
+        provinces={provinces}
+        cultures={cultures}
+        religions={religions}
+        populationByProvinceId={populationByProvinceId}
       />
       <DiplomacyModal
         open={diplomacyOpen}

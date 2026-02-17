@@ -1,22 +1,24 @@
-import { Factory, ShoppingCart, TrendingUp, Lightbulb } from 'lucide-react';
+import { Factory, ShoppingCart, Users, Lightbulb } from 'lucide-react';
 import { useState } from 'react';
 import Tooltip from './Tooltip';
 
 const tools = [
   { id: 'industry', icon: Factory, label: 'Индустрия' },
   { id: 'markets', icon: ShoppingCart, label: 'Товары и торговля' },
-  { id: 'economy', icon: TrendingUp, label: 'Economy' },
+  { id: 'population', icon: Users, label: 'Население' },
   { id: 'tech', icon: Lightbulb, label: 'Tech' },
 ];
 
 type LeftToolbarProps = {
   onOpenIndustry: () => void;
   onOpenMarkets: () => void;
+  onOpenPopulation: () => void;
 };
 
 export default function LeftToolbar({
   onOpenIndustry,
   onOpenMarkets,
+  onOpenPopulation,
 }: LeftToolbarProps) {
   const [hoveredTool, setHoveredTool] = useState<string | null>(null);
 
@@ -31,6 +33,9 @@ export default function LeftToolbar({
               }
               if (tool.id === 'markets') {
                 onOpenMarkets();
+              }
+              if (tool.id === 'population') {
+                onOpenPopulation();
               }
             }}
             onMouseEnter={() => setHoveredTool(tool.id)}

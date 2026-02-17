@@ -105,6 +105,7 @@ type AdminPanelProps = {
     iconDataUrl?: string,
     industryId?: string,
     startingDucats?: number,
+    laborDemand?: number,
     consumptionByResourceId?: Record<string, number>,
     extractionByResourceId?: Record<string, number>,
     productionByResourceId?: Record<string, number>,
@@ -172,6 +173,7 @@ type AdminPanelProps = {
     patch: Pick<
       BuildingDefinition,
       | 'startingDucats'
+      | 'laborDemand'
       | 'consumptionByResourceId'
       | 'extractionByResourceId'
       | 'productionByResourceId'
@@ -341,6 +343,7 @@ export default function AdminPanel({
   const [buildingIcon, setBuildingIcon] = useState<string | undefined>(undefined);
   const [buildingIndustryId, setBuildingIndustryId] = useState<string>('');
   const [buildingStartingDucats, setBuildingStartingDucats] = useState<number | ''>(0);
+  const [buildingLaborDemand, setBuildingLaborDemand] = useState<number | ''>(0);
   const [buildingConsumptionByResourceId, setBuildingConsumptionByResourceId] =
     useState<BuildingEconomyMap>({});
   const [buildingExtractionByResourceId, setBuildingExtractionByResourceId] =
@@ -349,6 +352,7 @@ export default function AdminPanel({
     useState<BuildingEconomyMap>({});
   const [editingEconomyBuildingId, setEditingEconomyBuildingId] = useState<string | null>(null);
   const [editEconomyStartingDucats, setEditEconomyStartingDucats] = useState<number | ''>(0);
+  const [editEconomyLaborDemand, setEditEconomyLaborDemand] = useState<number | ''>(0);
   const [editEconomyConsumptionByResourceId, setEditEconomyConsumptionByResourceId] =
     useState<BuildingEconomyMap>({});
   const [editEconomyExtractionByResourceId, setEditEconomyExtractionByResourceId] =
@@ -649,6 +653,7 @@ export default function AdminPanel({
       buildingIcon,
       buildingIndustryId || undefined,
       buildingStartingDucats === '' ? undefined : Math.max(0, Number(buildingStartingDucats) || 0),
+      buildingLaborDemand === '' ? undefined : Math.max(0, Number(buildingLaborDemand) || 0),
       sanitizeOptionalEconomyMap(buildingConsumptionByResourceId),
       sanitizeOptionalEconomyMap(buildingExtractionByResourceId),
       sanitizeOptionalEconomyMap(buildingProductionByResourceId),
@@ -658,6 +663,7 @@ export default function AdminPanel({
     setBuildingIcon(undefined);
     setBuildingIndustryId('');
     setBuildingStartingDucats(0);
+    setBuildingLaborDemand(0);
     setBuildingConsumptionByResourceId({});
     setBuildingExtractionByResourceId({});
     setBuildingProductionByResourceId({});
@@ -666,6 +672,7 @@ export default function AdminPanel({
   const openEditEconomy = (building: BuildingDefinition) => {
     setEditingEconomyBuildingId(building.id);
     setEditEconomyStartingDucats(building.startingDucats ?? 0);
+    setEditEconomyLaborDemand(building.laborDemand ?? 0);
     setEditEconomyConsumptionByResourceId(
       normalizeBuildingEconomyMap(building.consumptionByResourceId),
     );
@@ -691,6 +698,10 @@ export default function AdminPanel({
         editEconomyStartingDucats === ''
           ? undefined
           : Math.max(0, Number(editEconomyStartingDucats) || 0),
+      laborDemand:
+        editEconomyLaborDemand === ''
+          ? undefined
+          : Math.max(0, Number(editEconomyLaborDemand) || 0),
       consumptionByResourceId: sanitizeOptionalEconomyMap(
         editEconomyConsumptionByResourceId,
       ),
@@ -2878,6 +2889,22 @@ export default function AdminPanel({
                     className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
                   />
                 </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm min-w-[170px]">
+                  Рабочие (laborDemand)
+                  <input
+                    type="number"
+                    min={0}
+                    value={buildingLaborDemand}
+                    onChange={(event) =>
+                      setBuildingLaborDemand(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
                 <label className="flex flex-col gap-2 text-white/70 text-sm">
                   Логотип
                   <div className="flex items-center gap-2">
@@ -3033,7 +3060,8 @@ export default function AdminPanel({
                               ?.name ?? '—'}
                           </div>
                           <div className="text-white/40 text-xs">
-                            Экономика: старт {Math.max(0, building.startingDucats ?? 0)} / потр.{' '}
+                            Экономика: старт {Math.max(0, building.startingDucats ?? 0)} / раб.{' '}
+                            {Math.max(0, Math.floor(building.laborDemand ?? 0))} / потр.{' '}
                             {Object.keys(building.consumptionByResourceId ?? {}).length} / доб.{' '}
                             {Object.keys(building.extractionByResourceId ?? {}).length} / пр-во{' '}
                             {Object.keys(building.productionByResourceId ?? {}).length}
@@ -4370,6 +4398,22 @@ export default function AdminPanel({
                     value={editEconomyStartingDucats}
                     onChange={(event) =>
                       setEditEconomyStartingDucats(
+                        event.target.value === ''
+                          ? ''
+                          : Math.max(0, Number(event.target.value) || 0),
+                      )
+                    }
+                    className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-white/70 text-sm max-w-[220px]">
+                  Рабочие (laborDemand)
+                  <input
+                    type="number"
+                    min={0}
+                    value={editEconomyLaborDemand}
+                    onChange={(event) =>
+                      setEditEconomyLaborDemand(
                         event.target.value === ''
                           ? ''
                           : Math.max(0, Number(event.target.value) || 0),

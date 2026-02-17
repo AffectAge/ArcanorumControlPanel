@@ -34,6 +34,7 @@ export type GameState = {
   diplomacy?: DiplomacyAgreement[];
   diplomacyProposals?: DiplomacyProposal[];
   logistics?: LogisticsState;
+  populationByProvinceId?: PopulationByProvinceId;
   markets?: Market[];
   worldMarket?: WorldMarket;
   settings?: GameSettings;
@@ -144,6 +145,26 @@ export type LogisticsState = {
   routeTypes: LogisticsRouteType[];
   routes: LogisticsRoute[];
 };
+
+export type PopulationBucket = {
+  id: string;
+  cultureId?: string;
+  religionId?: string;
+  maleCount: number;
+  femaleCount: number;
+  workingShare?: number;
+  employed?: number;
+  unemployed?: number;
+  employmentBySector?: Partial<Record<PopulationEmploymentSector, number>>;
+};
+
+export type PopulationByProvinceId = Record<string, PopulationBucket[]>;
+
+export type PopulationEmploymentSector =
+  | 'industry'
+  | 'agri'
+  | 'services'
+  | 'state';
 
 export type MarketResourceTradePolicy = {
   allowExportToMarketMembers?: boolean;
@@ -277,6 +298,7 @@ export type BuildingDefinition = {
   iconDataUrl?: string;
   industryId?: string;
   startingDucats?: number;
+  laborDemand?: number;
   consumptionByResourceId?: Record<string, number>;
   extractionByResourceId?: Record<string, number>;
   productionByResourceId?: Record<string, number>;
@@ -439,6 +461,9 @@ export type BuiltBuilding = {
   warehouseByResourceId?: Record<string, number>;
   ducats?: number;
   lastProductivity?: number;
+  lastLaborDemand?: number;
+  lastLaborAssigned?: number;
+  lastLaborCoverage?: number;
   lastPurchaseNeedByResourceId?: Record<string, number>;
   lastPurchasedByResourceId?: Record<string, number>;
   lastPurchaseCostDucats?: number;
