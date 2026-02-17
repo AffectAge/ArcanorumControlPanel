@@ -39,6 +39,13 @@ export type GameState = {
   worldMarket?: WorldMarket;
   settings?: GameSettings;
   eventLog?: EventLogState;
+  parliamentByCountryId?: ParliamentByCountryId;
+  lawCategories?: LawCategory[];
+  laws?: LawItem[];
+  ideologies?: IdeologyDefinition[];
+  politicalFactions?: PoliticalFactionDefinition[];
+  lawStateByCountryId?: LawStateByCountryId;
+  lawPolicyParamsByCountryId?: LawPolicyParamsByCountryId;
 };
 
 export type SaveGame = {
@@ -165,6 +172,91 @@ export type PopulationEmploymentSector =
   | 'agri'
   | 'services'
   | 'state';
+
+export type ParliamentFactionId = string;
+
+export type ParliamentFactionState = {
+  id: ParliamentFactionId;
+  name: string;
+  color: string;
+  seats: number;
+  support: number;
+  voters: number;
+  score?: number;
+  explanation?: string[];
+  notes?: string;
+};
+
+export type ParliamentCountryState = {
+  countryId: string;
+  totalSeats: number;
+  lastRecomputedTurn: number;
+  factions: ParliamentFactionState[];
+  laborSupply: number;
+  employed: number;
+  unemployed: number;
+};
+
+export type ParliamentByCountryId = Record<string, ParliamentCountryState>;
+
+export type LawFactionSupportPosition = 'support' | 'neutral' | 'oppose';
+
+export type IdeologyDefinition = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+export type PoliticalFactionDefinition = {
+  id: string;
+  name: string;
+  color: string;
+  baseSupportPercent: number;
+  ideologyWeightsById?: Record<string, number>;
+};
+
+export type LawCategory = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+export type LawItem = {
+  id: string;
+  categoryId: string;
+  name: string;
+  short: string;
+  effects: string[];
+  requirements?: string[];
+  ideologyWeightsById?: Record<string, number>;
+  params?: LawParamDefinition[];
+};
+
+export type LawParamDefinition = {
+  id: string;
+  name: string;
+  min: number;
+  max: number;
+  step?: number;
+  defaultValue: number;
+  unit?: string;
+  ideologyImpactById?: Record<string, number>;
+};
+
+export type LawVoteStatus = 'draft' | 'proposed' | 'passed' | 'rejected';
+
+export type LawVoteState = {
+  status: LawVoteStatus;
+  requestedAtTurn?: number;
+  resolvedAtTurn?: number;
+  yesVotes?: number;
+  noVotes?: number;
+  abstainVotes?: number;
+  proposedParamsById?: Record<string, number>;
+};
+
+export type LawStateByCountryId = Record<string, Record<string, LawVoteState>>;
+export type LawPolicyParamsByCountryId = Record<string, Record<string, Record<string, number>>>;
 
 export type MarketResourceTradePolicy = {
   allowExportToMarketMembers?: boolean;
