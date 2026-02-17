@@ -386,6 +386,15 @@ const fertilityColor = (value: number) => {
   return `hsl(${hue} 55% ${lightness}%)`;
 };
 
+const populationColor = (value: number, maxValue: number) => {
+  if (maxValue <= 0) return 'hsl(210 20% 75%)';
+  const t = clamp01(value / maxValue);
+  const hue = 210 - 160 * t;
+  const saturation = 45 + t * 30;
+  const lightness = 70 - t * 35;
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
+};
+
 const normalizeProvinceRecord = (record: ProvinceRecord): ProvinceRecord => {
   const next: ProvinceRecord = { ...record };
   Object.values(next).forEach((province) => {
@@ -775,6 +784,36 @@ const mergePopulationBucketsByCultureReligion = (
   );
 };
 
+const resolveMajorityTraitId = (
+  buckets: PopulationBucket[],
+  key: 'cultureId' | 'religionId',
+  validIds: Set<string>,
+  currentId?: string,
+): string | undefined => {
+  const byId = new Map<string, number>();
+  buckets.forEach((bucket) => {
+    const id = bucket[key];
+    if (!id || !validIds.has(id)) return;
+    const size =
+      normalizePopulationCount(bucket.maleCount) + normalizePopulationCount(bucket.femaleCount);
+    if (size <= 0) return;
+    byId.set(id, (byId.get(id) ?? 0) + size);
+  });
+  let bestId: string | undefined;
+  let bestValue = -1;
+  byId.forEach((value, id) => {
+    if (value > bestValue) {
+      bestId = id;
+      bestValue = value;
+      return;
+    }
+    if (value === bestValue && id === currentId) {
+      bestId = id;
+    }
+  });
+  return bestId;
+};
+
 const initialMapLayers: MapLayer[] = [
   { id: 'political', name: 'Политическая', visible: true },
   { id: 'cultural', name: 'Культурная', visible: false },
@@ -784,6 +823,7 @@ const initialMapLayers: MapLayer[] = [
   { id: 'climate', name: 'Климат', visible: false },
   { id: 'religion', name: 'Религии', visible: false },
   { id: 'resources', name: 'Ресурсы', visible: false },
+  { id: 'population', name: 'Население', visible: false },
   { id: 'fertility', name: 'Плодородность', visible: false },
   { id: 'radiation', name: 'Радиация', visible: false },
   { id: 'pollution', name: 'Загрязнения', visible: false },
@@ -830,6 +870,9 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [industryOpen, setIndustryOpen] = useState(false);
   const [populationOpen, setPopulationOpen] = useState(false);
+  const [populationPresetProvinceId, setPopulationPresetProvinceId] = useState<
+    string | undefined
+  >(undefined);
   const [diplomacyOpen, setDiplomacyOpen] = useState(false);
   const [climates, setClimates] = useState<Trait[]>(() =>
     cloneTraits(startingData.climates),
@@ -962,6 +1005,9 @@ function App() {
 
   const ensureAdditionalMapLayers = useCallback((layers: MapLayer[]) => {
     const nextLayers = [...layers];
+    if (!nextLayers.some((layer) => layer.id === 'population')) {
+      nextLayers.push({ id: 'population', name: 'Население', visible: false });
+    }
     if (!nextLayers.some((layer) => layer.id === 'markets')) {
       nextLayers.push({ id: 'markets', name: 'Рынки', visible: false });
     }
@@ -1036,6 +1082,44 @@ function App() {
       return next;
     });
   }, [provinces]);
+
+  useEffect(() => {
+    const validCultureIds = new Set(cultures.map((item) => item.id));
+    const validReligionIds = new Set(religions.map((item) => item.id));
+    setProvinces((prev) => {
+      let changed = false;
+      const next: ProvinceRecord = { ...prev };
+      Object.entries(prev).forEach(([provinceId, province]) => {
+        const buckets = populationByProvinceId[provinceId] ?? [];
+        if (buckets.length === 0) return;
+        const nextCultureId = resolveMajorityTraitId(
+          buckets,
+          'cultureId',
+          validCultureIds,
+          province.cultureId,
+        );
+        const nextReligionId = resolveMajorityTraitId(
+          buckets,
+          'religionId',
+          validReligionIds,
+          province.religionId,
+        );
+        if (
+          (province.cultureId ?? '') === (nextCultureId ?? '') &&
+          (province.religionId ?? '') === (nextReligionId ?? '')
+        ) {
+          return;
+        }
+        changed = true;
+        next[provinceId] = {
+          ...province,
+          cultureId: nextCultureId,
+          religionId: nextReligionId,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [populationByProvinceId, cultures, religions]);
 
   const getActiveColonizationsCount = (countryId?: string) => {
     if (!countryId) return 0;
@@ -4491,6 +4575,21 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     mapLayers.forEach((layer) => {
       paint[layer.id] = {};
     });
+    const populationTotalByProvinceId: Record<string, number> = {};
+    let maxPopulation = 0;
+    Object.entries(populationByProvinceId).forEach(([provinceId, buckets]) => {
+      const total = buckets.reduce(
+        (sum, bucket) =>
+          sum +
+          normalizePopulationCount(bucket.maleCount) +
+          normalizePopulationCount(bucket.femaleCount),
+        0,
+      );
+      populationTotalByProvinceId[provinceId] = total;
+      if (total > maxPopulation) {
+        maxPopulation = total;
+      }
+    });
     const marketByCountry = new Map<string, Market>();
     markets.forEach((market) => {
       market.memberCountryIds.forEach((countryId) => {
@@ -4560,6 +4659,9 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         paint.pollution ??= {};
         paint.pollution[province.id] = pollutionColor(province.pollution);
       }
+      const provincePopulation = populationTotalByProvinceId[province.id] ?? 0;
+      paint.population ??= {};
+      paint.population[province.id] = populationColor(provincePopulation, maxPopulation);
       if (selectedResourceId) {
         const amount = province.resourceAmounts?.[selectedResourceId] ?? 0;
         if (amount > 0) {
@@ -4593,6 +4695,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     cultures,
     resources,
     selectedResourceId,
+    populationByProvinceId,
   ]);
 
   const politicalStripes = useMemo(() => {
@@ -4739,6 +4842,32 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         color: pollutionColor(from),
       };
     });
+    let maxPopulation = 0;
+    const populationTotals = Object.values(populationByProvinceId).map((buckets) => {
+      const total = buckets.reduce(
+        (sum, bucket) =>
+          sum +
+          normalizePopulationCount(bucket.maleCount) +
+          normalizePopulationCount(bucket.femaleCount),
+        0,
+      );
+      if (total > maxPopulation) {
+        maxPopulation = total;
+      }
+      return total;
+    });
+    if (populationTotals.length === 0) {
+      maxPopulation = 0;
+    }
+    const populationLegendSteps = 5;
+    legends.population = Array.from({ length: populationLegendSteps }, (_, index) => {
+      const from = Math.round((maxPopulation / populationLegendSteps) * index);
+      const to = Math.round((maxPopulation / populationLegendSteps) * (index + 1));
+      return {
+        label: `${from}-${to}`,
+        color: populationColor(from, maxPopulation),
+      };
+    });
     return legends;
   }, [
     climates,
@@ -4751,6 +4880,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
     markets,
     selectedResourceId,
     countries,
+    populationByProvinceId,
   ]);
 
   const selectedProvince = selectedProvinceId
@@ -5636,14 +5766,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
   };
 
   const assignReligion = (provinceId: string, religionId?: string) => {
-    setProvinces((prev) => ({
-      ...prev,
-      [provinceId]: {
-        ...(prev[provinceId] as ProvinceData),
-        id: provinceId,
-        religionId,
-      },
-    }));
+    void provinceId;
+    void religionId;
   };
 
   const assignLandscape = (provinceId: string, landscapeId?: string) => {
@@ -5680,14 +5804,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
   };
 
   const assignCulture = (provinceId: string, cultureId?: string) => {
-    setProvinces((prev) => ({
-      ...prev,
-      [provinceId]: {
-        ...(prev[provinceId] as ProvinceData),
-        id: provinceId,
-        cultureId,
-      },
-    }));
+    void provinceId;
+    void cultureId;
   };
 
   const setColonizationCost = (provinceId: string, cost: number) => {
@@ -7729,6 +7847,18 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       });
       return next;
     });
+    setPopulationByProvinceId((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).map(([provinceId, buckets]) => [
+          provinceId,
+          mergePopulationBucketsByCultureReligion(
+            buckets.map((bucket) =>
+              bucket.religionId === id ? { ...bucket, religionId: undefined } : bucket,
+            ),
+          ),
+        ]),
+      ),
+    );
   };
 
   const deleteLandscape = (id: string) => {
@@ -7781,6 +7911,18 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       });
       return next;
     });
+    setPopulationByProvinceId((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).map(([provinceId, buckets]) => [
+          provinceId,
+          mergePopulationBucketsByCultureReligion(
+            buckets.map((bucket) =>
+              bucket.cultureId === id ? { ...bucket, cultureId: undefined } : bucket,
+            ),
+          ),
+        ]),
+      ),
+    );
   };
 
   const deleteResource = (id: string) => {
@@ -8162,7 +8304,10 @@ const layerPaint: MapLayerPaint = useMemo(() => {
       <LeftToolbar
         onOpenIndustry={() => setIndustryOpen(true)}
         onOpenMarkets={() => setMarketsOpen(true)}
-        onOpenPopulation={() => setPopulationOpen(true)}
+        onOpenPopulation={() => {
+          setPopulationPresetProvinceId(undefined);
+          setPopulationOpen(true);
+        }}
       />
       {logisticsRoutePlannerActive && (
         <div className="absolute left-1/2 -translate-x-1/2 bottom-24 z-40 rounded-xl border border-cyan-400/40 bg-[#08131f]/90 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-900/30">
@@ -8688,6 +8833,15 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           setRoutePlannerHint(undefined);
           setLogisticsOpen(true);
         }}
+        onOpenPopulation={() => {
+          if (contextMenu?.provinceId) {
+            setSelectedProvinceId(contextMenu.provinceId);
+            setPopulationPresetProvinceId(contextMenu.provinceId);
+          } else {
+            setPopulationPresetProvinceId(undefined);
+          }
+          setPopulationOpen(true);
+        }}
       />
 
       <LogisticsModal
@@ -9029,6 +9183,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         cultures={cultures}
         religions={religions}
         populationByProvinceId={populationByProvinceId}
+        presetProvinceId={populationPresetProvinceId}
       />
       <DiplomacyModal
         open={diplomacyOpen}

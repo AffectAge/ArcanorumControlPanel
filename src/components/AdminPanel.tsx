@@ -1597,32 +1597,16 @@ export default function AdminPanel({
                     </select>
                   </label>
 
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <div className="flex flex-col gap-2 text-white/70 text-sm">
                     Религия
-                    <select
-                      value={activeProvince.religionId ?? ''}
-                      onChange={(event) =>
-                        onAssignReligion(
-                          activeProvince.id,
-                          event.target.value || undefined,
-                        )
-                      }
-                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не назначена
-                      </option>
-                      {religions.map((religion) => (
-                        <option
-                          key={religion.id}
-                          value={religion.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {religion.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <div className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white/85 text-sm flex items-center">
+                      {religions.find((religion) => religion.id === activeProvince.religionId)
+                        ?.name ?? 'Не определена'}
+                    </div>
+                    <div className="text-[11px] text-white/45">
+                      Определяется автоматически по большинству населения провинции.
+                    </div>
+                  </div>
 
                   <label className="flex flex-col gap-2 text-white/70 text-sm">
                     Ландшафт
@@ -1705,32 +1689,16 @@ export default function AdminPanel({
                     </select>
                   </label>
 
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
+                  <div className="flex flex-col gap-2 text-white/70 text-sm">
                     Культура
-                    <select
-                      value={activeProvince.cultureId ?? ''}
-                      onChange={(event) =>
-                        onAssignCulture(
-                          activeProvince.id,
-                          event.target.value || undefined,
-                        )
-                      }
-                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    >
-                      <option value="" className="bg-[#0b111b] text-white">
-                        Не назначена
-                      </option>
-                      {cultures.map((culture) => (
-                        <option
-                          key={culture.id}
-                          value={culture.id}
-                          className="bg-[#0b111b] text-white"
-                        >
-                          {culture.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <div className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white/85 text-sm flex items-center">
+                      {cultures.find((culture) => culture.id === activeProvince.cultureId)
+                        ?.name ?? 'Не определена'}
+                    </div>
+                    <div className="text-[11px] text-white/45">
+                      Определяется автоматически по большинству населения провинции.
+                    </div>
+                  </div>
 
                   <div className="md:col-span-2">
                     <div className="text-white/70 text-sm mb-2">Ресурсы</div>

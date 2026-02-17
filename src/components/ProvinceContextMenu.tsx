@@ -7,6 +7,7 @@
   onConstruct: () => void;
   onEditProvince: () => void;
   onOpenLogistics: () => void;
+  onOpenPopulation: () => void;
 };
 
 export default function ProvinceContextMenu({
@@ -18,6 +19,7 @@ export default function ProvinceContextMenu({
   onConstruct,
   onEditProvince,
   onOpenLogistics,
+  onOpenPopulation,
 }: ProvinceContextMenuProps) {
   if (!open) return null;
 
@@ -63,6 +65,15 @@ export default function ProvinceContextMenu({
           className="w-full px-4 py-3 text-left text-white/80 hover:bg-sky-400/10 hover:text-sky-300 transition-colors"
         >
           Логистика
+        </button>
+        <button
+          onClick={() => {
+            onOpenPopulation();
+            onClose();
+          }}
+          className="w-full px-4 py-3 text-left text-white/80 hover:bg-violet-400/10 hover:text-violet-300 transition-colors"
+        >
+          Население провинции
         </button>
       </div>
     </div>

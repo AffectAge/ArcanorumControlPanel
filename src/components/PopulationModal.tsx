@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Users, X } from 'lucide-react';
 import Tooltip from './Tooltip';
 import type {
@@ -21,9 +21,11 @@ type PopulationModalProps = {
   cultures: Trait[];
   religions: Trait[];
   populationByProvinceId: PopulationByProvinceId;
+  presetProvinceId?: string;
 };
 
 type PopulationTab = 'main' | 'employment';
+type PopulationScope = 'own_country' | 'world' | 'own_province' | 'world_province';
 
 type ChartEntry = {
   id: string;
@@ -168,8 +170,12 @@ export default function PopulationModal({
   cultures,
   religions,
   populationByProvinceId,
+  presetProvinceId,
 }: PopulationModalProps) {
   const [tab, setTab] = useState<PopulationTab>('main');
+  const [scope, setScope] = useState<PopulationScope>('own_country');
+  const [selectedOwnProvinceId, setSelectedOwnProvinceId] = useState<string>('');
+  const [selectedWorldProvinceId, setSelectedWorldProvinceId] = useState<string>('');
   const countryName =
     countries.find((country) => country.id === activeCountryId)?.name ?? 'Все страны';
   const cultureById = useMemo(
@@ -189,17 +195,80 @@ export default function PopulationModal({
     [industries],
   );
 
-  const visibleProvinceIds = useMemo(
+  const ownProvinceIds = useMemo(
     () =>
       Object.values(provinces)
         .filter((province) =>
-          activeCountryId
-            ? province.ownerCountryId === activeCountryId
-            : Boolean(province.ownerCountryId),
+          activeCountryId ? province.ownerCountryId === activeCountryId : false,
         )
         .map((province) => province.id),
     [provinces, activeCountryId],
   );
+
+  const worldProvinceIds = useMemo(
+    () =>
+      Object.values(provinces)
+        .filter((province) => Boolean(province.ownerCountryId))
+        .map((province) => province.id),
+    [provinces],
+  );
+
+  const visibleProvinceIds = useMemo(() => {
+    if (scope === 'world') return worldProvinceIds;
+    if (scope === 'own_country') {
+      return activeCountryId ? ownProvinceIds : worldProvinceIds;
+    }
+    if (scope === 'own_province') {
+      return selectedOwnProvinceId ? [selectedOwnProvinceId] : [];
+    }
+    if (scope === 'world_province') {
+      return selectedWorldProvinceId ? [selectedWorldProvinceId] : [];
+    }
+    return worldProvinceIds;
+  }, [
+    scope,
+    activeCountryId,
+    ownProvinceIds,
+    worldProvinceIds,
+    selectedOwnProvinceId,
+    selectedWorldProvinceId,
+  ]);
+
+  const scopeLabel = useMemo(() => {
+    if (scope === 'world') return 'Весь мир';
+    if (scope === 'own_country') return activeCountryId ? `Наша страна: ${countryName}` : 'Весь мир';
+    if (scope === 'own_province') return selectedOwnProvinceId ? `Провинция: ${selectedOwnProvinceId}` : 'Провинция нашей страны';
+    if (scope === 'world_province') return selectedWorldProvinceId ? `Провинция: ${selectedWorldProvinceId}` : 'Провинция мира';
+    return countryName;
+  }, [scope, activeCountryId, countryName, selectedOwnProvinceId, selectedWorldProvinceId]);
+
+  useEffect(() => {
+    if (ownProvinceIds.length === 0) {
+      setSelectedOwnProvinceId('');
+      return;
+    }
+    if (!selectedOwnProvinceId || !ownProvinceIds.includes(selectedOwnProvinceId)) {
+      setSelectedOwnProvinceId(ownProvinceIds[0]);
+    }
+  }, [ownProvinceIds, selectedOwnProvinceId]);
+
+  useEffect(() => {
+    if (worldProvinceIds.length === 0) {
+      setSelectedWorldProvinceId('');
+      return;
+    }
+    if (!selectedWorldProvinceId || !worldProvinceIds.includes(selectedWorldProvinceId)) {
+      setSelectedWorldProvinceId(worldProvinceIds[0]);
+    }
+  }, [worldProvinceIds, selectedWorldProvinceId]);
+
+  useEffect(() => {
+    if (!open || !presetProvinceId) return;
+    if (!worldProvinceIds.includes(presetProvinceId)) return;
+    setScope('world_province');
+    setSelectedWorldProvinceId(presetProvinceId);
+    setTab('main');
+  }, [open, presetProvinceId, worldProvinceIds]);
 
   const stats = useMemo(() => {
     const cultureTotals = new Map<string, number>();
@@ -364,7 +433,7 @@ export default function PopulationModal({
             </div>
             <div>
               <div className="text-white text-lg font-semibold">Население</div>
-              <div className="text-white/55 text-xs">{countryName}</div>
+              <div className="text-white/55 text-xs">{scopeLabel}</div>
             </div>
           </div>
           <button
@@ -377,6 +446,69 @@ export default function PopulationModal({
 
         <div className="flex-1 min-h-0 flex">
           <div className="w-[300px] border-r border-white/10 p-4 space-y-2">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2 mb-3">
+              <div className="text-white/85 text-xs font-semibold">Данные</div>
+              <select
+                value={scope}
+                onChange={(event) => setScope(event.target.value as PopulationScope)}
+                className="h-9 w-full rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+              >
+                <option value="own_country" className="bg-[#0b111b] text-white">
+                  Наша страна
+                </option>
+                <option value="world" className="bg-[#0b111b] text-white">
+                  Весь мир
+                </option>
+                <option
+                  value="own_province"
+                  disabled={!activeCountryId || ownProvinceIds.length === 0}
+                  className="bg-[#0b111b] text-white"
+                >
+                  Провинция нашей страны
+                </option>
+                <option
+                  value="world_province"
+                  disabled={worldProvinceIds.length === 0}
+                  className="bg-[#0b111b] text-white"
+                >
+                  Провинция мира
+                </option>
+              </select>
+              {scope === 'own_province' && (
+                <select
+                  value={selectedOwnProvinceId}
+                  onChange={(event) => setSelectedOwnProvinceId(event.target.value)}
+                  className="h-9 w-full rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                >
+                  {ownProvinceIds.map((provinceId) => (
+                    <option
+                      key={`own-scope-province:${provinceId}`}
+                      value={provinceId}
+                      className="bg-[#0b111b] text-white"
+                    >
+                      {provinceId}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {scope === 'world_province' && (
+                <select
+                  value={selectedWorldProvinceId}
+                  onChange={(event) => setSelectedWorldProvinceId(event.target.value)}
+                  className="h-9 w-full rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                >
+                  {worldProvinceIds.map((provinceId) => (
+                    <option
+                      key={`world-scope-province:${provinceId}`}
+                      value={provinceId}
+                      className="bg-[#0b111b] text-white"
+                    >
+                      {provinceId}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <button
               onClick={() => setTab('main')}
               className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${

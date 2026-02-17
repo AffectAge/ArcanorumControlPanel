@@ -13,6 +13,7 @@ import {
   Map as MapIcon,
   Route,
   Link2,
+  Users,
 } from 'lucide-react';
 import svgPanZoom from 'svg-pan-zoom';
 import mapUrl from '../assets/world-states-provinces.svg';
@@ -92,6 +93,7 @@ const layerTone: Record<string, string> = {
   climate: 'from-blue-400/30 via-orange-300/10 to-transparent',
   religion: 'from-yellow-300/30 via-purple-400/10 to-transparent',
   resources: 'from-emerald-300/25 via-lime-400/10 to-transparent',
+  population: 'from-sky-300/25 via-blue-500/10 to-transparent',
   markets: 'from-sky-300/25 via-cyan-400/10 to-transparent',
   fertility: 'from-lime-300/25 via-emerald-400/10 to-transparent',
   radiation: 'from-lime-300/25 via-red-400/10 to-transparent',
@@ -110,6 +112,7 @@ const layerIconMap: Record<string, React.ComponentType<{ className?: string }>> 
   climate: CloudSun,
   religion: Landmark,
   resources: Gem,
+  population: Users,
   markets: Globe2,
   fertility: Leaf,
   radiation: CloudSun,
