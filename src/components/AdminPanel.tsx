@@ -17,7 +17,6 @@ import {
   Briefcase,
   Factory,
   Route,
-  Scale,
 } from 'lucide-react';
 import Tooltip from './Tooltip';
 import type {
@@ -31,10 +30,6 @@ import type {
   TraitCriteria,
   RequirementNode,
   ResourceCategory,
-  LawCategory,
-  LawItem,
-  IdeologyDefinition,
-  PoliticalFactionDefinition,
 } from '../types';
 
 type AdminTab =
@@ -50,9 +45,7 @@ type AdminTab =
   | 'buildings'
   | 'companies'
   | 'industries'
-  | 'routeTypes'
-  | 'laws';
-type LawsAdminSection = 'ideologies' | 'factions' | 'laws';
+  | 'routeTypes';
 
 type AdminPanelProps = {
   open: boolean;
@@ -71,10 +64,6 @@ type AdminPanelProps = {
   industries: Industry[];
   routeTypes: LogisticsRouteType[];
   companies: Company[];
-  lawCategories: LawCategory[];
-  laws: LawItem[];
-  ideologies: IdeologyDefinition[];
-  politicalFactions: PoliticalFactionDefinition[];
   onClose: () => void;
   onAssignOwner: (provinceId: string, ownerId?: string) => void;
   onAssignClimate: (provinceId: string, climateId?: string) => void;
@@ -212,21 +201,6 @@ type AdminPanelProps = {
     },
   ) => void;
   onUpdateResourceCategory: (resourceId: string, categoryId?: string) => void;
-  onAddIdeology: (name: string, color: string) => void;
-  onDeleteIdeology: (ideologyId: string) => void;
-  onUpdateIdeologyColor: (ideologyId: string, color: string) => void;
-  onAddPoliticalFaction: (name: string, color: string) => void;
-  onDeletePoliticalFaction: (factionId: string) => void;
-  onUpdatePoliticalFactionField: (
-    factionId: string,
-    patch: Partial<PoliticalFactionDefinition>,
-  ) => void;
-  onUpdateFactionIdeologyWeight: (
-    factionId: string,
-    ideologyId: string,
-    value: number,
-  ) => void;
-  onUpdateLawIdeologyWeight: (lawId: string, ideologyId: string, value: number) => void;
   onDeleteClimate: (id: string) => void;
   onDeleteReligion: (id: string) => void;
   onDeleteLandscape: (id: string) => void;
@@ -279,10 +253,6 @@ export default function AdminPanel({
   industries,
   routeTypes,
   companies,
-  lawCategories,
-  laws,
-  ideologies,
-  politicalFactions,
   onClose,
   onAssignOwner,
   onAssignClimate,
@@ -333,14 +303,6 @@ export default function AdminPanel({
   onUpdateResourceCategoryIcon,
   onUpdateResourcePricing,
   onUpdateResourceCategory,
-  onAddIdeology,
-  onDeleteIdeology,
-  onUpdateIdeologyColor,
-  onAddPoliticalFaction,
-  onDeletePoliticalFaction,
-  onUpdatePoliticalFactionField,
-  onUpdateFactionIdeologyWeight,
-  onUpdateLawIdeologyWeight,
   onDeleteClimate,
   onDeleteReligion,
   onDeleteLandscape,
@@ -488,13 +450,6 @@ export default function AdminPanel({
   const [routeTypeTransportCapacityByCategory, setRouteTypeTransportCapacityByCategory] =
     useState<Record<string, number>>({});
   const [routeTypesModalOpen, setRouteTypesModalOpen] = useState(false);
-  const [ideologyName, setIdeologyName] = useState('');
-  const [ideologyColor, setIdeologyColor] = useState('#60a5fa');
-  const [factionName, setFactionName] = useState('');
-  const [factionColor, setFactionColor] = useState('#34d399');
-  const [lawsAdminSection, setLawsAdminSection] = useState<LawsAdminSection>(
-    'ideologies',
-  );
 
   const provinceIds = useMemo(() => Object.keys(provinces).sort(), [provinces]);
   const activeProvince = selectedProvince ? provinces[selectedProvince] : undefined;
@@ -1548,17 +1503,6 @@ export default function AdminPanel({
           >
             <Route className="w-4 h-4" />
             Типы маршрутов
-          </button>
-          <button
-            onClick={() => setTab('laws')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${
-              tab === 'laws'
-                ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
-                : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
-            }`}
-          >
-            <Scale className="w-4 h-4" />
-            Законы
           </button>
           <button
             onClick={onClose}
@@ -3665,272 +3609,6 @@ export default function AdminPanel({
                   <div className="text-white/50 text-sm">Нет типов маршрутов</div>
                 )}
               </div>
-            </div>
-          )}
-          {tab === 'laws' && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-white text-xl font-semibold">Законы</h2>
-                <p className="text-white/60 text-sm">
-                  Настройка идеологий, фракций и идеологического профиля законов.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setLawsAdminSection('ideologies')}
-                  className={`px-3 py-2 rounded-lg text-sm border ${
-                    lawsAdminSection === 'ideologies'
-                      ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
-                      : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
-                  }`}
-                >
-                  Идеологии
-                </button>
-                <button
-                  onClick={() => setLawsAdminSection('factions')}
-                  className={`px-3 py-2 rounded-lg text-sm border ${
-                    lawsAdminSection === 'factions'
-                      ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
-                      : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
-                  }`}
-                >
-                  Фракции
-                </button>
-                <button
-                  onClick={() => setLawsAdminSection('laws')}
-                  className={`px-3 py-2 rounded-lg text-sm border ${
-                    lawsAdminSection === 'laws'
-                      ? 'bg-emerald-500/15 border-emerald-400/40 text-white'
-                      : 'bg-white/5 border-white/10 text-white/60 hover:border-emerald-400/30'
-                  }`}
-                >
-                  Законы
-                </button>
-              </div>
-              {lawsAdminSection === 'ideologies' && (
-              <div className="rounded-xl border border-white/10 bg-black/25 p-4 space-y-3">
-                <div className="text-white/85 text-sm font-semibold">Идеологии</div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Название
-                    <input
-                      value={ideologyName}
-                      onChange={(event) => setIdeologyName(event.target.value)}
-                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Цвет
-                    <input
-                      type="color"
-                      value={ideologyColor}
-                      onChange={(event) => setIdeologyColor(event.target.value)}
-                      className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
-                    />
-                  </label>
-                  <button
-                    onClick={() => {
-                      onAddIdeology(ideologyName, ideologyColor);
-                      setIdeologyName('');
-                    }}
-                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 inline-flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Добавить идеологию
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {ideologies.map((ideology) => (
-                    <div
-                      key={`admin-ideology:${ideology.id}`}
-                      className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between gap-2"
-                    >
-                      <div className="flex items-center gap-2 text-white/80 text-sm">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full border border-white/10"
-                          style={{ backgroundColor: ideology.color }}
-                        />
-                        {ideology.name}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={ideology.color}
-                          onChange={(event) =>
-                            onUpdateIdeologyColor(ideology.id, event.target.value)
-                          }
-                          className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
-                        />
-                        <button
-                          onClick={() => onDeleteIdeology(ideology.id)}
-                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                        >
-                          <Trash2 className="w-4 h-4 text-white/60" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              )}
-              {lawsAdminSection === 'factions' && (
-              <div className="rounded-xl border border-white/10 bg-black/25 p-4 space-y-3">
-                <div className="text-white/85 text-sm font-semibold">Фракции</div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Название
-                    <input
-                      value={factionName}
-                      onChange={(event) => setFactionName(event.target.value)}
-                      className="h-10 rounded-lg bg-black/40 border border-white/10 px-3 text-white focus:outline-none focus:border-emerald-400/60"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2 text-white/70 text-sm">
-                    Цвет
-                    <input
-                      type="color"
-                      value={factionColor}
-                      onChange={(event) => setFactionColor(event.target.value)}
-                      className="w-14 h-10 rounded-lg border border-white/10 bg-transparent"
-                    />
-                  </label>
-                  <button
-                    onClick={() => {
-                      onAddPoliticalFaction(factionName, factionColor);
-                      setFactionName('');
-                    }}
-                    className="h-10 px-4 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 inline-flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Добавить фракцию
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {politicalFactions.map((faction) => (
-                    <div
-                      key={`admin-faction:${faction.id}`}
-                      className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <input
-                          value={faction.name}
-                          onChange={(event) =>
-                            onUpdatePoliticalFactionField(faction.id, {
-                              name: event.target.value,
-                            })
-                          }
-                          className="h-8 flex-1 rounded-md bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
-                        />
-                        <input
-                          type="color"
-                          value={faction.color}
-                          onChange={(event) =>
-                            onUpdatePoliticalFactionField(faction.id, {
-                              color: event.target.value,
-                            })
-                          }
-                          className="w-8 h-8 rounded-lg border border-white/10 bg-transparent"
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          value={faction.baseSupportPercent ?? 0}
-                          onChange={(event) =>
-                            onUpdatePoliticalFactionField(faction.id, {
-                              baseSupportPercent: Math.max(
-                                0,
-                                Number(event.target.value) || 0,
-                              ),
-                            })
-                          }
-                          className="w-24 h-8 rounded-md bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
-                          title="Базовая поддержка %"
-                        />
-                        <button
-                          onClick={() => onDeletePoliticalFaction(faction.id)}
-                          className="w-8 h-8 rounded-lg border border-white/10 bg-black/30 flex items-center justify-center hover:border-red-400/40"
-                        >
-                          <Trash2 className="w-4 h-4 text-white/60" />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {ideologies.map((ideology) => (
-                          <label
-                            key={`admin-faction-ideology:${faction.id}:${ideology.id}`}
-                            className="rounded-md border border-white/10 bg-black/25 px-2 py-1.5 flex items-center justify-between gap-2"
-                          >
-                            <span className="text-white/70 text-xs">{ideology.name}</span>
-                            <input
-                              type="number"
-                              min={0}
-                              value={faction.ideologyWeightsById?.[ideology.id] ?? 0}
-                              onChange={(event) =>
-                                onUpdateFactionIdeologyWeight(
-                                  faction.id,
-                                  ideology.id,
-                                  Math.max(0, Number(event.target.value) || 0),
-                                )
-                              }
-                              className="w-20 h-7 rounded-md bg-black/40 border border-white/10 px-2 text-white text-xs focus:outline-none focus:border-emerald-400/60"
-                            />
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              )}
-              {lawsAdminSection === 'laws' && (
-              <div className="space-y-3">
-                {laws.length > 0 ? (
-                  laws.map((law) => {
-                    const categoryName =
-                      lawCategories.find((item) => item.id === law.categoryId)?.name ??
-                      law.categoryId;
-                    return (
-                      <div
-                        key={`admin-law:${law.id}`}
-                        className="rounded-xl border border-white/10 bg-black/25 p-4 space-y-3"
-                      >
-                        <div>
-                          <div className="text-white/85 text-sm font-semibold">{law.name}</div>
-                          <div className="text-white/50 text-xs mt-0.5">
-                            Категория: {categoryName}
-                          </div>
-                          <div className="text-white/60 text-xs mt-1">{law.short}</div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {ideologies.map((ideology) => (
-                            <label
-                              key={`admin-law-ideology:${law.id}:${ideology.id}`}
-                              className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 flex items-center justify-between gap-2"
-                            >
-                              <span className="text-white/75 text-sm">{ideology.name}</span>
-                              <input
-                                type="number"
-                                min={0}
-                                value={law.ideologyWeightsById?.[ideology.id] ?? 0}
-                                onChange={(event) =>
-                                  onUpdateLawIdeologyWeight(
-                                    law.id,
-                                    ideology.id,
-                                    Math.max(0, Number(event.target.value) || 0),
-                                  )
-                                }
-                                className="w-20 h-8 rounded-md bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
-                              />
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-white/50 text-sm">Нет законов</div>
-                )}
-              </div>
-              )}
             </div>
           )}
           {routeTypesModalOpen && (

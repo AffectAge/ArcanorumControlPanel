@@ -19,8 +19,7 @@ import DiplomacyProposalsModal from './components/DiplomacyProposalsModal';
 import LogisticsModal from './components/LogisticsModal';
 import MarketModal from './components/MarketModal';
 import PopulationModal from './components/PopulationModal';
-import ParliamentModal from './components/ParliamentModal';
-import LawsModal from './components/LawsModal';
+import BudgetModal from './components/BudgetModal';
 import LegacyTooltipBridge from './components/LegacyTooltipBridge';
 import startingDataJson from './data/starting-data.json';
 import {
@@ -58,18 +57,6 @@ import type {
   PopulationBucket,
   PopulationEmploymentSector,
   PopulationByProvinceId,
-  ParliamentByCountryId,
-  ParliamentCountryState,
-  ParliamentFactionId,
-  ParliamentFactionState,
-  IdeologyDefinition,
-  PoliticalFactionDefinition,
-  LawCategory,
-  LawItem,
-  LawParamDefinition,
-  LawStateByCountryId,
-  LawVoteState,
-  LawPolicyParamsByCountryId,
   Market,
   MarketWorldResourceTradePolicy,
   WorldMarket,
@@ -89,226 +76,11 @@ const createId = () =>
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
-const seededUnitRandom = (seed: string) => {
-  let hash = 2166136261;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash ^= seed.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  const normalized = (hash >>> 0) / 4294967295;
-  return clamp01(normalized);
-};
 const DEFAULT_RESOURCE_BASE_PRICE = 1;
 const MARKET_PRICE_SMOOTHING = 0.30;
 const MARKET_PRICE_HISTORY_LENGTH = 10;
 const MARKET_PRICE_EPSILON = 0.0001;
 const ALL_RESOURCES_WORLD_TRADE_POLICY_KEY = '__all_resources__';
-const PARLIAMENT_RECOMPUTE_INTERVAL = 6;
-const PARLIAMENT_TOTAL_SEATS = 300;
-const LAW_VOTE_NOISE_RANGE = 0.08;
-const LAW_VOTE_VOLATILITY = 0.5;
-const DEFAULT_IDEOLOGIES: IdeologyDefinition[] = [
-  { id: 'industrialism', name: 'Индустриализм', color: '#38bdf8' },
-  { id: 'agrarianism', name: 'Аграризм', color: '#84cc16' },
-  { id: 'traditionalism', name: 'Традиционализм', color: '#f59e0b' },
-  { id: 'statism', name: 'Этатизм', color: '#a78bfa' },
-];
-const DEFAULT_POLITICAL_FACTIONS: PoliticalFactionDefinition[] = [
-  {
-    id: 'industrialists',
-    name: 'Промышленный блок',
-    color: '#38bdf8',
-    baseSupportPercent: 30,
-    ideologyWeightsById: {
-      industrialism: 55,
-      agrarianism: 10,
-      traditionalism: 10,
-      statism: 25,
-    },
-  },
-  {
-    id: 'agrarians',
-    name: 'Аграрный союз',
-    color: '#84cc16',
-    baseSupportPercent: 25,
-    ideologyWeightsById: {
-      industrialism: 10,
-      agrarianism: 65,
-      traditionalism: 20,
-      statism: 5,
-    },
-  },
-  {
-    id: 'traditionalists',
-    name: 'Традиционалисты',
-    color: '#f59e0b',
-    baseSupportPercent: 20,
-    ideologyWeightsById: {
-      industrialism: 5,
-      agrarianism: 20,
-      traditionalism: 70,
-      statism: 5,
-    },
-  },
-  {
-    id: 'bureaucrats',
-    name: 'Государственники',
-    color: '#a78bfa',
-    baseSupportPercent: 25,
-    ideologyWeightsById: {
-      industrialism: 20,
-      agrarianism: 5,
-      traditionalism: 15,
-      statism: 60,
-    },
-  },
-];
-const DEFAULT_LAW_CATEGORIES: LawCategory[] = [
-  {
-    id: 'employment',
-    name: 'Занятость',
-    description: 'Законы рынка труда и регулирования рабочих мест.',
-  },
-  {
-    id: 'social',
-    name: 'Социальная политика',
-    description: 'Законы о защите населения и уровне жизни.',
-  },
-  {
-    id: 'taxes',
-    name: 'Налоги',
-    description: 'Налоговые правила и перераспределение доходов.',
-  },
-];
-const DEFAULT_LAWS: LawItem[] = [
-  {
-    id: 'employment_min_wage',
-    categoryId: 'employment',
-    name: 'Минимальная зарплата',
-    short: 'Гарантирует нижнюю планку оплаты труда.',
-    effects: [
-      '+ Снижает социальную напряженность при безработице.',
-      '- Повышает стоимость труда для зданий.',
-    ],
-    requirements: ['Поддержка парламентского большинства > 50%.'],
-    ideologyWeightsById: {
-      industrialism: 20,
-      agrarianism: 15,
-      traditionalism: 25,
-      statism: 40,
-    },
-    params: [
-      {
-        id: 'min_wage',
-        name: 'Размер минимальной зарплаты',
-        min: 1,
-        max: 1000,
-        step: 1,
-        defaultValue: 1,
-        unit: 'дук.',
-        ideologyImpactById: {
-          industrialism: -35,
-          agrarianism: -10,
-          traditionalism: 10,
-          statism: 40,
-        },
-      },
-    ],
-  },
-  {
-    id: 'employment_unions',
-    categoryId: 'employment',
-    name: 'Профсоюзные гарантии',
-    short: 'Укрепляет права работников в ключевых отраслях.',
-    effects: ['+ Рост лояльности занятых POP.', '- Небольшое снижение гибкости рынка труда.'],
-    ideologyWeightsById: {
-      industrialism: 10,
-      agrarianism: 15,
-      traditionalism: 20,
-      statism: 55,
-    },
-  },
-  {
-    id: 'social_basic_support',
-    categoryId: 'social',
-    name: 'Базовая поддержка безработных',
-    short: 'Пособия при потере работы.',
-    effects: ['+ Снижает штрафы от безработицы.', '- Расходы бюджета растут.'],
-    ideologyWeightsById: {
-      industrialism: 10,
-      agrarianism: 25,
-      traditionalism: 35,
-      statism: 30,
-    },
-  },
-  {
-    id: 'taxes_progressive',
-    categoryId: 'taxes',
-    name: 'Прогрессивная шкала',
-    short: 'Более высокие ставки для богатых групп.',
-    effects: ['+ Более стабильные бюджетные поступления в кризис.', '- Снижение поддержки части элит.'],
-    ideologyWeightsById: {
-      industrialism: 20,
-      agrarianism: 20,
-      traditionalism: 20,
-      statism: 40,
-    },
-  },
-];
-
-const cloneLawParams = (params?: LawParamDefinition[]) =>
-  (params ?? []).map((param) => ({
-    ...param,
-    ideologyImpactById: { ...(param.ideologyImpactById ?? {}) },
-  }));
-
-const cloneLawDefinition = (law: LawItem): LawItem => ({
-  ...law,
-  effects: [...law.effects],
-  requirements: law.requirements ? [...law.requirements] : undefined,
-  ideologyWeightsById: { ...(law.ideologyWeightsById ?? {}) },
-  params: cloneLawParams(law.params),
-});
-
-const normalizeLoadedLaws = (input?: LawItem[]): LawItem[] => {
-  const source = input && input.length > 0 ? input : DEFAULT_LAWS;
-  const defaultsById = new Map(DEFAULT_LAWS.map((law) => [law.id, law]));
-  const merged = source.map((law) => {
-    const def = defaultsById.get(law.id);
-    if (!def) return cloneLawDefinition(law);
-    return cloneLawDefinition({
-      ...def,
-      ...law,
-      effects: law.effects?.length ? law.effects : def.effects,
-      requirements: law.requirements ?? def.requirements,
-      ideologyWeightsById: {
-        ...(def.ideologyWeightsById ?? {}),
-        ...(law.ideologyWeightsById ?? {}),
-      },
-      params:
-        law.params && law.params.length > 0
-          ? law.params.map((param) => {
-              const defParam = def.params?.find((item) => item.id === param.id);
-              return {
-                ...(defParam ?? {}),
-                ...param,
-                ideologyImpactById: {
-                  ...(defParam?.ideologyImpactById ?? {}),
-                  ...(param.ideologyImpactById ?? {}),
-                },
-              } as LawParamDefinition;
-            })
-          : def.params,
-    });
-  });
-  const ids = new Set(merged.map((law) => law.id));
-  DEFAULT_LAWS.forEach((law) => {
-    if (!ids.has(law.id)) {
-      merged.push(cloneLawDefinition(law));
-    }
-  });
-  return merged;
-};
 
 const normalizePositiveNumber = (value: unknown): number | undefined => {
   if (!Number.isFinite(value)) return undefined;
@@ -1043,65 +815,6 @@ const resolveMajorityTraitId = (
   return bestId;
 };
 
-const apportionSeatsByScore = (
-  scores: Record<ParliamentFactionId, number>,
-  totalSeats: number,
-) => {
-  const ids = Object.keys(scores) as ParliamentFactionId[];
-  const safeScores = Object.fromEntries(
-    ids.map((id) => [id, Math.max(0, Number(scores[id]) || 0)]),
-  ) as Record<ParliamentFactionId, number>;
-  const scoreSum = ids.reduce((sum, id) => sum + safeScores[id], 0);
-  const normalizedSupport: Record<ParliamentFactionId, number> = {
-    industrialists: 0,
-    agrarians: 0,
-    traditionalists: 0,
-    bureaucrats: 0,
-  };
-  if (scoreSum > 0) {
-    ids.forEach((id) => {
-      normalizedSupport[id] = safeScores[id] / scoreSum;
-    });
-  } else {
-    const uniform = 1 / ids.length;
-    ids.forEach((id) => {
-      normalizedSupport[id] = uniform;
-    });
-  }
-
-  const rawSeats = ids.map((id) => ({
-    id,
-    raw: normalizedSupport[id] * totalSeats,
-  }));
-  const baseSeatsById: Record<ParliamentFactionId, number> = {
-    industrialists: 0,
-    agrarians: 0,
-    traditionalists: 0,
-    bureaucrats: 0,
-  };
-  rawSeats.forEach(({ id, raw }) => {
-    baseSeatsById[id] = Math.floor(raw);
-  });
-  let remaining = totalSeats - ids.reduce((sum, id) => sum + baseSeatsById[id], 0);
-  if (remaining > 0) {
-    const byRemainder = [...rawSeats].sort(
-      (a, b) => b.raw - Math.floor(b.raw) - (a.raw - Math.floor(a.raw)),
-    );
-    for (let index = 0; index < byRemainder.length && remaining > 0; index += 1) {
-      const targetId = byRemainder[index].id;
-      baseSeatsById[targetId] += 1;
-      remaining -= 1;
-      if (index === byRemainder.length - 1 && remaining > 0) {
-        index = -1;
-      }
-    }
-  }
-  return {
-    supportById: normalizedSupport,
-    seatsById: baseSeatsById,
-  };
-};
-
 const initialMapLayers: MapLayer[] = [
   { id: 'political', name: 'Политическая', visible: true },
   { id: 'cultural', name: 'Культурная', visible: false },
@@ -1158,8 +871,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [industryOpen, setIndustryOpen] = useState(false);
   const [populationOpen, setPopulationOpen] = useState(false);
-  const [parliamentOpen, setParliamentOpen] = useState(false);
-  const [lawsOpen, setLawsOpen] = useState(false);
+  const [budgetOpen, setBudgetOpen] = useState(false);
   const [populationPresetProvinceId, setPopulationPresetProvinceId] = useState<
     string | undefined
   >(undefined);
@@ -1204,25 +916,6 @@ function App() {
   );
   const [populationByProvinceId, setPopulationByProvinceId] =
     useState<PopulationByProvinceId>({});
-  const [parliamentByCountryId, setParliamentByCountryId] =
-    useState<ParliamentByCountryId>({});
-  const [ideologies, setIdeologies] = useState<IdeologyDefinition[]>(
-    () => DEFAULT_IDEOLOGIES.map((item) => ({ ...item })),
-  );
-  const [politicalFactions, setPoliticalFactions] = useState<PoliticalFactionDefinition[]>(
-    () =>
-      DEFAULT_POLITICAL_FACTIONS.map((item) => ({
-        ...item,
-        ideologyWeightsById: { ...(item.ideologyWeightsById ?? {}) },
-      })),
-  );
-  const [lawCategories, setLawCategories] = useState<LawCategory[]>(
-    () => DEFAULT_LAW_CATEGORIES.map((item) => ({ ...item })),
-  );
-  const [laws, setLaws] = useState<LawItem[]>(() => normalizeLoadedLaws());
-  const [lawStateByCountryId, setLawStateByCountryId] = useState<LawStateByCountryId>({});
-  const [lawPolicyParamsByCountryId, setLawPolicyParamsByCountryId] =
-    useState<LawPolicyParamsByCountryId>({});
   const [markets, setMarkets] = useState<Market[]>([]);
   const [worldMarket, setWorldMarket] = useState<WorldMarket>(() =>
     createDefaultWorldMarket(cloneResources(startingData.resources)),
@@ -1429,270 +1122,6 @@ function App() {
       return changed ? next : prev;
     });
   }, [populationByProvinceId, cultures, religions]);
-
-  const buildParliamentStateForCountry = useCallback(
-    (countryId: string, atTurn: number): ParliamentCountryState => {
-      let laborSupply = 0;
-      let employed = 0;
-      let unemployed = 0;
-      const employedBySector: Record<PopulationEmploymentSector, number> = {
-        industry: 0,
-        agri: 0,
-        services: 0,
-        state: 0,
-      };
-
-      Object.values(provinces).forEach((province) => {
-        if (province.ownerCountryId !== countryId) return;
-        const buckets = populationByProvinceId[province.id] ?? [];
-        buckets.forEach((bucket) => {
-          const totalPopulation =
-            normalizePopulationCount(bucket.maleCount) +
-            normalizePopulationCount(bucket.femaleCount);
-          const workingShare = normalizeWorkingShare(bucket.workingShare);
-          laborSupply += Math.floor(totalPopulation * workingShare);
-          employed += normalizePopulationCount(bucket.employed);
-          unemployed += normalizePopulationCount(bucket.unemployed);
-          (['industry', 'agri', 'services', 'state'] as PopulationEmploymentSector[]).forEach(
-            (sector) => {
-              employedBySector[sector] +=
-                normalizePopulationCount(bucket.employmentBySector?.[sector]);
-            },
-          );
-        });
-      });
-
-      const employedTotal = Math.max(
-        1,
-        employedBySector.industry +
-          employedBySector.agri +
-          employedBySector.services +
-          employedBySector.state,
-      );
-      const industryShare = employedBySector.industry / employedTotal;
-      const agriShare = employedBySector.agri / employedTotal;
-      const servicesShare = employedBySector.services / employedTotal;
-      const stateShare = employedBySector.state / employedTotal;
-      const unemploymentRate = unemployed / Math.max(1, laborSupply);
-
-      const normalizedFactions =
-        politicalFactions.length > 0
-          ? politicalFactions
-          : DEFAULT_POLITICAL_FACTIONS;
-      const scores: Record<ParliamentFactionId, number> = {};
-      normalizedFactions.forEach((faction) => {
-        const base = Math.max(0.01, (faction.baseSupportPercent ?? 0) / 100);
-        const ideologyWeights = faction.ideologyWeightsById ?? {};
-        const statismBias = Math.max(0, (ideologyWeights.statism ?? 0) / 100);
-        const agrarianBias = Math.max(0, (ideologyWeights.agrarianism ?? 0) / 100);
-        const industrialBias = Math.max(0, (ideologyWeights.industrialism ?? 0) / 100);
-        const traditionalBias = Math.max(0, (ideologyWeights.traditionalism ?? 0) / 100);
-        const metricBoost =
-          1 +
-          (industrialBias * industryShare +
-            agrarianBias * agriShare +
-            statismBias * stateShare +
-            traditionalBias * unemploymentRate * 0.7 +
-            servicesShare * 0.05);
-        scores[faction.id] = Math.max(0.0001, base * metricBoost);
-      });
-      const { supportById, seatsById } = apportionSeatsByScore(
-        scores,
-        PARLIAMENT_TOTAL_SEATS,
-      );
-      const factions: ParliamentFactionState[] = normalizedFactions.map((faction) => {
-        const id = faction.id;
-        const baseExplanation = [
-          `Занятость в индустрии: ${(industryShare * 100).toFixed(1)}%`,
-          `Занятость в агро: ${(agriShare * 100).toFixed(1)}%`,
-          `Занятость в услугах: ${(servicesShare * 100).toFixed(1)}%`,
-          `Занятость в гос. секторе: ${(stateShare * 100).toFixed(1)}%`,
-          `Безработица: ${(unemploymentRate * 100).toFixed(1)}%`,
-          `Итоговый вес фракции: ${scores[id].toFixed(3)}`,
-        ];
-        return {
-          id,
-          name: faction.name,
-          color: faction.color,
-          notes: 'Вес фракции зависит от базовой поддержки и структуры занятости.',
-          seats: seatsById[id],
-          support: supportById[id],
-          voters: Math.round(laborSupply * supportById[id]),
-          score: scores[id],
-          explanation: baseExplanation,
-        };
-      });
-
-      return {
-        countryId,
-        totalSeats: PARLIAMENT_TOTAL_SEATS,
-        lastRecomputedTurn: atTurn,
-        factions,
-        laborSupply,
-        employed,
-        unemployed,
-      };
-    },
-    [provinces, populationByProvinceId, politicalFactions],
-  );
-
-  const recomputeParliamentStates = useCallback(
-    (atTurn: number, force = false) => {
-      setParliamentByCountryId((prev) => {
-        let changed = false;
-        const next: ParliamentByCountryId = {};
-        countries.forEach((country) => {
-          const current = prev[country.id];
-          const shouldRecompute =
-            force ||
-            !current ||
-            atTurn - (current.lastRecomputedTurn ?? 0) >= PARLIAMENT_RECOMPUTE_INTERVAL;
-          if (!shouldRecompute && current) {
-            next[country.id] = current;
-            return;
-          }
-          next[country.id] = buildParliamentStateForCountry(country.id, atTurn);
-          changed = true;
-        });
-        if (!changed && Object.keys(prev).length === Object.keys(next).length) {
-          return prev;
-        }
-        return next;
-      });
-    },
-    [countries, buildParliamentStateForCountry],
-  );
-
-  useEffect(() => {
-    if (countries.length === 0) {
-      setParliamentByCountryId({});
-      return;
-    }
-    recomputeParliamentStates(turn, false);
-  }, [countries, recomputeParliamentStates, turn]);
-
-  const updateLawIdeologyWeight = useCallback(
-    (lawId: string, ideologyId: string, value: number) => {
-      setLaws((prev) =>
-        prev.map((law) =>
-          law.id === lawId
-            ? {
-                ...law,
-                ideologyWeightsById: {
-                  ...(law.ideologyWeightsById ?? {}),
-                  [ideologyId]: Math.max(0, Math.floor(value)),
-                },
-              }
-            : law,
-        ),
-      );
-    },
-    [],
-  );
-
-  const addIdeology = useCallback((name: string, color: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setIdeologies((prev) => [...prev, { id: createId(), name: trimmed, color }]);
-  }, []);
-
-  const deleteIdeology = useCallback((ideologyId: string) => {
-    setIdeologies((prev) => prev.filter((item) => item.id !== ideologyId));
-    setPoliticalFactions((prev) =>
-      prev.map((faction) => {
-        const nextWeights = { ...(faction.ideologyWeightsById ?? {}) };
-        delete nextWeights[ideologyId];
-        return { ...faction, ideologyWeightsById: nextWeights };
-      }),
-    );
-    setLaws((prev) =>
-      prev.map((law) => {
-        const nextWeights = { ...(law.ideologyWeightsById ?? {}) };
-        delete nextWeights[ideologyId];
-        return { ...law, ideologyWeightsById: nextWeights };
-      }),
-    );
-  }, []);
-
-  const updateIdeologyColor = useCallback((ideologyId: string, color: string) => {
-    setIdeologies((prev) =>
-      prev.map((item) => (item.id === ideologyId ? { ...item, color } : item)),
-    );
-  }, []);
-
-  const addPoliticalFaction = useCallback((name: string, color: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setPoliticalFactions((prev) => [
-      ...prev,
-      {
-        id: createId(),
-        name: trimmed,
-        color,
-        baseSupportPercent: 10,
-        ideologyWeightsById: {},
-      },
-    ]);
-  }, []);
-
-  const deletePoliticalFaction = useCallback((factionId: string) => {
-    setPoliticalFactions((prev) => prev.filter((item) => item.id !== factionId));
-  }, []);
-
-  const updatePoliticalFactionField = useCallback(
-    (factionId: string, patch: Partial<PoliticalFactionDefinition>) => {
-      setPoliticalFactions((prev) =>
-        prev.map((item) => (item.id === factionId ? { ...item, ...patch } : item)),
-      );
-    },
-    [],
-  );
-
-  const updateFactionIdeologyWeight = useCallback(
-    (factionId: string, ideologyId: string, value: number) => {
-      setPoliticalFactions((prev) =>
-        prev.map((item) =>
-          item.id === factionId
-            ? {
-                ...item,
-                ideologyWeightsById: {
-                  ...(item.ideologyWeightsById ?? {}),
-                  [ideologyId]: Math.max(0, Math.floor(value)),
-                },
-              }
-            : item,
-        ),
-      );
-    },
-    [],
-  );
-
-  const proposeLawForVote = useCallback(
-    (countryId: string, lawId: string, proposedParamsById?: Record<string, number>) => {
-      if (!countryId || !lawId) return;
-      const law = laws.find((item) => item.id === lawId);
-      const currentParamsByLawId = lawPolicyParamsByCountryId[countryId] ?? {};
-      const safeProposedParamsById: Record<string, number> = {};
-      (law?.params ?? []).forEach((param) => {
-        const proposed = proposedParamsById?.[param.id];
-        const fallback = currentParamsByLawId[lawId]?.[param.id];
-        safeProposedParamsById[param.id] = sanitizeLawParamValue(
-          param,
-          proposed ?? fallback,
-        );
-      });
-      setLawStateByCountryId((prev) => {
-        const countryState = { ...(prev[countryId] ?? {}) };
-        countryState[lawId] = {
-          status: 'proposed',
-          requestedAtTurn: turn,
-          proposedParamsById: safeProposedParamsById,
-        };
-        return { ...prev, [countryId]: countryState };
-      });
-    },
-    [turn, laws, lawPolicyParamsByCountryId],
-  );
 
   const getActiveColonizationsCount = (countryId?: string) => {
     if (!countryId) return 0;
@@ -3981,137 +3410,6 @@ function App() {
     });
   };
 
-  const normalizeIdeologyWeights = (weights?: Record<string, number>) => {
-    const entries = Object.entries(weights ?? {}).filter(
-      ([ideologyId, value]) =>
-        Boolean(ideologyId) && Number.isFinite(value) && Number(value) > 0,
-    );
-    const sum = entries.reduce((acc, [, value]) => acc + Number(value), 0);
-    if (sum <= 0) return {} as Record<string, number>;
-    return Object.fromEntries(
-      entries.map(([ideologyId, value]) => [ideologyId, Number(value) / sum]),
-    ) as Record<string, number>;
-  };
-
-  const sanitizeLawParamValue = (
-    definition: LawParamDefinition,
-    rawValue: number | undefined,
-  ) => {
-    const safe =
-      rawValue == null || !Number.isFinite(rawValue)
-        ? definition.defaultValue
-        : Number(rawValue);
-    const step = definition.step && definition.step > 0 ? definition.step : 1;
-    const rounded = Math.round(safe / step) * step;
-    return Math.max(definition.min, Math.min(definition.max, rounded));
-  };
-
-  const resolveLawIdeologyVector = (
-    law: LawItem,
-    proposedParamValuesById?: Record<string, number>,
-    currentParamValuesById?: Record<string, number>,
-  ) => {
-    const baseWeights: Record<string, number> = {
-      ...(law.ideologyWeightsById ?? {}),
-    };
-    (law.params ?? []).forEach((param) => {
-      const baseline = sanitizeLawParamValue(
-        param,
-        currentParamValuesById?.[param.id] ?? param.defaultValue,
-      );
-      const proposed = sanitizeLawParamValue(
-        param,
-        proposedParamValuesById?.[param.id] ?? baseline,
-      );
-      const span = Math.max(1, param.max - param.min);
-      const centered = (proposed - baseline) / span;
-      Object.entries(param.ideologyImpactById ?? {}).forEach(([ideologyId, impact]) => {
-        baseWeights[ideologyId] = Math.max(
-          0,
-          (baseWeights[ideologyId] ?? 0) + centered * Number(impact),
-        );
-      });
-    });
-    return normalizeIdeologyWeights(baseWeights);
-  };
-
-  const resolveLawVoteForCountry = useCallback(
-    (countryId: string, lawId: string, atTurn: number): LawVoteState | undefined => {
-      const law = laws.find((item) => item.id === lawId);
-      if (!law) return undefined;
-      const parliament = parliamentByCountryId[countryId];
-      if (!parliament || parliament.factions.length === 0) return undefined;
-      const pendingState = lawStateByCountryId[countryId]?.[lawId];
-      const currentLawParams = lawPolicyParamsByCountryId[countryId]?.[lawId];
-      const lawVector = resolveLawIdeologyVector(
-        law,
-        pendingState?.proposedParamsById,
-        currentLawParams,
-      );
-      const lawIdeologyIds = new Set(Object.keys(lawVector));
-      if (lawIdeologyIds.size === 0) {
-        return {
-          status: 'rejected',
-          resolvedAtTurn: atTurn,
-          yesVotes: 0,
-          noVotes: 0,
-          abstainVotes: parliament.totalSeats,
-        };
-      }
-      let yesVotes = 0;
-      let noVotes = 0;
-      let abstainVotes = 0;
-      parliament.factions.forEach((factionState) => {
-        const factionDef = politicalFactions.find((item) => item.id === factionState.id);
-        const factionVector = normalizeIdeologyWeights(factionDef?.ideologyWeightsById);
-        const allIdeologyIds = new Set([
-          ...Object.keys(factionVector),
-          ...Object.keys(lawVector),
-        ]);
-        let alignment = 0;
-        allIdeologyIds.forEach((ideologyId) => {
-          alignment += (factionVector[ideologyId] ?? 0) * (lawVector[ideologyId] ?? 0);
-        });
-        const noiseSeed = `${atTurn}|${countryId}|${lawId}|${factionState.id}`;
-        const noiseAmplitude = LAW_VOTE_NOISE_RANGE * LAW_VOTE_VOLATILITY;
-        const noise = (seededUnitRandom(noiseSeed) * 2 - 1) * noiseAmplitude;
-        const normalizedAlignment = Math.max(0, Math.min(1, alignment * 2.5 + noise));
-        const supportShare = Math.max(0, Math.min(1, (normalizedAlignment - 0.35) / 0.65));
-        const opposeShare = Math.max(0, Math.min(1, (0.65 - normalizedAlignment) / 0.65));
-        const abstainShare = Math.max(0, 1 - supportShare - opposeShare);
-        const seats = Math.max(0, factionState.seats ?? 0);
-        let factionYes = Math.floor(seats * supportShare);
-        let factionNo = Math.floor(seats * opposeShare);
-        let factionAbstain = seats - factionYes - factionNo;
-        if (factionAbstain < 0) {
-          factionAbstain = 0;
-        }
-        const distributed = factionYes + factionNo + factionAbstain;
-        if (distributed < seats) {
-          factionAbstain += seats - distributed;
-        }
-        yesVotes += factionYes;
-        noVotes += factionNo;
-        abstainVotes += factionAbstain;
-      });
-      const status = yesVotes > noVotes ? 'passed' : 'rejected';
-      return {
-        status,
-        resolvedAtTurn: atTurn,
-        yesVotes,
-        noVotes,
-        abstainVotes,
-      };
-    },
-    [
-      laws,
-      parliamentByCountryId,
-      politicalFactions,
-      lawStateByCountryId,
-      lawPolicyParamsByCountryId,
-    ],
-  );
-
   const endTurn = () => {
     if (countries.length === 0) return;
     const currentIndex = countries.findIndex(
@@ -4122,67 +3420,15 @@ function App() {
     const wraps = nextIndex >= countries.length;
     const nextId = wraps ? countries[0]?.id : countries[nextIndex].id;
     if (wraps) {
-      const nextTurnNumber = turn + 1;
       setTurn((prev) => prev + 1);
       addEvent({
         category: 'system',
-        message: `Начался глобальный ход ${nextTurnNumber}`,
+        message: `Начался глобальный ход ${turn + 1}`,
         priority: 'low',
       });
       countries.forEach((country) => {
         applyColonizationTurn(country.id);
         applyConstructionTurn(country.id);
-      });
-      if (nextTurnNumber % PARLIAMENT_RECOMPUTE_INTERVAL === 0) {
-        recomputeParliamentStates(nextTurnNumber, true);
-        addEvent({
-          category: 'politics',
-          message: `Обновлен состав парламентов (период: ${PARLIAMENT_RECOMPUTE_INTERVAL} ходов).`,
-          priority: 'low',
-        });
-      }
-      setLawStateByCountryId((prev) => {
-        let changed = false;
-        const next: LawStateByCountryId = { ...prev };
-        countries.forEach((country) => {
-          const countryLawState = { ...(next[country.id] ?? {}) };
-          let countryChanged = false;
-          laws.forEach((law) => {
-            const state = countryLawState[law.id];
-            if (!state || state.status !== 'proposed') return;
-            const resolved = resolveLawVoteForCountry(country.id, law.id, nextTurnNumber);
-            if (!resolved) return;
-            countryLawState[law.id] = {
-              ...state,
-              ...resolved,
-            };
-            if (resolved.status === 'passed') {
-              setLawPolicyParamsByCountryId((prevParams) => {
-                const countryParams = { ...(prevParams[country.id] ?? {}) };
-                countryParams[law.id] = {
-                  ...(countryParams[law.id] ?? {}),
-                  ...(state.proposedParamsById ?? {}),
-                };
-                return { ...prevParams, [country.id]: countryParams };
-              });
-            }
-            countryChanged = true;
-            addEvent({
-              category: 'politics',
-              message:
-                resolved.status === 'passed'
-                  ? `${country.name}: закон "${law.name}" принят парламентом (${resolved.yesVotes}/${resolved.noVotes}/${resolved.abstainVotes}).`
-                  : `${country.name}: закон "${law.name}" отклонен парламентом (${resolved.yesVotes}/${resolved.noVotes}/${resolved.abstainVotes}).`,
-              countryId: country.id,
-              priority: 'medium',
-            });
-          });
-          if (countryChanged) {
-            next[country.id] = countryLawState;
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
       });
     }
     setActiveCountryId(nextId);
@@ -4465,13 +3711,6 @@ function App() {
       worldMarket,
       settings: gameSettings,
       eventLog,
-      parliamentByCountryId,
-      lawCategories,
-      laws,
-      ideologies,
-      politicalFactions,
-      lawStateByCountryId,
-      lawPolicyParamsByCountryId,
     }),
     [
       turn,
@@ -4499,13 +3738,6 @@ function App() {
       worldMarket,
       gameSettings,
       eventLog,
-      parliamentByCountryId,
-      lawCategories,
-      laws,
-      ideologies,
-      politicalFactions,
-      lawStateByCountryId,
-      lawPolicyParamsByCountryId,
     ],
   );
 
@@ -4631,22 +3863,6 @@ function App() {
       });
       return next;
     });
-    setParliamentByCountryId(save.data.parliamentByCountryId ?? {});
-    setLawCategories(
-      (save.data.lawCategories ?? DEFAULT_LAW_CATEGORIES).map((item) => ({ ...item })),
-    );
-    setLaws(normalizeLoadedLaws(save.data.laws));
-    setIdeologies(
-      (save.data.ideologies ?? DEFAULT_IDEOLOGIES).map((item) => ({ ...item })),
-    );
-    setPoliticalFactions(
-      (save.data.politicalFactions ?? DEFAULT_POLITICAL_FACTIONS).map((item) => ({
-        ...item,
-        ideologyWeightsById: { ...(item.ideologyWeightsById ?? {}) },
-      })),
-    );
-    setLawStateByCountryId(save.data.lawStateByCountryId ?? {});
-    setLawPolicyParamsByCountryId(save.data.lawPolicyParamsByCountryId ?? {});
     setMarkets(() => {
       const loaded = save.data.markets ?? [];
       const validCountryIds = new Set(
@@ -5204,18 +4420,6 @@ function App() {
     setDiplomacyAgreements([]);
     setDiplomacyProposals([]);
     setPopulationByProvinceId({});
-    setParliamentByCountryId({});
-    setLawCategories(DEFAULT_LAW_CATEGORIES.map((item) => ({ ...item })));
-    setLaws(normalizeLoadedLaws());
-    setIdeologies(DEFAULT_IDEOLOGIES.map((item) => ({ ...item })));
-    setPoliticalFactions(
-      DEFAULT_POLITICAL_FACTIONS.map((item) => ({
-        ...item,
-        ideologyWeightsById: { ...(item.ideologyWeightsById ?? {}) },
-      })),
-    );
-    setLawStateByCountryId({});
-    setLawPolicyParamsByCountryId({});
     setMarkets([]);
     setWorldMarket(createDefaultWorldMarket(cloneResources(startingData.resources)));
     setLogistics(createDefaultLogisticsState());
@@ -9106,8 +8310,7 @@ const layerPaint: MapLayerPaint = useMemo(() => {
           setPopulationPresetProvinceId(undefined);
           setPopulationOpen(true);
         }}
-        onOpenParliament={() => setParliamentOpen(true)}
-        onOpenLaws={() => setLawsOpen(true)}
+        onOpenBudget={() => setBudgetOpen(true)}
       />
       {logisticsRoutePlannerActive && (
         <div className="absolute left-1/2 -translate-x-1/2 bottom-24 z-40 rounded-xl border border-cyan-400/40 bg-[#08131f]/90 backdrop-blur px-3 py-2 flex items-center gap-2 shadow-lg shadow-cyan-900/30">
@@ -9985,32 +9188,15 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         populationByProvinceId={populationByProvinceId}
         presetProvinceId={populationPresetProvinceId}
       />
-      <ParliamentModal
-        open={parliamentOpen}
-        onClose={() => setParliamentOpen(false)}
+      <BudgetModal
+        open={budgetOpen}
+        onClose={() => setBudgetOpen(false)}
         activeCountryId={activeCountryId}
         countries={countries}
-        turn={turn}
-        recomputeInterval={PARLIAMENT_RECOMPUTE_INTERVAL}
-        parliament={
-          activeCountryId ? parliamentByCountryId[activeCountryId] : undefined
-        }
-      />
-      <LawsModal
-        open={lawsOpen}
-        onClose={() => setLawsOpen(false)}
-        activeCountryId={activeCountryId}
-        countries={countries}
-        lawCategories={lawCategories}
-        laws={laws}
-        ideologies={ideologies}
-        politicalFactions={politicalFactions}
-        lawStateByCountryId={lawStateByCountryId}
-        lawPolicyParamsByCountryId={lawPolicyParamsByCountryId}
-        parliament={
-          activeCountryId ? parliamentByCountryId[activeCountryId] : undefined
-        }
-        onProposeLawForVote={proposeLawForVote}
+        provinces={provinces}
+        buildings={buildings}
+        industries={industries}
+        gameSettings={gameSettings}
       />
       <DiplomacyModal
         open={diplomacyOpen}
@@ -10065,10 +9251,6 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         industries={industries}
         routeTypes={logistics.routeTypes}
         companies={companies}
-        lawCategories={lawCategories}
-        laws={laws}
-        ideologies={ideologies}
-        politicalFactions={politicalFactions}
         onClose={() => setAdminOpen(false)}
         onAssignOwner={assignOwner}
         onAssignClimate={assignClimate}
@@ -10165,14 +9347,6 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         onUpdateResourceCategoryIcon={updateResourceCategoryIcon}
         onUpdateResourcePricing={updateResourcePricing}
         onUpdateResourceCategory={updateResourceCategory}
-        onAddIdeology={addIdeology}
-        onDeleteIdeology={deleteIdeology}
-        onUpdateIdeologyColor={updateIdeologyColor}
-        onAddPoliticalFaction={addPoliticalFaction}
-        onDeletePoliticalFaction={deletePoliticalFaction}
-        onUpdatePoliticalFactionField={updatePoliticalFactionField}
-        onUpdateFactionIdeologyWeight={updateFactionIdeologyWeight}
-        onUpdateLawIdeologyWeight={updateLawIdeologyWeight}
         onDeleteClimate={deleteClimate}
         onDeleteReligion={deleteReligion}
         onDeleteLandscape={deleteLandscape}
