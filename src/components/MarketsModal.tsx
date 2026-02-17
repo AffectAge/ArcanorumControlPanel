@@ -5,6 +5,7 @@ import {
   Plus,
   Save,
   Send,
+  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react';
@@ -274,7 +275,7 @@ export default function MarketsModal({
   const [marketColorDraft, setMarketColorDraft] = useState('#22c55e');
   const [marketLogoDraft, setMarketLogoDraft] = useState<string | undefined>(undefined);
   const [allowInfrastructureAccessWithoutTreatiesDraft, setAllowInfrastructureAccessWithoutTreatiesDraft] =
-    useState(false);
+    useState(true);
   const [tradePolicyModalResourceId, setTradePolicyModalResourceId] = useState<
     string | undefined
   >(undefined);
@@ -395,7 +396,7 @@ export default function MarketsModal({
     }
     setCapitalProvinceIdDraft((prev) => prev || ownCountryProvinceIds[0] || '');
     setMarketColorDraft((prev) => prev || activeCountry?.color || '#22c55e');
-    setAllowInfrastructureAccessWithoutTreatiesDraft(false);
+    setAllowInfrastructureAccessWithoutTreatiesDraft(true);
   }, [open, ownMarket, activeCountry, newMarketName, ownCountryProvinceIds]);
 
   useEffect(() => {
@@ -1412,86 +1413,117 @@ export default function MarketsModal({
 
           <div className="flex-1 min-h-0 overflow-y-auto legend-scroll p-6">
             {tab === 'market' ? (
-              <div className="max-w-4xl space-y-4">
+              <div className="w-full space-y-4">
                 {!activeCountryId ? (
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-white/60 text-sm">
                     Выберите активную страну.
                   </div>
                 ) : !memberMarket ? (
                   <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
-                    <div className="text-white/85 text-sm font-semibold">Создание рынка</div>
-                    <label className="flex flex-col gap-1 text-white/70 text-sm">
-                      Название
-                      <input
-                        type="text"
-                        value={newMarketName}
-                        onChange={(event) => setNewMarketName(event.target.value)}
-                        className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm focus:outline-none focus:border-emerald-400/60"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1 text-white/70 text-sm">
-                      Столица рынка
-                      <select
-                        value={capitalProvinceIdDraft}
-                        onChange={(event) => setCapitalProvinceIdDraft(event.target.value)}
-                        className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
-                      >
-                        <option value="" className="bg-[#0b111b] text-white">
-                          Выберите провинцию
-                        </option>
-                        {ownCountryProvinceIds.map((provinceId) => (
-                          <option
-                            key={`market-capital-new:${provinceId}`}
-                            value={provinceId}
-                            className="bg-[#0b111b] text-white"
-                          >
-                            {provinceId}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="flex flex-col gap-1 text-white/70 text-sm">
-                      Цвет рынка
-                      <input
-                        type="color"
-                        value={marketColorDraft}
-                        onChange={(event) => setMarketColorDraft(event.target.value)}
-                        className="h-9 rounded-lg bg-black/40 border border-white/10 p-1"
-                      />
-                    </label>
-                    <div className="flex flex-col gap-1 text-white/70 text-sm">
-                      <span>Логотип рынка</span>
-                      <div className="rounded-lg border border-white/10 bg-black/30 p-2 flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center">
-                          {marketLogoDraft ? (
-                            <img src={marketLogoDraft} alt="Логотип рынка" className="w-full h-full object-cover" />
-                          ) : (
-                            <Globe2 className="w-5 h-5 text-white/40" />
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <label className="h-8 px-3 rounded-lg border border-white/15 bg-black/40 text-white/80 text-xs inline-flex items-center cursor-pointer hover:border-emerald-400/40 hover:text-emerald-200 transition-colors">
-                            {marketLogoDraft ? 'Заменить' : 'Выбрать'}
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(event) => handleLogoUpload(event.target.files?.[0])}
-                              className="hidden"
-                            />
-                          </label>
-                          {marketLogoDraft && (
-                            <button
-                              type="button"
-                              onClick={() => setMarketLogoDraft(undefined)}
-                              className="h-8 px-3 rounded-lg border border-rose-400/35 bg-rose-500/10 text-rose-200 text-xs inline-flex items-center hover:bg-rose-500/20 transition-colors"
-                            >
-                              Удалить
-                            </button>
-                          )}
-                        </div>
+                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-4">
+                      <div className="space-y-3">
+                    <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/[0.06] p-3">
+                      <div className="text-white/90 text-sm font-semibold">Создание рынка</div>
+                      <div className="text-white/55 text-xs mt-1">
+                        Заполните базовые параметры. Лидером и создателем будет активная страна.
                       </div>
-                      <div className="text-[11px] text-white/45">
-                        PNG/JPG/WebP. Лучше использовать квадратное изображение.
+                      <div className="flex flex-wrap gap-2 mt-2 text-[11px]">
+                        <span
+                          className={`px-2 py-1 rounded-md border ${
+                            (newMarketName.trim() || `Рынок ${activeCountry?.name ?? ''}`).trim()
+                              ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                              : 'border-rose-400/30 bg-rose-500/10 text-rose-200'
+                          }`}
+                        >
+                          Название {(newMarketName.trim() || `Рынок ${activeCountry?.name ?? ''}`).trim() ? 'готово' : 'не задано'}
+                        </span>
+                        <span
+                          className={`px-2 py-1 rounded-md border ${
+                            capitalProvinceIdDraft
+                              ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                              : 'border-rose-400/30 bg-rose-500/10 text-rose-200'
+                          }`}
+                        >
+                          Столица {capitalProvinceIdDraft ? 'выбрана' : 'не выбрана'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <label className="flex flex-col gap-1 text-white/70 text-sm">
+                        Название
+                        <input
+                          type="text"
+                          value={newMarketName}
+                          onChange={(event) => setNewMarketName(event.target.value)}
+                          className="h-9 rounded-lg bg-black/40 border border-white/10 px-3 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-white/70 text-sm">
+                        Столица рынка
+                        <select
+                          value={capitalProvinceIdDraft}
+                          onChange={(event) => setCapitalProvinceIdDraft(event.target.value)}
+                          className="h-9 rounded-lg bg-black/40 border border-white/10 px-2 text-white text-sm focus:outline-none focus:border-emerald-400/60"
+                        >
+                          <option value="" className="bg-[#0b111b] text-white">
+                            Выберите провинцию
+                          </option>
+                          {ownCountryProvinceIds.map((provinceId) => (
+                            <option
+                              key={`market-capital-new:${provinceId}`}
+                              value={provinceId}
+                              className="bg-[#0b111b] text-white"
+                            >
+                              {provinceId}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-3">
+                      <label className="flex flex-col gap-1 text-white/70 text-sm">
+                        Цвет рынка
+                        <input
+                          type="color"
+                          value={marketColorDraft}
+                          onChange={(event) => setMarketColorDraft(event.target.value)}
+                          className="h-12 w-24 rounded-lg bg-black/40 border border-white/10 p-1 cursor-pointer"
+                        />
+                      </label>
+                      <div className="flex flex-col gap-1 text-white/70 text-sm">
+                        <span>Логотип рынка</span>
+                        <div className="rounded-lg border border-white/10 bg-black/30 p-2 flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-lg border border-white/10 bg-black/40 overflow-hidden flex items-center justify-center">
+                            {marketLogoDraft ? (
+                              <img src={marketLogoDraft} alt="Логотип рынка" className="w-full h-full object-cover" />
+                            ) : (
+                              <Globe2 className="w-5 h-5 text-white/40" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <label className="h-8 px-3 rounded-lg border border-white/15 bg-black/40 text-white/80 text-xs inline-flex items-center cursor-pointer hover:border-emerald-400/40 hover:text-emerald-200 transition-colors">
+                              {marketLogoDraft ? 'Заменить' : 'Выбрать'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(event) => handleLogoUpload(event.target.files?.[0])}
+                                className="hidden"
+                              />
+                            </label>
+                            {marketLogoDraft && (
+                              <button
+                                type="button"
+                                onClick={() => setMarketLogoDraft(undefined)}
+                                className="h-8 px-3 rounded-lg border border-rose-400/35 bg-rose-500/10 text-rose-200 text-xs inline-flex items-center hover:bg-rose-500/20 transition-colors"
+                              >
+                                Удалить
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-[11px] text-white/45">
+                          PNG/JPG/WebP. Лучше использовать квадратное изображение.
+                        </div>
                       </div>
                     </div>
                     <label className="flex items-center gap-2 text-white/75 text-sm">
@@ -1541,7 +1573,8 @@ export default function MarketsModal({
                       <Plus className="w-4 h-4" />
                       Создать рынок
                     </button>
-                    <div className="pt-2 border-t border-white/10 space-y-2">
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2 h-fit">
                       <div className="text-white/85 text-sm font-semibold">
                         Попроситься в существующий рынок
                       </div>
@@ -1588,6 +1621,7 @@ export default function MarketsModal({
                           <div className="text-white/50 text-sm">Нет рынков для запроса вступления.</div>
                         )}
                       </div>
+                      </div>
                     </div>
                   </div>
                 ) : !ownMarket ? (
@@ -1622,8 +1656,10 @@ export default function MarketsModal({
                     </button>
                   </div>
                 ) : (
-                  <>
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-4 items-start">
+                      <div className="space-y-3">
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
                       <div className="text-white/85 text-sm font-semibold">Параметры рынка</div>
                       {!canEditOwnMarket && (
                         <div className="text-amber-200/90 text-xs">
@@ -1669,7 +1705,7 @@ export default function MarketsModal({
                           value={marketColorDraft}
                           onChange={(event) => setMarketColorDraft(event.target.value)}
                           disabled={!canEditOwnMarket}
-                          className="h-9 rounded-lg bg-black/40 border border-white/10 p-1 disabled:opacity-60"
+                          className="h-12 w-24 rounded-lg bg-black/40 border border-white/10 p-1 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                         />
                       </label>
                       <div className="flex flex-col gap-1 text-white/70 text-sm">
@@ -1776,7 +1812,10 @@ export default function MarketsModal({
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                      </div>
+
+                      <div className="space-y-3 w-full">
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-4 w-full">
                       <div className="text-white/85 text-sm font-semibold mb-2">Участники рынка</div>
                       <div className="mb-2 text-[11px] text-white/60">
                         Общая инфраструктура без договоров:{' '}
@@ -1835,7 +1874,7 @@ export default function MarketsModal({
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-4 w-full">
                       <div className="text-white/85 text-sm font-semibold mb-2">
                         Приглашение стран договором
                       </div>
@@ -1881,7 +1920,9 @@ export default function MarketsModal({
                         )}
                       </div>
                     </div>
-                  </>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             ) : tab === 'goods' ? (
@@ -2069,8 +2110,41 @@ export default function MarketsModal({
                           )}
                         </span>
                       </div>
-                      <div className="text-[11px] text-white/45">
-                        В строках: база на ход, расход за прошлый ход, остаток после прошлого хода.
+                      <div className="grid grid-cols-[minmax(180px,1fr)_120px_160px_120px] gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/65">
+                        <span className="uppercase tracking-wide text-white/45">Категория</span>
+                        <div className="justify-self-center">
+                          <Tooltip
+                            label="Доступно"
+                            description="Базовый объем общей инфраструктуры категории на текущий ход до списаний."
+                            side="bottom"
+                          >
+                            <span className="inline-flex justify-center uppercase tracking-wide hover:text-white/85 cursor-help">
+                              Доступно
+                            </span>
+                          </Tooltip>
+                        </div>
+                        <div className="justify-self-center">
+                          <Tooltip
+                            label="Использовано за ход"
+                            description="Сколько общей инфраструктуры этой категории было потрачено за прошлый ход."
+                            side="bottom"
+                          >
+                            <span className="inline-flex justify-center uppercase tracking-wide hover:text-white/85 cursor-help">
+                              Использовано за ход
+                            </span>
+                          </Tooltip>
+                        </div>
+                        <div className="justify-self-center">
+                          <Tooltip
+                            label="Остаток"
+                            description="Расчетный остаток после списаний прошлого хода: доступно минус использовано."
+                            side="bottom"
+                          >
+                            <span className="inline-flex justify-center uppercase tracking-wide hover:text-white/85 cursor-help">
+                              Остаток
+                            </span>
+                          </Tooltip>
+                        </div>
                       </div>
                       <div className="space-y-1">
                         {worldMarketSharedInfrastructureOverviewRows.map((row) => {
@@ -2078,7 +2152,7 @@ export default function MarketsModal({
                           return (
                             <div
                               key={`world-market-shared-infra-overview:${row.categoryId}`}
-                              className="flex items-center justify-between rounded-md border border-white/10 bg-black/25 px-2 py-1"
+                              className="grid grid-cols-[minmax(180px,1fr)_120px_160px_120px] items-center gap-2 rounded-md border border-white/10 bg-black/25 px-2 py-1.5"
                             >
                               <span className="inline-flex items-center gap-2 text-white/70">
                                 {row.iconDataUrl ? (
@@ -2095,22 +2169,20 @@ export default function MarketsModal({
                                 )}
                                 {row.name}
                               </span>
-                              <span className="inline-flex items-center gap-3">
-                                <span
-                                  className={
-                                    hasAccess
-                                      ? 'text-emerald-200 tabular-nums'
-                                      : 'text-rose-200 tabular-nums'
-                                  }
-                                >
-                                  База {formatInfrastructureAmount(row.current)}
-                                </span>
-                                <span className="text-amber-200 tabular-nums">
-                                  -{formatInfrastructureAmount(row.consumed)}
-                                </span>
-                                <span className="text-sky-200 tabular-nums">
-                                  = {formatInfrastructureAmount(row.remainingAfterLastTurn)}
-                                </span>
+                              <span
+                                className={`justify-self-center inline-flex items-center px-2 py-0.5 rounded-md border tabular-nums ${
+                                  hasAccess
+                                    ? 'text-emerald-200 border-emerald-400/30 bg-emerald-500/10'
+                                    : 'text-rose-200 border-rose-400/30 bg-rose-500/10'
+                                }`}
+                              >
+                                {formatInfrastructureAmount(row.current)}
+                              </span>
+                              <span className="justify-self-center inline-flex items-center px-2 py-0.5 rounded-md border border-amber-400/30 bg-amber-500/10 text-amber-200 tabular-nums">
+                                {formatInfrastructureAmount(row.consumed)}
+                              </span>
+                              <span className="justify-self-center inline-flex items-center px-2 py-0.5 rounded-md border border-sky-400/30 bg-sky-500/10 text-sky-200 tabular-nums">
+                                {formatInfrastructureAmount(row.remainingAfterLastTurn)}
                               </span>
                             </div>
                           );
@@ -2132,8 +2204,7 @@ export default function MarketsModal({
                         className="w-full rounded-xl border border-white/10 bg-black/30 p-3"
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-2">
-                            <div className="inline-flex items-center gap-2 text-white/90">
+                          <div className="inline-flex items-center gap-2 text-white/90">
                               {row.resourceIconDataUrl ? (
                                 <img
                                   src={row.resourceIconDataUrl}
@@ -2147,20 +2218,26 @@ export default function MarketsModal({
                                 />
                               )}
                               <span className="text-sm">{row.resourceName}</span>
-                            </div>
-                            {memberMarket && activeCountryId && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setWorldTradePolicyModalResourceId(row.resourceId);
-                                  setWorldTradePolicyTargetMode('all');
-                                  setWorldTradePolicyTargetId('');
-                                }}
-                                className="h-7 px-2.5 rounded-md border border-sky-400/35 bg-sky-500/10 text-sky-200 text-xs hover:bg-sky-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
-                              >
-                                Ограничения импорта/экспорта
-                              </button>
-                            )}
+                              {memberMarket && activeCountryId && (
+                                <Tooltip
+                                  label="Ограничения импорта/экспорта"
+                                  description="Открыть полноэкранные настройки ограничений мировой торговли для этого ресурса, включая общие правила, правила по рынкам и по странам."
+                                  side="bottom"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setWorldTradePolicyModalResourceId(row.resourceId);
+                                      setWorldTradePolicyTargetMode('all');
+                                      setWorldTradePolicyTargetId('');
+                                    }}
+                                    className="h-7 w-7 rounded-md border border-white/15 bg-black/35 text-cyan-200 inline-flex items-center justify-center hover:text-white hover:border-cyan-300/45 hover:bg-cyan-500/15 hover:shadow-[0_0_0_1px_rgba(34,211,238,0.2)] transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                                    aria-label={`Ограничения импорта/экспорта для ${row.resourceName}`}
+                                  >
+                                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                                  </button>
+                                </Tooltip>
+                              )}
                           </div>
                           <div className="flex flex-wrap items-center justify-end gap-2">
                             <MiniGraphCard
