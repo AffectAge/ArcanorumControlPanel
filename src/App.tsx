@@ -9024,6 +9024,8 @@ const layerPaint: MapLayerPaint = useMemo(() => {
         activeCountryId={activeCountryId}
         countries={countries}
         provinces={provinces}
+        buildings={buildings}
+        industries={industries}
         cultures={cultures}
         religions={religions}
         populationByProvinceId={populationByProvinceId}

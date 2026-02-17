@@ -1510,6 +1510,24 @@ export default function IndustryModal({
                         const productivityPercent = Math.round(
                           Math.max(0, Math.min(1, builtEntry?.lastProductivity ?? 0)) * 100,
                         );
+                        const laborCoveragePercent = Math.round(
+                          Math.max(
+                            0,
+                            Math.min(
+                              1,
+                              builtEntry?.lastLaborCoverage ??
+                                ((builtEntry?.lastLaborDemand ?? 0) > 0 ? 0 : 1),
+                            ),
+                          ) * 100,
+                        );
+                        const laborAssigned = Math.max(
+                          0,
+                          Math.round(builtEntry?.lastLaborAssigned ?? 0),
+                        );
+                        const laborDemand = Math.max(
+                          0,
+                          Math.round(builtEntry?.lastLaborDemand ?? 0),
+                        );
                         const ducatsDelta =
                           (builtEntry?.lastSalesRevenueDucats ?? 0) -
                           (builtEntry?.lastPurchaseCostDucats ?? 0);
@@ -1709,6 +1727,43 @@ export default function IndustryModal({
                                 </Tooltip>
                               </div>
                               {card.kind === 'built' && (
+                                <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                                  <span className="text-white/75 tabular-nums text-[11px]">
+                                    Продуктивность: {productivityPercent}%
+                                  </span>
+                                  <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full transition-all"
+                                      style={{
+                                        width: `${productivityPercent}%`,
+                                        backgroundColor: getProductivityBarColor(
+                                          productivityPercent,
+                                        ),
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="text-white/75 tabular-nums text-[11px]">
+                                    Занятость: {laborCoveragePercent}%
+                                  </span>
+                                  <div className="relative group w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full transition-all"
+                                      style={{
+                                        width: `${laborCoveragePercent}%`,
+                                        backgroundColor: getProductivityBarColor(
+                                          laborCoveragePercent,
+                                        ),
+                                      }}
+                                    />
+                                    <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                      {laborDemand > 0
+                                        ? `Занято ${laborAssigned}/${laborDemand} рабочих за ход.`
+                                        : 'Зданию не требуются рабочие.'}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              {card.kind === 'built' && (
                                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
                                   <button
                                     type="button"
@@ -1719,25 +1774,6 @@ export default function IndustryModal({
                                       Экономика
                                     </span>
                                     <span className="ml-auto flex items-center justify-end gap-1.5 text-[10px]">
-                                      <span className="relative group flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2 py-1">
-                                      <span className="text-white/75 tabular-nums">
-                                        Продуктивность: {productivityPercent}%
-                                      </span>
-                                      <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                        <div
-                                          className="h-full rounded-full transition-all"
-                                          style={{
-                                            width: `${productivityPercent}%`,
-                                            backgroundColor: getProductivityBarColor(
-                                              productivityPercent,
-                                            ),
-                                          }}
-                                        />
-                                      </div>
-                                      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                        Эффективность здания за ход.
-                                      </span>
-                                      </span>
                                       <span className="relative group rounded-lg border border-white/15 bg-black/35 px-2 py-0.5 text-white-200 tabular-nums inline-flex items-center gap-1.5">
                                       <Coins className="w-3.5 h-3.5" />
                                       {(builtEntry?.ducats ?? 0).toFixed(1)}
@@ -2192,6 +2228,24 @@ export default function IndustryModal({
                   const productivityPercent = Math.round(
                     Math.max(0, Math.min(1, builtEntry?.lastProductivity ?? 0)) * 100,
                   );
+                  const laborCoveragePercent = Math.round(
+                    Math.max(
+                      0,
+                      Math.min(
+                        1,
+                        builtEntry?.lastLaborCoverage ??
+                          ((builtEntry?.lastLaborDemand ?? 0) > 0 ? 0 : 1),
+                      ),
+                    ) * 100,
+                  );
+                  const laborAssigned = Math.max(
+                    0,
+                    Math.round(builtEntry?.lastLaborAssigned ?? 0),
+                  );
+                  const laborDemand = Math.max(
+                    0,
+                    Math.round(builtEntry?.lastLaborDemand ?? 0),
+                  );
                   const ducatsDelta =
                     (builtEntry?.lastSalesRevenueDucats ?? 0) -
                     (builtEntry?.lastPurchaseCostDucats ?? 0);
@@ -2435,6 +2489,43 @@ export default function IndustryModal({
                           </Tooltip>
                         </div>
                         {card.kind === 'built' && (
+                          <div className="rounded-lg border border-white/10 bg-black/25 px-2 py-2 space-y-1">
+                            <span className="text-white/75 tabular-nums text-[11px]">
+                              Продуктивность: {productivityPercent}%
+                            </span>
+                            <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${productivityPercent}%`,
+                                  backgroundColor: getProductivityBarColor(
+                                    productivityPercent,
+                                  ),
+                                }}
+                              />
+                            </div>
+                            <span className="text-white/75 tabular-nums text-[11px]">
+                              Занятость: {laborCoveragePercent}%
+                            </span>
+                            <div className="relative group w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{
+                                  width: `${laborCoveragePercent}%`,
+                                  backgroundColor: getProductivityBarColor(
+                                    laborCoveragePercent,
+                                  ),
+                                }}
+                              />
+                              <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                                {laborDemand > 0
+                                  ? `Занято ${laborAssigned}/${laborDemand} рабочих за ход.`
+                                  : 'Зданию не требуются рабочие.'}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {card.kind === 'built' && (
                           <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 space-y-3">
                             <button
                               type="button"
@@ -2445,25 +2536,6 @@ export default function IndustryModal({
                                 Экономика
                               </span>
                               <span className="ml-auto flex items-center justify-end gap-1.5 text-[10px]">
-                                <span className="relative group flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/35 px-2 py-1">
-                                <span className="text-white/75 tabular-nums">
-                                  Продуктивность: {productivityPercent}%
-                                </span>
-                                <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full transition-all"
-                                    style={{
-                                      width: `${productivityPercent}%`,
-                                      backgroundColor: getProductivityBarColor(
-                                        productivityPercent,
-                                      ),
-                                    }}
-                                  />
-                                </div>
-                                <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-black/90 px-2 py-1 text-[11px] text-white/80 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                                  Эффективность здания за ход.
-                                </span>
-                                </span>
                                 <span className="relative group rounded-full border border-amber-400/35 bg-amber-500/15 px-2 py-0.5 text-amber-200 tabular-nums inline-flex items-center gap-1.5">
                                 <Coins className="w-3.5 h-3.5" />
                                 {(builtEntry?.ducats ?? 0).toFixed(1)}

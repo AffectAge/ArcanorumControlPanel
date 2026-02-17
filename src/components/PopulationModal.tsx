@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react';
 import { PieChart, Users, X } from 'lucide-react';
 import Tooltip from './Tooltip';
 import type {
+  BuildingDefinition,
   Country,
+  Industry,
   PopulationByProvinceId,
-  PopulationEmploymentSector,
   ProvinceRecord,
   Trait,
 } from '../types';
@@ -15,6 +16,8 @@ type PopulationModalProps = {
   activeCountryId?: string;
   countries: Country[];
   provinces: ProvinceRecord;
+  buildings: BuildingDefinition[];
+  industries: Industry[];
   cultures: Trait[];
   religions: Trait[];
   populationByProvinceId: PopulationByProvinceId;
@@ -27,20 +30,6 @@ type ChartEntry = {
   label: string;
   value: number;
   color: string;
-};
-
-const sectorLabelById: Record<PopulationEmploymentSector, string> = {
-  industry: 'Индустрия',
-  agri: 'Аграрный',
-  services: 'Услуги',
-  state: 'Госсектор',
-};
-
-const sectorColorById: Record<PopulationEmploymentSector, string> = {
-  industry: '#38bdf8',
-  agri: '#22c55e',
-  services: '#f59e0b',
-  state: '#a78bfa',
 };
 
 const formatCompact = (value: number) => {
@@ -174,6 +163,8 @@ export default function PopulationModal({
   activeCountryId,
   countries,
   provinces,
+  buildings,
+  industries,
   cultures,
   religions,
   populationByProvinceId,
@@ -188,6 +179,14 @@ export default function PopulationModal({
   const religionById = useMemo(
     () => new Map(religions.map((item) => [item.id, item])),
     [religions],
+  );
+  const buildingById = useMemo(
+    () => new Map(buildings.map((item) => [item.id, item])),
+    [buildings],
+  );
+  const industryById = useMemo(
+    () => new Map(industries.map((item) => [item.id, item])),
+    [industries],
   );
 
   const visibleProvinceIds = useMemo(
@@ -223,12 +222,7 @@ export default function PopulationModal({
       assigned: number;
       coverage: number;
     }> = [];
-    const sectorTotals: Record<PopulationEmploymentSector, number> = {
-      industry: 0,
-      agri: 0,
-      services: 0,
-      state: 0,
-    };
+    const industryTotals = new Map<string, { name: string; color: string; value: number }>();
     let total = 0;
     let male = 0;
     let female = 0;
@@ -277,17 +271,24 @@ export default function PopulationModal({
         laborSupply += bucketSupply;
         laborEmployed += bucketEmployed;
         laborUnemployed += bucketUnemployed;
-        (Object.keys(sectorTotals) as PopulationEmploymentSector[]).forEach((sector) => {
-          const sectorAmount = Math.max(
-            0,
-            Math.floor(bucket.employmentBySector?.[sector] ?? 0),
-          );
-          sectorTotals[sector] += sectorAmount;
-        });
       });
       if (provinceTotal > 0) {
         provinceTotals.push({ provinceId, total: provinceTotal });
       }
+      built.forEach((entry) => {
+        const assigned = Math.max(0, Math.floor(entry.lastLaborAssigned ?? 0));
+        if (assigned <= 0) return;
+        const definition = buildingById.get(entry.buildingId);
+        const industryId = definition?.industryId ?? '__none__';
+        const industry = industryId === '__none__' ? undefined : industryById.get(industryId);
+        const current = industryTotals.get(industryId) ?? {
+          name: industry?.name ?? 'Без отрасли',
+          color: industry?.color ?? '#94a3b8',
+          value: 0,
+        };
+        current.value += assigned;
+        industryTotals.set(industryId, current);
+      });
       const demand = built.reduce(
         (sum, entry) => sum + Math.max(0, Math.floor(entry.lastLaborDemand ?? 0)),
         0,
@@ -335,10 +336,21 @@ export default function PopulationModal({
       laborAssigned,
       unemploymentRate: laborSupply > 0 ? laborUnemployed / laborSupply : 0,
       laborCoverageRate: laborDemand > 0 ? Math.min(1, laborAssigned / laborDemand) : 1,
-      sectorTotals,
+      topIndustries: Array.from(industryTotals.entries())
+        .map(([id, item]) => ({ id, ...item }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 12),
       provinceEmploymentRows: provinceEmploymentRows.slice(0, 150),
     };
-  }, [visibleProvinceIds, populationByProvinceId, provinces, cultureById, religionById]);
+  }, [
+    visibleProvinceIds,
+    populationByProvinceId,
+    provinces,
+    cultureById,
+    religionById,
+    buildingById,
+    industryById,
+  ]);
 
   if (!open) return null;
 
@@ -633,14 +645,14 @@ export default function PopulationModal({
                     }))}
                   />
                   <DonutChart
-                    title="Занятость по секторам"
-                    tooltip="Распределение занятых работников по секторам."
-                    entries={(Object.keys(stats.sectorTotals) as PopulationEmploymentSector[])
-                      .map((sector) => ({
-                        id: sector,
-                        label: sectorLabelById[sector],
-                        value: Math.max(0, stats.sectorTotals[sector] ?? 0),
-                        color: sectorColorById[sector],
+                    title="Занятость по отраслям"
+                    tooltip="Распределение занятых работников по вашим отраслям."
+                    entries={stats.topIndustries
+                      .map((industry) => ({
+                        id: industry.id,
+                        label: industry.name,
+                        value: industry.value,
+                        color: industry.color,
                       }))
                       .filter((entry) => entry.value > 0)}
                   />
@@ -684,14 +696,14 @@ export default function PopulationModal({
                     ]}
                   />
                   <BigBarChart
-                    title="Сектора по числу занятых"
-                    tooltip="Абсолютные значения занятости в секторах."
-                    entries={(Object.keys(stats.sectorTotals) as PopulationEmploymentSector[])
-                      .map((sector) => ({
-                        id: sector,
-                        label: sectorLabelById[sector],
-                        value: Math.max(0, stats.sectorTotals[sector] ?? 0),
-                        color: sectorColorById[sector],
+                    title="Отрасли по числу занятых"
+                    tooltip="Абсолютные значения занятости по вашим отраслям."
+                    entries={stats.topIndustries
+                      .map((industry) => ({
+                        id: industry.id,
+                        label: industry.name,
+                        value: industry.value,
+                        color: industry.color,
                       }))
                       .filter((entry) => entry.value > 0)}
                   />
